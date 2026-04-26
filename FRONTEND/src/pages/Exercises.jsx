@@ -121,7 +121,9 @@ export default function Exercises() {
                         <Space direction="vertical" size={2}>
                           <Text>{item.description}</Text>
                           {item.next_exercise_id ? (
-                            <Text type="secondary">Další v pořadí: {item.next_exercise_id}</Text>
+                            <Text type="secondary">
+                              Další v pořadí: {item.next_exercise_name}
+                            </Text>
                           ) : (
                             <Text type="secondary">Poslední cvik v pevné návaznosti</Text>
                           )}

@@ -49,6 +49,34 @@ class Exercise(BaseModel):
     levels: dict[Level, ExerciseLevel]
 
 
+class ExerciseListItem(BaseModel):
+    id: str
+    order: int
+    category: str
+    name: str
+    description: str
+    image: str
+    available_levels: list[Level]
+    next_exercise_id: str | None
+    next_exercise_name: str | None
+
+
+class ExerciseDetailResponse(BaseModel):
+    id: str
+    order: int
+    category: str
+    name: str
+    description: str
+    image: str
+    muscles: list[str]
+    frequency: str
+    correct: list[str]
+    incorrect: list[str]
+    level: Level
+    level_detail: ExerciseLevel
+    level_order: list[Level]
+
+
 EXERCISES: list[Exercise] = [
     Exercise(
         id="pushups",
@@ -232,49 +260,53 @@ def _sorted_exercises() -> list[Exercise]:
 
 
 @app.get("/api/exercises")
-def list_exercises() -> list[dict[str, str | int | list[str] | dict[str, str] | None]]:
+def list_exercises() -> list[ExerciseListItem]:
     ordered = _sorted_exercises()
     next_by_order = {
         current.id: ordered[index + 1].id if index + 1 < len(ordered) else None
         for index, current in enumerate(ordered)
     }
+    by_id = {exercise.id: exercise for exercise in ordered}
     return [
-        {
-            "id": exercise.id,
-            "order": exercise.order,
-            "category": exercise.category,
-            "name": exercise.name,
-            "description": exercise.description,
-            "image": exercise.image,
-            "available_levels": list(LEVEL_ORDER),
-            "next_exercise_id": next_by_order[exercise.id],
-        }
+        ExerciseListItem(
+            id=exercise.id,
+            order=exercise.order,
+            category=exercise.category,
+            name=exercise.name,
+            description=exercise.description,
+            image=exercise.image,
+            available_levels=list(LEVEL_ORDER),
+            next_exercise_id=next_by_order[exercise.id],
+            next_exercise_name=(
+                by_id[next_by_order[exercise.id]].name if next_by_order[exercise.id] else None
+            ),
+        )
         for exercise in ordered
     ]
 
 
 @app.get("/api/exercises/{exercise_id}")
-def get_exercise_detail(exercise_id: str, level: Level = "beginner") -> dict[str, object]:
+def get_exercise_detail(exercise_id: str, level: Level = "beginner") -> ExerciseDetailResponse:
     exercise = next((item for item in EXERCISES if item.id == exercise_id), None)
     if exercise is None:
         raise HTTPException(status_code=404, detail="Exercise not found")
 
     level_data = exercise.levels[level]
-    return {
-        "id": exercise.id,
-        "order": exercise.order,
-        "category": exercise.category,
-        "name": exercise.name,
-        "description": exercise.description,
-        "image": exercise.image,
-        "muscles": exercise.muscles,
-        "frequency": exercise.frequency,
-        "correct": exercise.correct,
-        "incorrect": exercise.incorrect,
-        "level": level,
-        "level_detail": level_data.model_dump(),
-        "level_order": list(LEVEL_ORDER),
-    }
+    return ExerciseDetailResponse(
+        id=exercise.id,
+        order=exercise.order,
+        category=exercise.category,
+        name=exercise.name,
+        description=exercise.description,
+        image=exercise.image,
+        muscles=exercise.muscles,
+        frequency=exercise.frequency,
+        correct=exercise.correct,
+        incorrect=exercise.incorrect,
+        level=level,
+        level_detail=level_data,
+        level_order=list(LEVEL_ORDER),
+    )
 
 
 @app.get("/health")
