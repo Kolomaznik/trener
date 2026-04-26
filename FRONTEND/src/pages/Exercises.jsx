@@ -154,6 +154,7 @@ export default function Exercises() {
 
     if (acceptedEvents.length > 0) {
       const lastEvent = acceptedEvents[acceptedEvents.length - 1];
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCurrentNumber(lastEvent.value);
       setEvents((prev) => [...prev, ...acceptedEvents]);
     }
@@ -167,6 +168,7 @@ export default function Exercises() {
 
   useEffect(() => {
     if (sessionState === 'listening' && isMicrophoneAvailable === false) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setErrorMessage('Mikrofon není dostupný. Povolte oprávnění mikrofonu v prohlížeči.');
     }
   }, [isMicrophoneAvailable, sessionState]);
@@ -181,7 +183,7 @@ export default function Exercises() {
   const summary = useMemo(() => sessionSummary ?? computeSessionStats(events), [events, sessionSummary]);
 
   return (
-    <Space direction="vertical" size="large" style={{ display: 'flex' }}>
+    <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
       <Typography>
         <Title>Exercises</Title>
         <Paragraph>Voice counting session for number recognition and statistics.</Paragraph>
@@ -191,7 +193,7 @@ export default function Exercises() {
         <Alert
           type="error"
           showIcon
-          message="Tento prohlížeč nepodporuje rozpoznávání řeči (Web Speech API)."
+          title="Tento prohlížeč nepodporuje rozpoznávání řeči (Web Speech API)."
         />
       )}
 
@@ -199,14 +201,14 @@ export default function Exercises() {
         <Alert
           type="warning"
           showIcon
-          message="Na mobilu používejte HTTPS, jinak mikrofon nemusí fungovat."
+          title="Na mobilu používejte HTTPS, jinak mikrofon nemusí fungovat."
         />
       )}
 
-      {errorMessage && <Alert type="error" showIcon message={errorMessage} />}
+      {errorMessage && <Alert type="error" showIcon title={errorMessage} />}
 
       <Card title="Voice counting session">
-        <Space direction="vertical" size="middle" style={{ display: 'flex' }}>
+        <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
           <Space wrap>
             <Tag color={sessionState === 'listening' ? 'green' : 'default'}>
               Stav relace: {sessionState}
@@ -245,7 +247,7 @@ export default function Exercises() {
       </Card>
 
       <Card title="Statistiky">
-        <Space direction="vertical" size="small" style={{ display: 'flex' }}>
+        <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
           <Text>Počet: {summary.count}</Text>
           <Text>Min: {summary.min ?? '---'}</Text>
           <Text>Max: {summary.max ?? '---'}</Text>

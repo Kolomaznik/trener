@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Exercises from './Exercises.jsx';
 
@@ -54,8 +54,6 @@ import * as speechModule from 'react-speech-recognition';
 describe('Exercises voice counting', () => {
   beforeEach(() => {
     speechModule.__resetMockState();
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-01-01T10:00:00.000Z'));
   });
 
   it('starts and stops session', async () => {
@@ -67,9 +65,8 @@ describe('Exercises voice counting', () => {
     expect(screen.getByText(/Stav relace: listening/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Zastavit počítání' }));
-    rerender(<Exercises />);
     expect(speechModule.__mocks.stopListening).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/Stav relace: stopped/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/Stav relace:\s*stopped/)).toBeInTheDocument());
   });
 
   it('updates number and event list from transcript', async () => {
@@ -80,9 +77,9 @@ describe('Exercises voice counting', () => {
     rerender(<Exercises />);
 
     expect(screen.getByText('Aktuální číslo')).toBeInTheDocument();
-    expect(screen.getByText('7 (7)')).toBeInTheDocument();
+    expect(screen.getByText(/7 \(7\)/)).toBeInTheDocument();
     expect(screen.getByText('Rozpoznáno čísel')).toBeInTheDocument();
-    expect(screen.getByText('1')).toBeInTheDocument();
+    expect(screen.getByText('Události (1)')).toBeInTheDocument();
   });
 
   it('ignores non-number transcript', () => {
@@ -95,7 +92,7 @@ describe('Exercises voice counting', () => {
     expect(screen.getByText('Události (0)')).toBeInTheDocument();
   });
 
-  it('resets session data', () => {
+  it('resets session data', async () => {
     const { rerender } = render(<Exercises />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Začít poslouchat' }));
@@ -105,14 +102,18 @@ describe('Exercises voice counting', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Nová relace' }));
     rerender(<Exercises />);
-    expect(screen.getByText('Události (0)')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Události (0)')).toBeInTheDocument());
   });
 
-  it('shows unsupported browser fallback and microphone permission error', () => {
+  it('shows unsupported browser fallback', () => {
     speechModule.__setMockState({ browserSupportsSpeechRecognition: false });
-    const { rerender } = render(<Exercises />);
+    render(<Exercises />);
 
     expect(screen.getByText(/nepodporuje rozpoznávání řeči/i)).toBeInTheDocument();
+  });
+
+  it('shows microphone permission error', async () => {
+    const { rerender } = render(<Exercises />);
 
     speechModule.__setMockState({
       browserSupportsSpeechRecognition: true,
@@ -120,6 +121,6 @@ describe('Exercises voice counting', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Začít poslouchat' }));
     rerender(<Exercises />);
-    expect(screen.getByText(/Mikrofon není dostupný/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/Mikrofon není dostupný/i)).toBeInTheDocument());
   });
 });
