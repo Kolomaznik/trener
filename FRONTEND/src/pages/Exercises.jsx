@@ -20,13 +20,14 @@ import {
 
 const { Title, Paragraph, Text } = Typography;
 
-function createEvent({ value, token, timestampMs }) {
+function createEvent({ value, token, timestampMs, fallbackId }) {
   return {
-    id: globalThis.crypto?.randomUUID?.() ?? `${timestampMs}-${Math.random().toString(16).slice(2)}`,
+    id: globalThis.crypto?.randomUUID?.() ?? `${timestampMs}-${fallbackId}`,
     value,
     token,
     timestampMs,
     timestampIso: new Date(timestampMs).toISOString(),
+    timeLabel: new Date(timestampMs).toLocaleTimeString('cs-CZ'),
   };
 }
 
@@ -39,7 +40,6 @@ function isHttpsRequired() {
 export default function Exercises() {
   const [sessionState, setSessionState] = useState('idle');
   const [events, setEvents] = useState([]);
-  const [currentNumber, setCurrentNumber] = useState(null);
   const [sessionStartedAt, setSessionStartedAt] = useState(null);
   const [sessionEndedAt, setSessionEndedAt] = useState(null);
   const [sessionSummary, setSessionSummary] = useState(null);
@@ -47,6 +47,7 @@ export default function Exercises() {
   const processedTokenCountRef = useRef(0);
   const previousEventRef = useRef(null);
   const wakeLockRef = useRef(null);
+  const fallbackEventIdRef = useRef(0);
 
   const {
     transcript,
@@ -70,7 +71,8 @@ export default function Exercises() {
     try {
       if (!('wakeLock' in navigator)) return;
       wakeLockRef.current = await navigator.wakeLock.request('screen');
-    } catch {
+    } catch (error) {
+      console.error('Wake lock request failed:', error);
       setErrorMessage('Nepodařilo se aktivovat wake lock. Naslouchání může být při uspání přerušeno.');
     }
   };
@@ -80,7 +82,6 @@ export default function Exercises() {
     await releaseWakeLock();
     setSessionState('idle');
     setEvents([]);
-    setCurrentNumber(null);
     setSessionStartedAt(null);
     setSessionEndedAt(null);
     setSessionSummary(null);
@@ -104,7 +105,8 @@ export default function Exercises() {
     try {
       await SpeechRecognition.startListening({ continuous: true, language: 'cs-CZ' });
       await requestWakeLock();
-    } catch {
+    } catch (error) {
+      console.error('Start listening failed:', error);
       setSessionState('idle');
       setErrorMessage('Nepodařilo se spustit naslouchání. Zkontrolujte oprávnění mikrofonu.');
     }
@@ -142,7 +144,13 @@ export default function Exercises() {
       }
 
       const timestampMs = Date.now();
-      const event = createEvent({ value: parsed.value, token: parsed.token, timestampMs });
+      fallbackEventIdRef.current += 1;
+      const event = createEvent({
+        value: parsed.value,
+        token: parsed.token,
+        timestampMs,
+        fallbackId: fallbackEventIdRef.current,
+      });
 
       if (shouldAcceptEvent(event, previousEventRef.current)) {
         acceptedEvents.push(event);
@@ -153,9 +161,7 @@ export default function Exercises() {
     }
 
     if (acceptedEvents.length > 0) {
-      const lastEvent = acceptedEvents[acceptedEvents.length - 1];
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setCurrentNumber(lastEvent.value);
       setEvents((prev) => [...prev, ...acceptedEvents]);
     }
 
@@ -167,20 +173,19 @@ export default function Exercises() {
   }, [transcript, resetTranscript, sessionState]);
 
   useEffect(() => {
-    if (sessionState === 'listening' && isMicrophoneAvailable === false) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setErrorMessage('Mikrofon není dostupný. Povolte oprávnění mikrofonu v prohlížeči.');
-    }
-  }, [isMicrophoneAvailable, sessionState]);
-
-  useEffect(() => {
     return () => {
       releaseWakeLock();
     };
   }, []);
 
   const liveCount = events.length;
+  const currentNumber = events.length > 0 ? events[events.length - 1].value : null;
   const summary = useMemo(() => sessionSummary ?? computeSessionStats(events), [events, sessionSummary]);
+  const microphoneError =
+    sessionState === 'listening' && isMicrophoneAvailable === false
+      ? 'Mikrofon není dostupný. Povolte oprávnění mikrofonu v prohlížeči.'
+      : '';
+  const displayError = errorMessage || microphoneError;
 
   return (
     <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
@@ -205,7 +210,7 @@ export default function Exercises() {
         />
       )}
 
-      {errorMessage && <Alert type="error" showIcon title={errorMessage} />}
+      {displayError && <Alert type="error" showIcon title={displayError} />}
 
       <Card title="Voice counting session">
         <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
@@ -266,7 +271,7 @@ export default function Exercises() {
           renderItem={(event) => (
             <List.Item>
               <Text>
-                {event.value} ({event.token}) – {new Date(event.timestampIso).toLocaleTimeString('cs-CZ')}
+                {event.value} ({event.token}) – {event.timeLabel}
               </Text>
             </List.Item>
           )}

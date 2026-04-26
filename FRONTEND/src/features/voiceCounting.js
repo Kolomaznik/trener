@@ -60,14 +60,14 @@ const TENS = {
   devadesat: 90,
 };
 
-const NON_WORD_EDGE = /^[^\p{L}\p{N}-]+|[^\p{L}\p{N}-]+$/gu;
+const TRIM_NON_WORD_CHARS = /^[^\p{L}\p{N}-]+|[^\p{L}\p{N}-]+$/gu;
 
 export function tokenizeTranscript(transcript) {
   if (!transcript) return [];
 
   return transcript
     .split(/\s+/)
-    .map((token) => token.toLowerCase().replace(NON_WORD_EDGE, '').trim())
+    .map((token) => token.toLowerCase().replace(TRIM_NON_WORD_CHARS, '').trim())
     .filter(Boolean);
 }
 
@@ -85,7 +85,7 @@ export function parseNumberFromTokens(tokens, index) {
 
   if (Object.hasOwn(TENS, token)) {
     const nextToken = tokens[index + 1];
-    if (nextToken && Object.hasOwn(ONES, nextToken) && ONES[nextToken] > 0) {
+    if (nextToken && Object.hasOwn(ONES, nextToken)) {
       return {
         value: TENS[token] + ONES[nextToken],
         consumed: 2,
@@ -129,7 +129,8 @@ export function computeSessionStats(events) {
   const sum = values.reduce((acc, value) => acc + value, 0);
   const frequency = events.reduce((acc, event) => {
     const key = String(event.value);
-    return { ...acc, [key]: (acc[key] ?? 0) + 1 };
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
   }, {});
   const intervalsMs = events.slice(1).map((event, idx) => event.timestampMs - events[idx].timestampMs);
 
