@@ -255,18 +255,16 @@ EXERCISES: list[Exercise] = [
 ]
 
 
-def _sorted_exercises() -> list[Exercise]:
-    return sorted(EXERCISES, key=lambda exercise: exercise.order)
+ORDERED_EXERCISES = sorted(EXERCISES, key=lambda exercise: exercise.order)
 
 
 @app.get("/api/exercises")
 def list_exercises() -> list[ExerciseListItem]:
-    ordered = _sorted_exercises()
     next_by_order = {
-        current.id: ordered[index + 1].id if index + 1 < len(ordered) else None
-        for index, current in enumerate(ordered)
+        current.id: ORDERED_EXERCISES[index + 1].id if index + 1 < len(ORDERED_EXERCISES) else None
+        for index, current in enumerate(ORDERED_EXERCISES)
     }
-    by_id = {exercise.id: exercise for exercise in ordered}
+    by_id = {exercise.id: exercise for exercise in ORDERED_EXERCISES}
     return [
         ExerciseListItem(
             id=exercise.id,
@@ -281,7 +279,7 @@ def list_exercises() -> list[ExerciseListItem]:
                 by_id[next_by_order[exercise.id]].name if next_by_order[exercise.id] else None
             ),
         )
-        for exercise in ordered
+        for exercise in ORDERED_EXERCISES
     ]
 
 

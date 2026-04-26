@@ -43,7 +43,8 @@ export default function Exercises() {
         if (data.length > 0) {
           setSelectedExerciseId((previous) => previous ?? data[0].id);
         }
-      } catch {
+      } catch (loadError) {
+        console.error(loadError);
         if (!active) return;
         setError('Nepodařilo se načíst seznam cviků.');
       } finally {
@@ -68,7 +69,8 @@ export default function Exercises() {
         const data = await fetchExerciseDetail(selectedExerciseId, selectedLevel);
         if (!active) return;
         setDetail(data);
-      } catch {
+      } catch (loadError) {
+        console.error(loadError);
         if (!active) return;
         setError('Nepodařilo se načíst detail cviku.');
       } finally {
