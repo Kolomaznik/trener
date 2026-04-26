@@ -256,15 +256,19 @@ EXERCISES: list[Exercise] = [
 
 
 ORDERED_EXERCISES = sorted(EXERCISES, key=lambda exercise: exercise.order)
+EXERCISES_BY_ID = {exercise.id: exercise for exercise in ORDERED_EXERCISES}
+NEXT_EXERCISE_ID_BY_ID = {
+    current.id: ORDERED_EXERCISES[index + 1].id if index + 1 < len(ORDERED_EXERCISES) else None
+    for index, current in enumerate(ORDERED_EXERCISES)
+}
+NEXT_EXERCISE_NAME_BY_ID = {
+    exercise_id: (EXERCISES_BY_ID[next_id].name if next_id else None)
+    for exercise_id, next_id in NEXT_EXERCISE_ID_BY_ID.items()
+}
 
 
 @app.get("/api/exercises")
 def list_exercises() -> list[ExerciseListItem]:
-    next_by_order = {
-        current.id: ORDERED_EXERCISES[index + 1].id if index + 1 < len(ORDERED_EXERCISES) else None
-        for index, current in enumerate(ORDERED_EXERCISES)
-    }
-    by_id = {exercise.id: exercise for exercise in ORDERED_EXERCISES}
     return [
         ExerciseListItem(
             id=exercise.id,
@@ -274,10 +278,8 @@ def list_exercises() -> list[ExerciseListItem]:
             description=exercise.description,
             image=exercise.image,
             available_levels=list(LEVEL_ORDER),
-            next_exercise_id=next_by_order[exercise.id],
-            next_exercise_name=(
-                by_id[next_by_order[exercise.id]].name if next_by_order[exercise.id] else None
-            ),
+            next_exercise_id=NEXT_EXERCISE_ID_BY_ID[exercise.id],
+            next_exercise_name=NEXT_EXERCISE_NAME_BY_ID[exercise.id],
         )
         for exercise in ORDERED_EXERCISES
     ]
@@ -285,7 +287,7 @@ def list_exercises() -> list[ExerciseListItem]:
 
 @app.get("/api/exercises/{exercise_id}")
 def get_exercise_detail(exercise_id: str, level: Level = "beginner") -> ExerciseDetailResponse:
-    exercise = next((item for item in EXERCISES if item.id == exercise_id), None)
+    exercise = EXERCISES_BY_ID.get(exercise_id)
     if exercise is None:
         raise HTTPException(status_code=404, detail="Exercise not found")
 
