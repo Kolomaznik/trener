@@ -4,6 +4,8 @@ import { MenuOutlined } from '@ant-design/icons';
 import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Home from './pages/Home.jsx';
 import Exercises from './pages/Exercises.jsx';
+import ExerciseCatalogList from './pages/ExerciseCatalogList.jsx';
+import ExerciseCatalogDetail from './pages/ExerciseCatalogDetail.jsx';
 
 const { Header, Content } = Layout;
 const { useBreakpoint } = Grid;
@@ -11,11 +13,13 @@ const { useBreakpoint } = Grid;
 const menuItems = [
   { key: '/', label: <Link to="/">Overview</Link> },
   { key: '/exercises', label: <Link to="/exercises">Exercises</Link> },
+  { key: '/exercise-catalog', label: <Link to="/exercise-catalog">Exercise Catalog</Link> },
 ];
 
 const drawerItems = [
   { key: '/', label: 'Overview' },
   { key: '/exercises', label: 'Exercises' },
+  { key: '/exercise-catalog', label: 'Exercise Catalog' },
 ];
 
 export default function App() {
@@ -24,6 +28,7 @@ export default function App() {
   const screens = useBreakpoint();
   const isMobile = !screens.md;
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const selectedKey = pathname.startsWith('/exercise-catalog') ? '/exercise-catalog' : pathname;
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -58,7 +63,7 @@ export default function App() {
             >
               <Menu
                 mode="vertical"
-                selectedKeys={[pathname]}
+                selectedKeys={[selectedKey]}
                 items={drawerItems}
                 onClick={({ key }) => {
                   navigate(key);
@@ -72,7 +77,7 @@ export default function App() {
           <Menu
             theme="dark"
             mode="horizontal"
-            selectedKeys={[pathname]}
+            selectedKeys={[selectedKey]}
             items={menuItems}
             style={{ flex: 1, minWidth: 0 }}
           />
@@ -85,6 +90,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/exercises" element={<Exercises />} />
+          <Route path="/exercise-catalog" element={<ExerciseCatalogList />} />
+          <Route path="/exercise-catalog/:slug" element={<ExerciseCatalogDetail />} />
         </Routes>
       </Content>
     </Layout>

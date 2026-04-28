@@ -8,7 +8,7 @@ FastAPI aplikace spravovaná pomocí [uv](https://docs.astral.sh/uv/).
 
 ## Instalace
 ```bash
-uv sync
+uv sync --group dev
 ```
 
 ## Spuštění (dev)
@@ -22,10 +22,23 @@ uv run uvicorn main:app --reload
 
 API běží na <http://127.0.0.1:8000>, dokumentace na `/docs`.
 
+## MongoDB seed/migrace cviků
+Zdroj dat: `app/db/seed_data/exercises_source.json`.
+
+Spuštění seedu:
+```bash
+uv run python -m app.db.migrations.exercises_seed
+```
+
 ## Lint
 ```bash
 uv run --group dev ruff check .
 uv run --group dev ruff format .
+```
+
+## Testy
+```bash
+uv run --group dev pytest
 ```
 
 ## Pre-commit

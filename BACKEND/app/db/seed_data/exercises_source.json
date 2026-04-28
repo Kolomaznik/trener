@@ -1,0 +1,80 @@
+{
+  "kniha": "Trénink vězně (Convict Conditioning)",
+  "cviky": {
+    "kliky": [
+      {
+        "uroven": 1,
+        "nazev": "Kliky o zeď (Wall Pushups)",
+        "popis": "Postavte se čelem ke zdi, nohy mějte u sebe. Předpažte a dlaně opřete o zeď ve výšce a šíři vašich ramen. Pokrčte lokty a s rovným tělem se pomalu spouštějte, dokud se čelo nebo hrudník lehce nedotkne zdi. Poté se plynule odtlačte zpět do výchozí pozice s nataženými pažemi.",
+        "svalove_partie": [
+          "Hrudník (velký prsní sval)",
+          "Tricepsy",
+          "Ramena (přední delty)"
+        ],
+        "kriteria_vykonu": {
+          "zacatecnik": "1 série, 10 opakování",
+          "pokrocily": "2 série, 25 opakování",
+          "expert": "3 série, 50 opakování"
+        },
+        "casovani_tempo": "2 sekundy dolů (excentrická fáze), 1 sekunda pauza ve spodní pozici, 2 sekundy nahoru (koncentrická fáze), 1 sekunda pauza v horní pozici. (Tempo 2-1-2-1)",
+        "odkaz_na_ukazku": "https://www.youtube.com/results?search_query=convict+conditioning+wall+pushups"
+      },
+      {
+        "uroven": 2,
+        "nazev": "Kliky v náklonu (Incline Pushups)",
+        "popis": "Najděte si stabilní objekt zhruba ve výšce pasu (stůl, pult, židle). Opřete se o něj rukama na šířku ramen. Nohy dejte k sobě a tělo držte v jedné přímce. Pokrčte ruce a spouštějte se dolů, dokud se hrudníkem nedotknete hrany objektu. Následně se silou vytlačte zpět do propnutých paží.",
+        "svalove_partie": [
+          "Hrudník (velký prsní sval - spodní část)",
+          "Tricepsy",
+          "Ramena",
+          "Střed těla (core) pro stabilizaci"
+        ],
+        "kriteria_vykonu": {
+          "zacatecnik": "1 série, 10 opakování",
+          "pokrocily": "2 série, 20 opakování",
+          "expert": "3 série, 40 opakování"
+        },
+        "casovani_tempo": "2 sekundy dolů, 1 sekunda pauza, 2 sekundy nahoru, 1 sekunda pauza. (Tempo 2-1-2-1)",
+        "odkaz_na_ukazku": "https://www.youtube.com/results?search_query=convict+conditioning+incline+pushups"
+      }
+    ],
+    "drepy": [
+      {
+        "uroven": 1,
+        "nazev": "Dřepy ve svíčce (Shoulderstand Squats)",
+        "popis": "Lehněte si na záda, zvedněte nohy a boky do vzduchu a podepřete si spodní část zad rukama (pozice svíčky). Váha spočívá na ramenou a horní části zad. Pokrčte kolena a pomalu je spouštějte směrem k čelu, dokud se ho nedotknou. Poté nohy plynule vytlačte zpět do rovné pozice.",
+        "svalove_partie": [
+          "Přední strana stehen (kvadricepsy)",
+          "Zadní strana stehen (hamstringy)",
+          "Hýždě",
+          "Spodní záda a břišní svaly (stabilizace)"
+        ],
+        "kriteria_vykonu": {
+          "zacatecnik": "1 série, 10 opakování",
+          "pokrocily": "2 série, 25 opakování",
+          "expert": "3 série, 50 opakování"
+        },
+        "casovani_tempo": "2 sekundy dolů (krčení kolen), 1 sekunda pauza, 2 sekundy nahoru (natahování nohou), 1 sekunda pauza. (Tempo 2-1-2-1)",
+        "odkaz_na_ukazku": "https://www.youtube.com/results?search_query=convict+conditioning+shoulderstand+squats"
+      },
+      {
+        "uroven": 2,
+        "nazev": "Dřepy typu zavírací nůž (Jackknife Squats)",
+        "popis": "Postavte se čelem ke stabilnímu objektu ve výšce kolen (např. konferenční stolek). Nohy mějte na šířku ramen. Předkloňte se v pase, nohy nechte natažené a opřete ruce o objekt. Váhu držte na nohou, ruce slouží jen k rovnováze. Pokrčte kolena a klesejte do dřepu, dokud nejsou stehna rovnoběžně se zemí (nebo dokud se zadní část stehen nedotkne lýtek). Tlakem nohou se vraťte nahoru.",
+        "svalove_partie": [
+          "Přední strana stehen (kvadricepsy)",
+          "Hýžďové svaly",
+          "Zadní strana stehen (hamstringy)",
+          "Lýtka"
+        ],
+        "kriteria_vykonu": {
+          "zacatecnik": "1 série, 10 opakování",
+          "pokrocily": "2 série, 20 opakování",
+          "expert": "3 série, 40 opakování"
+        },
+        "casovani_tempo": "2 sekundy plynule dolů do dřepu, 1 sekunda pauza dole, 2 sekundy nahoru, 1 sekunda pauza nahoře. (Tempo 2-1-2-1)",
+        "odkaz_na_ukazku": "https://www.youtube.com/results?search_query=convict+conditioning+jackknife+squats"
+      }
+    ]
+  }
+}
