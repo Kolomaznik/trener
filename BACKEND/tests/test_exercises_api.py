@@ -6,7 +6,6 @@ from app.dependencies import get_exercise_repository
 from app.factory import create_app
 from app.repositories.exercises import ExerciseRepository
 
-
 SOURCE_FIXTURE = {
     "kniha": "Test book",
     "cviky": {

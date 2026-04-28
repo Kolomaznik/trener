@@ -1,8 +1,8 @@
 import mongomock
+import pytest
 
 from app.db.migrations.exercises_seed import transform_source, validate_chain_integrity
 from app.repositories.exercises import ExerciseRepository
-
 
 SOURCE_FIXTURE = {
     "kniha": "Test book",
@@ -50,11 +50,8 @@ def test_chain_validation_fails_for_missing_level() -> None:
     docs = transform_source(SOURCE_FIXTURE)
     docs[1].metadata.level = 3
 
-    try:
+    with pytest.raises(ValueError, match="contiguous levels"):
         validate_chain_integrity(docs)
-        assert False, "Expected ValueError"
-    except ValueError as error:
-        assert "contiguous levels" in str(error)
 
 
 def test_chain_validation_fails_for_cycle() -> None:
@@ -62,8 +59,5 @@ def test_chain_validation_fails_for_cycle() -> None:
     docs[0].progression.previous_slug = docs[1].slug
     docs[1].progression.next_slug = docs[0].slug
 
-    try:
+    with pytest.raises(ValueError, match="Cycle detected"):
         validate_chain_integrity(docs)
-        assert False, "Expected ValueError"
-    except ValueError as error:
-        assert "Cycle detected" in str(error)

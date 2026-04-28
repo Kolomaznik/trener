@@ -39,9 +39,7 @@ class ExerciseRepository:
                     category=model.metadata.category,
                     level=model.metadata.level,
                     muscle_load=model.muscle_load,
-                    short_description=(
-                        model.description if len(model.description) <= 160 else f"{model.description[:157]}..."
-                    ),
+                    short_description=short_description(model.description),
                     has_video=bool(model.media.video_url),
                 )
             )
@@ -64,3 +62,9 @@ class ExerciseRepository:
             progression=model.progression,
             metadata=model.metadata,
         )
+
+
+def short_description(value: str) -> str:
+    if len(value) <= 160:
+        return value
+    return f"{value[:157]}..."

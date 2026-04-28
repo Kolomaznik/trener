@@ -7,7 +7,14 @@ from pathlib import Path
 
 from app.db.client import get_exercises_collection
 from app.repositories.exercises import ExerciseRepository
-from app.schemas.exercises import ExerciseDocument, ExerciseMetadata, Media, MuscleLoad, Progression, Tempo
+from app.schemas.exercises import (
+    ExerciseDocument,
+    ExerciseMetadata,
+    Media,
+    MuscleLoad,
+    Progression,
+    Tempo,
+)
 
 DEFAULT_SOURCE_PATH = Path(__file__).resolve().parent.parent / "seed_data" / "exercises_source.json"
 
@@ -136,9 +143,7 @@ def validate_chain_integrity(exercises: list[ExerciseDocument]) -> None:
         levels = sorted(item.metadata.level for item in items)
         expected = list(range(1, len(levels) + 1))
         if levels != expected:
-            raise ValueError(
-                f"Category '{category}' must contain contiguous levels starting at 1."
-            )
+            raise ValueError(f"Category '{category}' must contain contiguous levels starting at 1.")
 
     for exercise in exercises:
         links = [exercise.progression.previous_slug, exercise.progression.next_slug]

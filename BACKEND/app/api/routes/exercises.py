@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.dependencies import get_exercise_repository
@@ -9,7 +11,7 @@ router = APIRouter(prefix="/api/exercises", tags=["exercises"])
 
 @router.get("", response_model=ExerciseListResponse)
 def list_exercises(
-    repository: ExerciseRepository = Depends(get_exercise_repository),
+    repository: Annotated[ExerciseRepository, Depends(get_exercise_repository)],
 ) -> ExerciseListResponse:
     return ExerciseListResponse(items=repository.list_active())
 
@@ -17,7 +19,7 @@ def list_exercises(
 @router.get("/{slug}", response_model=ExerciseDetail, responses={404: {"model": ErrorResponse}})
 def get_exercise_detail(
     slug: str,
-    repository: ExerciseRepository = Depends(get_exercise_repository),
+    repository: Annotated[ExerciseRepository, Depends(get_exercise_repository)],
 ) -> ExerciseDetail:
     detail = repository.get_active_by_slug(slug)
     if detail is None:

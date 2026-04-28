@@ -21,7 +21,7 @@ export default function ExerciseCatalogList() {
         if (!active) return;
         setItems(response.items ?? []);
         setStatus('ready');
-      } catch (loadError) {
+      } catch {
         if (!active) return;
         setError('Nepodařilo se načíst katalog cviků.');
         setStatus('error');
