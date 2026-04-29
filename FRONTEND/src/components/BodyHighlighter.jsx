@@ -128,9 +128,9 @@ const BACK_MUSCLES = {
 // ---------------------------------------------------------------------------
 
 function Shape({ shape, fill, opacity, onClick }) {
-  const { type: Tag, ...props } = shape;
+  const { type: SvgEl, ...props } = shape;
   return (
-    <Tag
+    <SvgEl
       {...props}
       style={{ fill, fillOpacity: opacity, cursor: 'pointer', transition: 'fill-opacity 0.25s' }}
       onClick={onClick}
@@ -139,9 +139,9 @@ function Shape({ shape, fill, opacity, onClick }) {
 }
 
 function SelectionRing({ shape }) {
-  const { type: Tag, ...props } = shape;
+  const { type: SvgEl, ...props } = shape;
   return (
-    <Tag
+    <SvgEl
       {...props}
       style={{ fill: 'none', stroke: '#fff', strokeWidth: 2, strokeDasharray: '3 2', pointerEvents: 'none' }}
     />
@@ -307,7 +307,11 @@ export default function BodyHighlighter() {
                       <div
                         role="button"
                         aria-label={c.label}
+                        tabIndex={0}
                         onClick={() => updateSelected('color', c.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') updateSelected('color', c.value);
+                        }}
                         style={{
                           width: 28,
                           height: 28,
