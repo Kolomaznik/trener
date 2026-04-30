@@ -2,6 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from endpoints.health import router as health_router
+from endpoints.monthly_overview import router as monthly_overview_router
+from endpoints.root import router as root_router
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
@@ -22,15 +26,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
-
-
-@app.get("/")
-def root() -> dict[str, str]:
-    return {"app": settings.app_name}
+app.include_router(root_router)
+app.include_router(health_router)
+app.include_router(monthly_overview_router)
 
 
 def main() -> None:
