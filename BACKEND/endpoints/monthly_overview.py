@@ -23,7 +23,9 @@ class MonthlyOverviewQuery(BaseModel):
 
 
 @router.get("/monthly-overview", response_model=MonthlyOverviewResponse)
-def monthly_overview(month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$")) -> MonthlyOverviewResponse:
+def monthly_overview(
+    month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
+) -> MonthlyOverviewResponse:
     validated_query = MonthlyOverviewQuery(month=month)
 
     if validated_query.month is None:
@@ -35,7 +37,10 @@ def monthly_overview(month: str | None = Query(default=None, pattern=r"^\d{4}-\d
         try:
             parsed = datetime.strptime(validated_query.month, "%Y-%m")
         except ValueError as error:
-            raise HTTPException(status_code=422, detail="Parametr month musí být ve formátu YYYY-MM.") from error
+            raise HTTPException(
+                status_code=422,
+                detail="Parametr month musí být ve formátu YYYY-MM.",
+            ) from error
         year = parsed.year
         month_index = parsed.month
         normalized_month = validated_query.month

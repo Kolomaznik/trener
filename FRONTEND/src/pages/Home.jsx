@@ -26,12 +26,11 @@ export default function Home() {
 
   useEffect(() => {
     let active = true;
-    setIsLoading(true);
-    setOverviewError('');
 
     getMonthlyOverview(month)
       .then((data) => {
         if (!active) return;
+        setOverviewError('');
         setOverview(data);
       })
       .catch(() => {
