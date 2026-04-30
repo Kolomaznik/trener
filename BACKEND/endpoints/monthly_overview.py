@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+MONTH_PATTERN = r"^\d{4}-\d{2}$"
 
 
 class DailyExerciseSummary(BaseModel):
@@ -14,28 +15,22 @@ class DailyExerciseSummary(BaseModel):
 
 
 class MonthlyOverviewResponse(BaseModel):
-    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    month: str = Field(pattern=MONTH_PATTERN)
     days: list[DailyExerciseSummary]
-
-
-class MonthlyOverviewQuery(BaseModel):
-    month: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}$")
 
 
 @router.get("/monthly-overview", response_model=MonthlyOverviewResponse)
 def monthly_overview(
-    month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
+    month: str | None = Query(default=None, pattern=MONTH_PATTERN),
 ) -> MonthlyOverviewResponse:
-    validated_query = MonthlyOverviewQuery(month=month)
-
-    if validated_query.month is None:
+    if month is None:
         today = date.today()
         year = today.year
         month_index = today.month
         normalized_month = f"{year:04d}-{month_index:02d}"
     else:
         try:
-            parsed = datetime.strptime(validated_query.month, "%Y-%m")
+            parsed = datetime.strptime(month, "%Y-%m")
         except ValueError as error:
             raise HTTPException(
                 status_code=422,
@@ -43,7 +38,7 @@ def monthly_overview(
             ) from error
         year = parsed.year
         month_index = parsed.month
-        normalized_month = validated_query.month
+        normalized_month = month
 
     _, days_in_month = monthrange(year, month_index)
     generated_days = [
