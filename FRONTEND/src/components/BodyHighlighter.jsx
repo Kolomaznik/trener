@@ -1,6 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useId, useMemo, useState } from 'react';
 import { Button, Card, Col, Row, Select, Slider, Space, Tag, Tooltip, Typography } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
+import frontSvgRaw from '../assets/muscle-map-front.svg?raw';
+import backSvgRaw from '../assets/muscle-map-back.svg?raw';
+import femaleFrontSvgRaw from '../assets/muscle-map-female-front.svg?raw';
+import femaleBackSvgRaw from '../assets/muscle-map-female-back.svg?raw';
 
 const { Text } = Typography;
 
@@ -23,190 +27,199 @@ const intensityToOpacity = (i) => [0, 0.3, 0.62, 0.9][i];
 const randomColor = () => COLORS[Math.floor(Math.random() * COLORS.length)].value;
 const randomIntensity = () => Math.ceil(Math.random() * 3); // 1–3
 
-// ---------------------------------------------------------------------------
-// Muscle group meta-data
-// ---------------------------------------------------------------------------
+function parseBodySvg(svgRaw, fallbackViewBox) {
+  if (typeof DOMParser === 'undefined') {
+    return { viewBox: fallbackViewBox, pathsBySlug: {} };
+  }
+
+  const doc = new DOMParser().parseFromString(svgRaw, 'image/svg+xml');
+  const svgEl = doc.querySelector('svg');
+  if (!svgEl) {
+    return { viewBox: fallbackViewBox, pathsBySlug: {} };
+  }
+
+  const pathsBySlug = {};
+  doc.querySelectorAll('g[data-slug]').forEach((groupEl) => {
+    const slug = groupEl.getAttribute('data-slug');
+    if (!slug) return;
+    pathsBySlug[slug] = Array.from(groupEl.querySelectorAll('path'))
+      .map((pathEl) => pathEl.getAttribute('d'))
+      .filter(Boolean);
+  });
+
+  return {
+    viewBox: svgEl.getAttribute('viewBox') || fallbackViewBox,
+    pathsBySlug,
+  };
+}
+
+const FRONT_SVG = parseBodySvg(frontSvgRaw, '0 0 724 1448');
+const BACK_SVG = parseBodySvg(backSvgRaw, '724 0 724 1448');
+const FEMALE_FRONT_SVG = parseBodySvg(femaleFrontSvgRaw, '-50 -40 734 1538');
+const FEMALE_BACK_SVG = parseBodySvg(femaleBackSvgRaw, '756 0 774 1448');
 
 const MUSCLE_GROUPS = [
-  { id: 'chest', label: 'Prsní svaly', view: 'front' },
-  { id: 'deltoids', label: 'Ramena (deltoid)', view: 'both' },
-  { id: 'biceps', label: 'Biceps', view: 'front' },
-  { id: 'triceps', label: 'Triceps', view: 'back' },
-  { id: 'forearms', label: 'Předloktí', view: 'both' },
-  { id: 'abs', label: 'Břišní svaly', view: 'front' },
-  { id: 'obliques', label: 'Šikmé svaly', view: 'front' },
-  { id: 'trapezius', label: 'Trapézový sval', view: 'back' },
-  { id: 'lats', label: 'Záda (latissimus)', view: 'back' },
-  { id: 'lower_back', label: 'Dolní záda', view: 'back' },
-  { id: 'quadriceps', label: 'Stehenní svaly', view: 'front' },
-  { id: 'hamstrings', label: 'Zadní svaly stehna', view: 'back' },
-  { id: 'glutes', label: 'Hýžďové svaly', view: 'back' },
-  { id: 'calves', label: 'Lýtkové svaly', view: 'both' },
+  { id: 'chest', label: 'Prsní svaly', slugs: { front: ['chest'] } },
+  { id: 'deltoids', label: 'Ramena (deltoid)', slugs: { front: ['deltoids'], back: ['deltoids'] } },
+  { id: 'biceps', label: 'Biceps', slugs: { front: ['biceps'] } },
+  { id: 'triceps', label: 'Triceps', slugs: { front: ['triceps'], back: ['triceps'] } },
+  { id: 'forearms', label: 'Předloktí', slugs: { front: ['forearm'], back: ['forearm'] } },
+  { id: 'abs', label: 'Břišní svaly', slugs: { front: ['abs'] } },
+  { id: 'obliques', label: 'Šikmé svaly', slugs: { front: ['obliques'] } },
+  { id: 'trapezius', label: 'Trapézový sval', slugs: { front: ['trapezius'], back: ['trapezius'] } },
+  { id: 'lats', label: 'Široký sval zádový', slugs: { back: ['upper-back'] } },
+  { id: 'lower_back', label: 'Dolní záda', slugs: { back: ['lower-back'] } },
+  { id: 'quadriceps', label: 'Stehenní svaly', slugs: { front: ['quadriceps'] } },
+  { id: 'hamstrings', label: 'Zadní svaly stehna', slugs: { back: ['hamstring'] } },
+  { id: 'glutes', label: 'Hýžďové svaly', slugs: { back: ['gluteal'] } },
+  { id: 'calves', label: 'Lýtkové svaly', slugs: { front: ['calves'], back: ['calves'] } },
+  { id: 'adductors', label: 'Adduktory', slugs: { front: ['adductors'], back: ['adductors'] } },
+  { id: 'tibialis', label: 'Holenní sval', slugs: { front: ['tibialis'] } },
+  { id: 'neck', label: 'Krk', slugs: { front: ['neck'], back: ['neck'] } },
+  { id: 'knees', label: 'Kolena', slugs: { front: ['knees'] } },
+  { id: 'hands', label: 'Ruce', slugs: { front: ['hands'], back: ['hands'] } },
+  { id: 'ankles', label: 'Kotníky', slugs: { front: ['ankles'], back: ['ankles'] } },
+  { id: 'feet', label: 'Chodidla', slugs: { front: ['feet'], back: ['feet'] } },
 ];
 
 const initMuscleData = () =>
   Object.fromEntries(MUSCLE_GROUPS.map((g) => [g.id, { color: randomColor(), intensity: randomIntensity() }]));
 
-// ---------------------------------------------------------------------------
-// SVG shape data  (viewBox "0 0 120 303")
-// ---------------------------------------------------------------------------
-
-const FRONT_MUSCLES = {
-  chest: [
-    { type: 'ellipse', cx: 43, cy: 70, rx: 17, ry: 14 },
-    { type: 'ellipse', cx: 77, cy: 70, rx: 17, ry: 14 },
-  ],
-  deltoids: [
-    { type: 'ellipse', cx: 21, cy: 52, rx: 10, ry: 9 },
-    { type: 'ellipse', cx: 99, cy: 52, rx: 10, ry: 9 },
-  ],
-  biceps: [
-    { type: 'rect', x: 16, y: 68, width: 14, height: 46, rx: 6 },
-    { type: 'rect', x: 90, y: 68, width: 14, height: 46, rx: 6 },
-  ],
-  forearms: [
-    { type: 'rect', x: 14, y: 116, width: 12, height: 54, rx: 5 },
-    { type: 'rect', x: 94, y: 116, width: 12, height: 54, rx: 5 },
-  ],
-  abs: [
-    { type: 'ellipse', cx: 50, cy: 89, rx: 9, ry: 8 },
-    { type: 'ellipse', cx: 70, cy: 89, rx: 9, ry: 8 },
-    { type: 'ellipse', cx: 50, cy: 107, rx: 9, ry: 8 },
-    { type: 'ellipse', cx: 70, cy: 107, rx: 9, ry: 8 },
-    { type: 'ellipse', cx: 50, cy: 125, rx: 9, ry: 8 },
-    { type: 'ellipse', cx: 70, cy: 125, rx: 9, ry: 8 },
-  ],
-  obliques: [
-    { type: 'ellipse', cx: 36, cy: 108, rx: 9, ry: 25 },
-    { type: 'ellipse', cx: 84, cy: 108, rx: 9, ry: 25 },
-  ],
-  quadriceps: [
-    { type: 'rect', x: 32, y: 155, width: 25, height: 62, rx: 9 },
-    { type: 'rect', x: 63, y: 155, width: 25, height: 62, rx: 9 },
-  ],
-  calves: [
-    { type: 'ellipse', cx: 44, cy: 250, rx: 12, ry: 24 },
-    { type: 'ellipse', cx: 76, cy: 250, rx: 12, ry: 24 },
-  ],
+const getGroupPaths = (group, view, pathsBySlug) => {
+  const slugs = group.slugs[view] || [];
+  return slugs.flatMap((slug) => pathsBySlug[slug] || []);
 };
-
-const BACK_MUSCLES = {
-  deltoids: [
-    { type: 'ellipse', cx: 21, cy: 52, rx: 10, ry: 9 },
-    { type: 'ellipse', cx: 99, cy: 52, rx: 10, ry: 9 },
-  ],
-  triceps: [
-    { type: 'rect', x: 16, y: 68, width: 14, height: 46, rx: 6 },
-    { type: 'rect', x: 90, y: 68, width: 14, height: 46, rx: 6 },
-  ],
-  forearms: [
-    { type: 'rect', x: 14, y: 116, width: 12, height: 54, rx: 5 },
-    { type: 'rect', x: 94, y: 116, width: 12, height: 54, rx: 5 },
-  ],
-  trapezius: [{ type: 'ellipse', cx: 60, cy: 60, rx: 30, ry: 18 }],
-  lats: [
-    { type: 'ellipse', cx: 35, cy: 98, rx: 14, ry: 36 },
-    { type: 'ellipse', cx: 85, cy: 98, rx: 14, ry: 36 },
-  ],
-  lower_back: [{ type: 'rect', x: 40, y: 120, width: 40, height: 28, rx: 7 }],
-  glutes: [
-    { type: 'ellipse', cx: 43, cy: 162, rx: 20, ry: 20 },
-    { type: 'ellipse', cx: 77, cy: 162, rx: 20, ry: 20 },
-  ],
-  hamstrings: [
-    { type: 'rect', x: 32, y: 182, width: 25, height: 55, rx: 9 },
-    { type: 'rect', x: 63, y: 182, width: 25, height: 55, rx: 9 },
-  ],
-  calves: [
-    { type: 'ellipse', cx: 44, cy: 258, rx: 12, ry: 24 },
-    { type: 'ellipse', cx: 76, cy: 258, rx: 12, ry: 24 },
-  ],
-};
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-
-function Shape({ shape, fill, opacity, onClick }) {
-  const { type: SvgEl, ...props } = shape;
-  return (
-    <SvgEl
-      {...props}
-      style={{ fill, fillOpacity: opacity, cursor: 'pointer', transition: 'fill-opacity 0.25s' }}
-      onClick={onClick}
-    />
-  );
-}
-
-function SelectionRing({ shape }) {
-  const { type: SvgEl, ...props } = shape;
-  return (
-    <SvgEl
-      {...props}
-      style={{ fill: 'none', stroke: '#fff', strokeWidth: 2, strokeDasharray: '3 2', pointerEvents: 'none' }}
-    />
-  );
-}
-
-function BodySilhouette() {
-  return (
-    <g fill="#f5e6d3" stroke="#c8a882" strokeWidth="1">
-      {/* Head */}
-      <circle cx="60" cy="21" r="16" />
-      {/* Neck */}
-      <rect x="53" y="36" width="14" height="13" rx="4" />
-      {/* Shoulder bar */}
-      <rect x="21" y="46" width="78" height="14" rx="7" />
-      {/* Torso */}
-      <polygon points="30,58 90,58 88,110 86,130 90,150 30,150 34,130 32,110" />
-      {/* Left upper arm */}
-      <rect x="15" y="48" width="17" height="72" rx="7" />
-      {/* Right upper arm */}
-      <rect x="88" y="48" width="17" height="72" rx="7" />
-      {/* Left forearm */}
-      <rect x="13" y="122" width="15" height="58" rx="6" />
-      {/* Right forearm */}
-      <rect x="92" y="122" width="15" height="58" rx="6" />
-      {/* Left hand */}
-      <ellipse cx="20" cy="188" rx="8" ry="10" />
-      {/* Right hand */}
-      <ellipse cx="100" cy="188" rx="8" ry="10" />
-      {/* Left thigh */}
-      <rect x="30" y="150" width="28" height="72" rx="10" />
-      {/* Right thigh */}
-      <rect x="62" y="150" width="28" height="72" rx="10" />
-      {/* Left lower leg */}
-      <rect x="32" y="222" width="24" height="70" rx="9" />
-      {/* Right lower leg */}
-      <rect x="64" y="222" width="24" height="70" rx="9" />
-      {/* Left foot */}
-      <ellipse cx="44" cy="296" rx="15" ry="7" />
-      {/* Right foot */}
-      <ellipse cx="76" cy="296" rx="15" ry="7" />
-    </g>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
 export default function BodyHighlighter() {
-  const [view, setView] = useState('front');
+  const svgId = useId().replace(/:/g, '');
+  const [gender, setGender] = useState('male');
   const [muscleData, setMuscleData] = useState(initMuscleData);
   const [selected, setSelected] = useState(MUSCLE_GROUPS[0].id);
+  const [hoveredGroupId, setHoveredGroupId] = useState(null);
 
-  const muscles = view === 'front' ? FRONT_MUSCLES : BACK_MUSCLES;
+  const frontSvgData = gender === 'female' ? FEMALE_FRONT_SVG : FRONT_SVG;
+  const backSvgData = gender === 'female' ? FEMALE_BACK_SVG : BACK_SVG;
+  const frontPathsBySlug = frontSvgData.pathsBySlug;
+  const backPathsBySlug = backSvgData.pathsBySlug;
 
   const handleRandomize = useCallback(() => setMuscleData(initMuscleData()), []);
 
   const updateSelected = (field, value) =>
     setMuscleData((prev) => ({ ...prev, [selected]: { ...prev[selected], [field]: value } }));
 
-  const selectedData = muscleData[selected];
+  const selectedData = muscleData[selected] || { color: COLORS[0].value, intensity: 1 };
   const selectedMeta = MUSCLE_GROUPS.find((g) => g.id === selected);
+  const hoveredMeta = MUSCLE_GROUPS.find((g) => g.id === hoveredGroupId);
 
-  const visibleGroups = MUSCLE_GROUPS.filter((g) => g.view === view || g.view === 'both');
+  const visibleGroups = useMemo(
+    () =>
+      MUSCLE_GROUPS.filter(
+        (g) => getGroupPaths(g, 'front', frontPathsBySlug).length > 0 || getGroupPaths(g, 'back', backPathsBySlug).length > 0,
+      ),
+    [frontPathsBySlug, backPathsBySlug],
+  );
+
+  const renderBodyFigure = (side, svgData, pathsBySlug) => {
+    const backgroundPaths = Object.values(pathsBySlug).flatMap((paths) => paths);
+    const gradientId = `bodyGrad-${svgId}-${side}`;
+    const shadowId = `bodyShadow-${svgId}-${side}`;
+
+    return (
+      <div style={{ width: '48%' }}>
+        <Text type="secondary" style={{ display: 'block', textAlign: 'center', marginBottom: 6 }}>
+          {side === 'front' ? 'Přední' : 'Zadní'} pohled
+        </Text>
+        <svg
+          viewBox={svgData.viewBox}
+          width="100%"
+          style={{ userSelect: 'none' }}
+          aria-label={`Lidská postava, ${side === 'front' ? 'přední' : 'zadní'} pohled`}
+        >
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#f4f5f6" />
+              <stop offset="100%" stopColor="#d8dadd" />
+            </linearGradient>
+            <filter id={shadowId} x="-12%" y="-12%" width="124%" height="124%">
+              <feDropShadow dx="0" dy="1.5" stdDeviation="1.2" floodColor="#5b5e66" floodOpacity="0.25" />
+            </filter>
+          </defs>
+
+          <g>
+            {backgroundPaths.map((d, i) => (
+              <path
+                key={`bg-${side}-${i}`}
+                d={d}
+                fill={`url(#${gradientId})`}
+                fillOpacity={0.52}
+                stroke="#7f8791"
+                strokeWidth={0.45}
+                filter={`url(#${shadowId})`}
+                style={{ pointerEvents: 'none' }}
+              />
+            ))}
+          </g>
+
+          {visibleGroups.map((group) => {
+            const groupPaths = getGroupPaths(group, side, pathsBySlug);
+            const data = muscleData[group.id];
+            if (!data || data.intensity === 0 || groupPaths.length === 0) return null;
+            const opacity = intensityToOpacity(data.intensity);
+            const isSelected = group.id === selected;
+
+            return (
+              <g key={`${side}-${group.id}`}>
+                {groupPaths.map((d, i) => (
+                  <path
+                    key={i}
+                    d={d}
+                    fill={data.color}
+                    fillOpacity={opacity}
+                    stroke={isSelected ? '#ffffff' : 'none'}
+                    strokeWidth={isSelected ? 1.8 : 0}
+                    style={{ cursor: 'pointer', transition: 'fill-opacity 0.25s' }}
+                    onClick={() => setSelected(group.id)}
+                    onMouseEnter={() => setHoveredGroupId(group.id)}
+                    onMouseLeave={() => setHoveredGroupId(null)}
+                  />
+                ))}
+                {isSelected &&
+                  groupPaths.map((d, i) => (
+                    <path
+                      key={`ring-${i}`}
+                      d={d}
+                      fill="none"
+                      stroke="#ffffff"
+                      strokeWidth={1.7}
+                      strokeDasharray="4 2"
+                      style={{ pointerEvents: 'none' }}
+                    />
+                  ))}
+              </g>
+            );
+          })}
+
+          {visibleGroups.map((group) => {
+            const groupPaths = getGroupPaths(group, side, pathsBySlug);
+            if (groupPaths.length === 0) return null;
+            return (
+              <g key={`title-${side}-${group.id}`} style={{ pointerEvents: 'none' }}>
+                {groupPaths.map((d, i) => (
+                  <path key={i} d={d} fill="transparent" stroke="none">
+                    <title>{group.label}</title>
+                  </path>
+                ))}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    );
+  };
 
   return (
     <Row gutter={[24, 24]} align="top">
@@ -220,44 +233,22 @@ export default function BodyHighlighter() {
           styles={{ body: { padding: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 } }}
         >
           <Space>
-            <Button type={view === 'front' ? 'primary' : 'default'} size="small" onClick={() => setView('front')}>
-              Přední pohled
+            <Button type={gender === 'male' ? 'primary' : 'default'} size="small" onClick={() => setGender('male')}>
+              Muž
             </Button>
-            <Button type={view === 'back' ? 'primary' : 'default'} size="small" onClick={() => setView('back')}>
-              Zadní pohled
+            <Button type={gender === 'female' ? 'primary' : 'default'} size="small" onClick={() => setGender('female')}>
+              Žena
             </Button>
           </Space>
 
-          <svg
-            viewBox="0 0 120 303"
-            width="100%"
-            style={{ maxWidth: 260, userSelect: 'none' }}
-            aria-label="Lidská postava se zvýrazněnými svalovými skupinami"
-          >
-            <BodySilhouette />
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', alignItems: 'flex-start', width: '100%' }}>
+            {renderBodyFigure('front', frontSvgData, frontPathsBySlug)}
+            {renderBodyFigure('back', backSvgData, backPathsBySlug)}
+          </div>
 
-            {Object.entries(muscles).map(([groupId, shapes]) => {
-              const data = muscleData[groupId];
-              if (!data || data.intensity === 0) return null;
-              const opacity = intensityToOpacity(data.intensity);
-              const isSelected = groupId === selected;
-
-              return (
-                <g key={groupId}>
-                  {shapes.map((shape, i) => (
-                    <Shape
-                      key={i}
-                      shape={shape}
-                      fill={data.color}
-                      opacity={opacity}
-                      onClick={() => setSelected(groupId)}
-                    />
-                  ))}
-                  {isSelected && shapes.map((shape, i) => <SelectionRing key={`ring-${i}`} shape={shape} />)}
-                </g>
-              );
-            })}
-          </svg>
+          <Text type="secondary" style={{ textAlign: 'center' }}>
+            {hoveredMeta ? `Nadjeto: ${hoveredMeta.label}` : 'Najeď nebo klikni na svalovou partii v mapě.'}
+          </Text>
         </Card>
       </Col>
 

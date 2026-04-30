@@ -1,0 +1,25 @@
+{
+  "highlightableMuscleGroups": [
+    { "id": "chest", "label": "Prsní svaly", "slugs": { "front": ["chest"] } },
+    { "id": "deltoids", "label": "Ramena (deltoid)", "slugs": { "front": ["deltoids"], "back": ["deltoids"] } },
+    { "id": "biceps", "label": "Biceps", "slugs": { "front": ["biceps"] } },
+    { "id": "triceps", "label": "Triceps", "slugs": { "front": ["triceps"], "back": ["triceps"] } },
+    { "id": "forearms", "label": "Předloktí", "slugs": { "front": ["forearm"], "back": ["forearm"] } },
+    { "id": "abs", "label": "Břišní svaly", "slugs": { "front": ["abs"] } },
+    { "id": "obliques", "label": "Šikmé svaly", "slugs": { "front": ["obliques"] } },
+    { "id": "trapezius", "label": "Trapézový sval", "slugs": { "front": ["trapezius"], "back": ["trapezius"] } },
+    { "id": "lats", "label": "Široký sval zádový", "slugs": { "back": ["upper-back"] } },
+    { "id": "lower_back", "label": "Dolní záda", "slugs": { "back": ["lower-back"] } },
+    { "id": "quadriceps", "label": "Stehenní svaly", "slugs": { "front": ["quadriceps"] } },
+    { "id": "hamstrings", "label": "Zadní svaly stehna", "slugs": { "back": ["hamstring"] } },
+    { "id": "glutes", "label": "Hýžďové svaly", "slugs": { "back": ["gluteal"] } },
+    { "id": "calves", "label": "Lýtkové svaly", "slugs": { "front": ["calves"], "back": ["calves"] } },
+    { "id": "adductors", "label": "Adduktory", "slugs": { "front": ["adductors"], "back": ["adductors"] } },
+    { "id": "tibialis", "label": "Holenní sval", "slugs": { "front": ["tibialis"] } },
+    { "id": "neck", "label": "Krk", "slugs": { "front": ["neck"], "back": ["neck"] } },
+    { "id": "knees", "label": "Kolena", "slugs": { "front": ["knees"] } },
+    { "id": "hands", "label": "Ruce", "slugs": { "front": ["hands"], "back": ["hands"] } },
+    { "id": "ankles", "label": "Kotníky", "slugs": { "front": ["ankles"], "back": ["ankles"] } },
+    { "id": "feet", "label": "Chodidla", "slugs": { "front": ["feet"], "back": ["feet"] } }
+  ]
+}
