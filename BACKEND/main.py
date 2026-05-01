@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, EmailStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,6 +9,11 @@ class Settings(BaseSettings):
 
     app_name: str = "trener-backend"
     cors_origins: list[str] = ["http://localhost:5173"]
+    user_email: EmailStr = "user@example.com"
+
+
+class UserSettingsResponse(BaseModel):
+    email: EmailStr
 
 
 settings = Settings()
@@ -31,6 +37,11 @@ def health() -> dict[str, str]:
 @app.get("/")
 def root() -> dict[str, str]:
     return {"app": settings.app_name}
+
+
+@app.get("/user/settings", response_model=UserSettingsResponse)
+def user_settings() -> UserSettingsResponse:
+    return UserSettingsResponse(email=settings.user_email)
 
 
 def main() -> None:
