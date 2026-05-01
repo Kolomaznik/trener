@@ -1,5 +1,4 @@
 import json
-from functools import lru_cache
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -46,7 +45,6 @@ class MuscleMetrics(BaseModel):
     increment_since_last_exercise: int = 0
 
 
-@lru_cache
 def get_muscle_ids() -> list[str]:
     try:
         data = json.loads(settings.muscle_map_json_path.read_text(encoding="utf-8"))
@@ -62,11 +60,14 @@ def get_muscle_ids() -> list[str]:
         ) from exc
 
     groups = data.get("highlightableMuscleGroups", [])
-    return [
-        group["id"]
-        for group in groups
-        if isinstance(group, dict) and isinstance(group.get("id"), str)
-    ]
+    muscle_ids: list[str] = []
+    for group in groups:
+        if not isinstance(group, dict):
+            continue
+        muscle_id = group.get("id")
+        if isinstance(muscle_id, str):
+            muscle_ids.append(muscle_id)
+    return muscle_ids
 
 
 @app.get("/muscle-map/data", response_model=dict[str, MuscleMetrics])
