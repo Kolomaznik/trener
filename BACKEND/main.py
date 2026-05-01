@@ -1,5 +1,10 @@
-from fastapi import FastAPI
+import json
+from functools import lru_cache
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +18,9 @@ class Settings(BaseSettings):
 settings = Settings()
 
 app = FastAPI(title=settings.app_name)
+MUSCLE_MAP_JSON_PATH = (
+    Path(__file__).resolve().parents[1] / "FRONTEND" / "src" / "assets" / "muscle-map.json"
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,6 +39,34 @@ def health() -> dict[str, str]:
 @app.get("/")
 def root() -> dict[str, str]:
     return {"app": settings.app_name}
+
+
+class MuscleMetrics(BaseModel):
+    strength: int = 0
+    increment_since_last_exercise: int = 0
+
+
+@lru_cache
+def get_muscle_ids() -> list[str]:
+    try:
+        data = json.loads(MUSCLE_MAP_JSON_PATH.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to load muscle map definition.",
+        ) from exc
+
+    groups = data.get("highlightableMuscleGroups", [])
+    return [
+        group["id"]
+        for group in groups
+        if isinstance(group, dict) and isinstance(group.get("id"), str)
+    ]
+
+
+@app.get("/muscle-map/data", response_model=dict[str, MuscleMetrics])
+def muscle_map_data() -> dict[str, MuscleMetrics]:
+    return {muscle_id: MuscleMetrics() for muscle_id in get_muscle_ids()}
 
 
 def main() -> None:
