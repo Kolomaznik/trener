@@ -5,6 +5,7 @@ from config import settings
 
 router = APIRouter()
 
+
 class RootResponse(BaseModel):
     app: str
 

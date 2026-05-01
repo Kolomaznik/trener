@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.health import router as health_router
+from app.api.root import router as root_router
+from app.api.yearly_overview import router as yearly_overview_router
 from config import settings
-from endpoints.health import router as health_router
-from endpoints.monthly_overview import router as monthly_overview_router
-from endpoints.root import router as root_router
 
 app = FastAPI(title=settings.app_name)
 
@@ -18,7 +18,7 @@ app.add_middleware(
 
 app.include_router(root_router)
 app.include_router(health_router)
-app.include_router(monthly_overview_router)
+app.include_router(yearly_overview_router)
 
 
 def main() -> None:

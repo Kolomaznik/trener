@@ -1,14 +1,35 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, Divider, Flex, Grid, Spin, Tooltip, Typography } from 'antd';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Divider, Flex, Grid, Spin, Typography } from 'antd';
 import BodyHighlighter from '../components/BodyHighlighter.jsx';
-import { getMonthlyOverview } from '../api/getMonthlyOverview.js';
+import { getYearlyOverview } from '../api/getYearlyOverview.js';
 
 const { Title, Paragraph } = Typography;
-const { useBreakpoint } = Grid;
 const HEATMAP_COLORS = ['#ebedf0', '#c6e48b', '#7bc96f', '#239a3b', '#196127'];
+const MONTH_LABELS = [
+  'Led',
+  'Úno',
+  'Bře',
+  'Dub',
+  'Kvě',
+  'Čvn',
+  'Čvc',
+  'Srp',
+  'Zář',
+  'Říj',
+  'Lis',
+  'Pro',
+];
+const DAY_LABELS = [null, 'Po', null, 'St', null, 'Pá', null];
 
-function formatMonthValue(dateValue) {
-  return `${dateValue.getFullYear()}-${String(dateValue.getMonth() + 1).padStart(2, '0')}`;
+function parseISODate(value) {
+  const [y, m, d] = value.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function formatDateKey(dateValue) {
+  return `${dateValue.getFullYear()}-${String(dateValue.getMonth() + 1).padStart(2, '0')}-${String(
+    dateValue.getDate(),
+  ).padStart(2, '0')}`;
 }
 
 function getLevel(value, maxValue) {
@@ -17,131 +38,222 @@ function getLevel(value, maxValue) {
 }
 
 export default function Home() {
-  const screens = useBreakpoint();
+  const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
+  const CELL_SIZE = isMobile ? 10 : 12;
+  const CELL_GAP = isMobile ? 2 : 3;
+  const DAY_LABEL_COL = isMobile ? 22 : 26;
+
   const [overview, setOverview] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [overviewError, setOverviewError] = useState('');
-  const month = useMemo(() => formatMonthValue(new Date()), []);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const containerRef = useRef(null);
 
   useEffect(() => {
-    let active = true;
+    const node = containerRef.current;
+    if (!node) return undefined;
+    const observer = new ResizeObserver((entries) => {
+      if (entries[0]) setContainerWidth(entries[0].contentRect.width);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [isLoading]);
 
-    getMonthlyOverview(month)
+  useEffect(() => {
+    let cancelled = false;
+
+    getYearlyOverview()
       .then((data) => {
-        if (!active) return;
-        setOverviewError('');
+        if (cancelled) return;
         setOverview(data);
       })
       .catch(() => {
-        if (!active) return;
-        setOverviewError('Nepodařilo se načíst měsíční přehled cvičení.');
+        if (cancelled) return;
+        setOverviewError('Nepodařilo se načíst roční přehled cvičení.');
       })
       .finally(() => {
-        if (!active) return;
+        if (cancelled) return;
         setIsLoading(false);
       });
 
     return () => {
-      active = false;
+      cancelled = true;
     };
-  }, [month]);
+  }, []);
 
-  const heatmapColumns = useMemo(() => {
-    if (!overview?.days?.length) return [];
-    const monthDate = new Date(`${overview.month}-01T00:00:00`);
-    if (Number.isNaN(monthDate.getTime())) return [];
+  const { weeks, monthLabels } = useMemo(() => {
+    if (!overview?.start_date || !overview?.end_date) {
+      return { weeks: [], monthLabels: [] };
+    }
 
-    const dayMap = new Map(overview.days.map((day) => [day.date, day.count]));
-    const maxCount = overview.days.reduce((max, day) => Math.max(max, day.count), 0);
-    const firstDay = new Date(monthDate);
-    const lastDay = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-    const firstWeekDay = (firstDay.getDay() + 6) % 7;
-    const totalCells = Math.ceil((firstWeekDay + lastDay.getDate()) / 7) * 7;
+    const start = parseISODate(overview.start_date);
+    const end = parseISODate(overview.end_date);
+    const dayMap = new Map((overview.days ?? []).map((d) => [d.date, d.count]));
+    const maxCount = (overview.days ?? []).reduce((m, d) => Math.max(m, d.count), 0);
 
-    const cells = Array.from({ length: totalCells }, (_, index) => {
-      const dayInMonth = index - firstWeekDay + 1;
-      const inMonth = dayInMonth >= 1 && dayInMonth <= lastDay.getDate();
-      if (!inMonth) return { key: `empty-${index}`, date: null, count: 0, level: 0, inMonth: false };
+    const builtWeeks = [];
+    const cursor = new Date(start);
+    while (cursor <= end) {
+      const week = [];
+      for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+        if (cursor > end) {
+          week.push({ key: `pad-${cursor.getTime()}-${dayIndex}`, inRange: false });
+        } else {
+          const dateKey = formatDateKey(cursor);
+          const count = dayMap.get(dateKey) ?? 0;
+          week.push({
+            key: dateKey,
+            date: new Date(cursor),
+            count,
+            level: getLevel(count, maxCount),
+            inRange: true,
+          });
+        }
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      builtWeeks.push(week);
+    }
 
-      const dateValue = new Date(monthDate.getFullYear(), monthDate.getMonth(), dayInMonth);
-      const dateKey = dateValue.toISOString().slice(0, 10);
-      const count = dayMap.get(dateKey) ?? 0;
-      return {
-        key: dateKey,
-        date: dateValue,
-        count,
-        level: getLevel(count, maxCount),
-        inMonth: true,
-      };
+    const labels = [];
+    let lastMonth = -1;
+    builtWeeks.forEach((week, weekIndex) => {
+      const firstInRange = week.find((c) => c.inRange);
+      if (!firstInRange) return;
+      const monthIndex = firstInRange.date.getMonth();
+      if (monthIndex !== lastMonth && firstInRange.date.getDate() <= 7) {
+        labels.push({ weekIndex, label: MONTH_LABELS[monthIndex] });
+        lastMonth = monthIndex;
+      }
     });
 
-    return Array.from({ length: cells.length / 7 }, (_, weekIndex) =>
-      cells.slice(weekIndex * 7, weekIndex * 7 + 7),
-    );
+    return { weeks: builtWeeks, monthLabels: labels };
   }, [overview]);
 
-  const monthLabel = useMemo(() => {
-    if (!overview?.month) return '';
-    const dateValue = new Date(`${overview.month}-01T00:00:00`);
-    if (Number.isNaN(dateValue.getTime())) return overview.month;
-    return new Intl.DateTimeFormat('cs-CZ', { month: 'long', year: 'numeric' }).format(dateValue);
-  }, [overview]);
+  const { visibleWeeks, visibleMonthLabels } = useMemo(() => {
+    if (containerWidth <= 0 || weeks.length === 0) {
+      return { visibleWeeks: weeks, visibleMonthLabels: monthLabels };
+    }
+    const cellPlusGap = CELL_SIZE + CELL_GAP;
+    const available = containerWidth - DAY_LABEL_COL - CELL_GAP;
+    const maxVisible = Math.max(1, Math.floor(available / cellPlusGap));
+    const count = Math.min(weeks.length, maxVisible);
+    const offset = weeks.length - count;
+    return {
+      visibleWeeks: weeks.slice(offset),
+      visibleMonthLabels: monthLabels
+        .filter((m) => m.weekIndex >= offset)
+        .map((m) => ({ ...m, weekIndex: m.weekIndex - offset })),
+    };
+  }, [weeks, monthLabels, containerWidth, CELL_SIZE, CELL_GAP, DAY_LABEL_COL]);
 
   return (
     <Typography>
-      <Title>Overview</Title>
-      <Paragraph>Welcome to Trainer. Pick up where you left off or start a new session.</Paragraph>
-
-      <Title level={3}>Měsíční přehled cvičení</Title>
-      <Paragraph style={{ marginBottom: 8 }}>{monthLabel}</Paragraph>
-
-      {overviewError && <Alert type="error" showIcon message={overviewError} style={{ marginBottom: 12 }} />}
+      {overviewError && (
+        <Alert type="error" showIcon message={overviewError} style={{ marginBottom: 12 }} />
+      )}
 
       {isLoading ? (
-        <Spin />
-      ) : (
-        <Flex gap={4} style={{ overflowX: 'auto', paddingBottom: 8, marginBottom: 8 }}>
-          {heatmapColumns.map((week, weekIndex) => (
-            <Flex key={`week-${weekIndex}`} vertical gap={4}>
-              {week.map((cell) =>
-                cell.inMonth && cell.date ? (
-                  <Tooltip
-                    key={cell.key}
-                    title={`${cell.date.toLocaleDateString('cs-CZ')}: ${cell.count} cvičení`}
-                    mouseEnterDelay={0.1}
-                  >
-                    <div
-                      style={{
-                        width: isMobile ? 12 : 14,
-                        height: isMobile ? 12 : 14,
-                        borderRadius: 3,
-                        backgroundColor: HEATMAP_COLORS[cell.level],
-                        border: '1px solid rgba(27,31,35,0.06)',
-                      }}
-                    />
-                  </Tooltip>
-                ) : (
-                  <div
-                    key={cell.key}
-                    style={{
-                      width: isMobile ? 12 : 14,
-                      height: isMobile ? 12 : 14,
-                    }}
-                  />
-                ),
-              )}
-            </Flex>
-          ))}
+        <Flex justify="center" style={{ padding: 24 }}>
+          <Spin />
         </Flex>
+      ) : (
+        <div ref={containerRef} style={{ width: '100%' }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateRows: `auto repeat(7, auto)`,
+            gridTemplateColumns: `${DAY_LABEL_COL}px repeat(${visibleWeeks.length}, ${CELL_SIZE}px)`,
+            gap: `${CELL_GAP}px`,
+            width: 'max-content',
+          }}
+        >
+          {visibleMonthLabels.map((m) => (
+            <div
+              key={`mlbl-${m.weekIndex}`}
+              style={{
+                gridRow: 1,
+                gridColumn: m.weekIndex + 2,
+                fontSize: 11,
+                color: '#666',
+                whiteSpace: 'nowrap',
+                lineHeight: 1,
+              }}
+            >
+              {m.label}
+            </div>
+          ))}
+
+          {DAY_LABELS.map((label, i) =>
+            label ? (
+              <div
+                key={`dlbl-${i}`}
+                style={{
+                  gridRow: i + 2,
+                  gridColumn: 1,
+                  fontSize: 11,
+                  color: '#666',
+                  display: 'flex',
+                  alignItems: 'center',
+                  lineHeight: 1,
+                }}
+              >
+                {label}
+              </div>
+            ) : null,
+          )}
+
+          {visibleWeeks.map((week, weekIndex) =>
+            week.map((cell, dayIndex) =>
+              cell.inRange ? (
+                <div
+                  key={cell.key}
+                  title={`${cell.date.toLocaleDateString('cs-CZ')}: ${cell.count} cvičení`}
+                  style={{
+                    gridRow: dayIndex + 2,
+                    gridColumn: weekIndex + 2,
+                    width: CELL_SIZE,
+                    height: CELL_SIZE,
+                    backgroundColor: HEATMAP_COLORS[cell.level],
+                    borderRadius: 2,
+                    border: '1px solid rgba(27,31,35,0.06)',
+                  }}
+                />
+              ) : null,
+            ),
+          )}
+        </div>
+        </div>
       )}
+
+      <Flex
+        align="center"
+        justify="flex-end"
+        gap={4}
+        style={{ marginTop: 4, fontSize: 11, color: '#666' }}
+      >
+        <span>Méně</span>
+        {HEATMAP_COLORS.map((color, i) => (
+          <div
+            key={`legend-${i}`}
+            style={{
+              width: CELL_SIZE,
+              height: CELL_SIZE,
+              backgroundColor: color,
+              borderRadius: 2,
+              border: '1px solid rgba(27,31,35,0.06)',
+            }}
+          />
+        ))}
+        <span>Více</span>
+      </Flex>
 
       <Divider />
 
       <Title level={3}>Svalová mapa</Title>
       <Paragraph>
-        Interaktivní přehled svalových partií. Klikněte na sval nebo vyberte partii ze seznamu a upravte barvu a
-        intenzitu zvýraznění.
+        Interaktivní přehled svalových partií. Klikněte na sval nebo vyberte partii ze seznamu a
+        upravte barvu a intenzitu zvýraznění.
       </Paragraph>
       <BodyHighlighter />
     </Typography>
