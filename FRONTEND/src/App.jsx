@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button, Drawer, Grid, Layout, Menu, Spin, Typography } from 'antd';
-import { MenuOutlined } from '@ant-design/icons';
+import { MenuOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { apiClient } from './api/client.js';
 import Home from './pages/Home.jsx';
@@ -96,6 +96,7 @@ export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [authError, setAuthError] = useState('');
+  const startButtonLabel = isMobile ? 'Začít' : 'Začít cvičit';
 
   useEffect(() => {
     let cancelled = false;
@@ -180,6 +181,15 @@ export default function App() {
               style={{ marginRight: 8 }}
             />
             <span style={{ color: '#fff', fontSize: 18, fontWeight: 500 }}>Trainer</span>
+            <div style={{ flex: 1 }} />
+            <Button
+              type="primary"
+              icon={<PlayCircleOutlined />}
+              onClick={() => navigate('/exercises')}
+              size="middle"
+            >
+              {startButtonLabel}
+            </Button>
             <Drawer
               placement="left"
               open={drawerOpen}
@@ -201,13 +211,18 @@ export default function App() {
             </Drawer>
           </>
         ) : (
-          <Menu
-            theme="dark"
-            mode="horizontal"
-            selectedKeys={[pathname]}
-            items={menuItems}
-            style={{ flex: 1, minWidth: 0 }}
-          />
+          <>
+            <Menu
+              theme="dark"
+              mode="horizontal"
+              selectedKeys={[pathname]}
+              items={menuItems}
+              style={{ flex: 1, minWidth: 0 }}
+            />
+            <Button type="primary" icon={<PlayCircleOutlined />} onClick={() => navigate('/exercises')}>
+              {startButtonLabel}
+            </Button>
+          </>
         )}
       </Header>
       <Content
