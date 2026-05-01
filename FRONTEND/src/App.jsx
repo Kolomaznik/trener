@@ -26,7 +26,42 @@ const drawerItems = [
 function readTokenFromHash() {
   const hash = window.location.hash.replace(/^#/, '');
   const params = new URLSearchParams(hash);
-  return params.get('access_token') ?? '';
+  const accessToken = params.get('access_token');
+  const expiresInRaw = Number(params.get('expires_in') ?? 0);
+  const expiresAtMs =
+    Number.isFinite(expiresInRaw) && expiresInRaw > 0 ? Date.now() + expiresInRaw * 1000 : null;
+  if (!accessToken) return null;
+  return { accessToken, expiresAtMs };
+}
+
+function readValidStoredToken() {
+  const rawValue = window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+  if (!rawValue) return null;
+
+  try {
+    const parsed = JSON.parse(rawValue);
+    if (typeof parsed === 'string') {
+      return parsed.length > 0 ? parsed : null;
+    }
+
+    if (typeof parsed?.accessToken !== 'string' || parsed.accessToken.length === 0) {
+      window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+      return null;
+    }
+
+    if (typeof parsed.expiresAtMs === 'number' && parsed.expiresAtMs <= Date.now()) {
+      window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+      return null;
+    }
+
+    return parsed.accessToken;
+  } catch {
+    if (rawValue.length > 0) {
+      return rawValue;
+    }
+    window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    return null;
+  }
 }
 
 function buildGoogleOauthUrl({ clientId, redirectUri, email }) {
@@ -60,6 +95,7 @@ export default function App() {
   const isMobile = !screens.md;
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [authReady, setAuthReady] = useState(false);
+  const [authError, setAuthError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -67,16 +103,24 @@ export default function App() {
     async function ensureAuthenticated() {
       const tokenFromHash = readTokenFromHash();
       if (tokenFromHash) {
-        window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, tokenFromHash);
+        window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, JSON.stringify(tokenFromHash));
         window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
       }
 
-      const savedToken = window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+      const savedToken = readValidStoredToken();
       const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
       const redirectUri = import.meta.env.VITE_GOOGLE_REDIRECT_URI;
 
-      if (savedToken || !clientId || !redirectUri) {
+      if (savedToken) {
         if (!cancelled) setAuthReady(true);
+        return;
+      }
+
+      if (!clientId || !redirectUri) {
+        if (!cancelled) {
+          setAuthError('Google OAuth is not configured. Please set VITE_GOOGLE_CLIENT_ID and VITE_GOOGLE_REDIRECT_URI.');
+          setAuthReady(true);
+        }
         return;
       }
 
@@ -97,7 +141,17 @@ export default function App() {
       <Layout style={{ minHeight: '100vh' }}>
         <Content style={{ display: 'grid', placeItems: 'center', padding: 24, gap: 16 }}>
           <Spin size="large" />
-          <Text>Redirecting to Google authentication…</Text>
+          <Text>Redirecting to Google authentication...</Text>
+        </Content>
+      </Layout>
+    );
+  }
+
+  if (authError) {
+    return (
+      <Layout style={{ minHeight: '100vh' }}>
+        <Content style={{ display: 'grid', placeItems: 'center', padding: 24 }}>
+          <Text type="danger">{authError}</Text>
         </Content>
       </Layout>
     );
