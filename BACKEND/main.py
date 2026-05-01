@@ -13,14 +13,14 @@ class Settings(BaseSettings):
 
     app_name: str = "trener-backend"
     cors_origins: list[str] = ["http://localhost:5173"]
+    muscle_map_json_path: Path = (
+        Path(__file__).resolve().parents[1] / "FRONTEND" / "src" / "assets" / "muscle-map.json"
+    )
 
 
 settings = Settings()
 
 app = FastAPI(title=settings.app_name)
-MUSCLE_MAP_JSON_PATH = (
-    Path(__file__).resolve().parents[1] / "FRONTEND" / "src" / "assets" / "muscle-map.json"
-)
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,11 +49,16 @@ class MuscleMetrics(BaseModel):
 @lru_cache
 def get_muscle_ids() -> list[str]:
     try:
-        data = json.loads(MUSCLE_MAP_JSON_PATH.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        data = json.loads(settings.muscle_map_json_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
         raise HTTPException(
             status_code=500,
-            detail="Failed to load muscle map definition.",
+            detail=f"Muscle map file not found: {settings.muscle_map_json_path}",
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Invalid JSON in muscle map file: {settings.muscle_map_json_path}",
         ) from exc
 
     groups = data.get("highlightableMuscleGroups", [])
