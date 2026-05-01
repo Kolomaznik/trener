@@ -83,7 +83,7 @@ async function fetchUserEmail() {
     const response = await apiClient.get('/user/settings');
     return response.data?.email ?? '';
   } catch (error) {
-    console.error('Failed to load user settings:', error);
+    console.warn('Unable to load user settings for login_hint, continuing without it.', error);
     return '';
   }
 }
@@ -118,7 +118,7 @@ export default function App() {
 
       if (!clientId || !redirectUri) {
         if (!cancelled) {
-          setAuthError('Google OAuth is not configured. Please set VITE_GOOGLE_CLIENT_ID and VITE_GOOGLE_REDIRECT_URI.');
+          setAuthError('Authentication is currently unavailable. Please contact support.');
           setAuthReady(true);
         }
         return;
