@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Exercises from './Exercises.jsx';
 
@@ -7,101 +8,91 @@ vi.mock('../api/client.js', () => ({
   fetchExerciseDetail: vi.fn(),
 }));
 
-import { fetchExerciseDetail, fetchExercises } from '../api/client.js';
+import { fetchExercises } from '../api/client.js';
 
 const listFixture = [
   {
-    id: 'pushups',
-    order: 1,
-    category: 'Kliky',
-    name: 'Kliky',
-    description: 'Tlakový cvik.',
-    image: '/favicon.svg',
-    available_levels: ['beginner', 'advanced', 'expert'],
-    next_exercise_id: 'squats',
-    next_exercise_name: 'Dřepy',
+    id: 'pushups_level_1',
+    name: 'Kliky o zeď',
+    family: 'Kliky',
+    level: 1,
+    description: 'Rehabilitační a přípravný cvik.',
+    next_exercise_id: 'pushups_level_2',
+    next_exercise_name: 'Kliky v předklonu',
   },
   {
-    id: 'squats',
-    order: 2,
-    category: 'Dřepy',
-    name: 'Dřepy',
-    description: 'Cvik na nohy.',
-    image: '/favicon.svg',
-    available_levels: ['beginner', 'advanced', 'expert'],
+    id: 'pushups_level_2',
+    name: 'Kliky v předklonu',
+    family: 'Kliky',
+    level: 2,
+    description: 'Náročnější varianta.',
     next_exercise_id: null,
     next_exercise_name: null,
   },
 ];
 
-function detailFixture({ id = 'pushups', level = 'beginner', title = 'Začátečník' } = {}) {
-  return {
-    id,
-    order: 1,
-    category: id === 'pushups' ? 'Kliky' : 'Dřepy',
-    name: id === 'pushups' ? 'Kliky' : 'Dřepy',
-    description: id === 'pushups' ? 'Tlakový cvik.' : 'Cvik na nohy.',
-    image: '/favicon.svg',
-    muscles: ['hrudník', 'triceps'],
-    frequency: '2–4x týdně',
-    correct: ['Rovná linie těla'],
-    incorrect: ['Propadlá bedra'],
-    level,
-    level_detail: { title, reps: '3 série po 8–12', note: 'Drž techniku.' },
-    level_order: ['beginner', 'advanced', 'expert'],
-  };
+function renderWithRouter(initialPath = '/exercises') {
+  return render(
+    <MemoryRouter initialEntries={[initialPath]}>
+      <Routes>
+        <Route path="/exercises" element={<Exercises />} />
+        <Route path="/exercises/:id" element={<div data-testid="detail-marker" />} />
+      </Routes>
+    </MemoryRouter>,
+  );
 }
 
-describe('Exercises page', () => {
+describe('Exercises page (tile grid)', () => {
   beforeEach(() => {
     fetchExercises.mockReset();
-    fetchExerciseDetail.mockReset();
     fetchExercises.mockResolvedValue(listFixture);
-    fetchExerciseDetail.mockResolvedValue(detailFixture());
   });
 
-  it('renders the list of exercises after loading', async () => {
-    render(<Exercises />);
+  it('renders tiles for each exercise', async () => {
+    renderWithRouter();
 
     await waitFor(() => expect(fetchExercises).toHaveBeenCalledTimes(1));
-    expect(await screen.findByText('1. Kliky')).toBeInTheDocument();
-    expect(screen.getByText('2. Dřepy')).toBeInTheDocument();
-    expect(screen.getByText(/Další v pořadí: Dřepy/)).toBeInTheDocument();
-    expect(screen.getByText('Poslední cvik v pevné návaznosti')).toBeInTheDocument();
+    expect(await screen.findByText('Kliky o zeď')).toBeInTheDocument();
+    expect(screen.getByText('Kliky v předklonu')).toBeInTheDocument();
+    expect(screen.getAllByText('Kliky').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/Level \d/).length).toBeGreaterThanOrEqual(2);
   });
 
-  it('auto-loads detail of the first exercise', async () => {
-    render(<Exercises />);
+  it('shows "next level" hint on tiles that have one, "highest" otherwise', async () => {
+    renderWithRouter();
 
-    await waitFor(() =>
-      expect(fetchExerciseDetail).toHaveBeenCalledWith('pushups', 'beginner'),
-    );
     expect(
-      await screen.findByText(/3 série po 8–12/, undefined, { timeout: 3000 }),
+      await screen.findByText(/Další úroveň: Kliky v předklonu/),
     ).toBeInTheDocument();
+    expect(screen.getByText('Nejvyšší úroveň této rodiny')).toBeInTheDocument();
   });
 
-  it('loads detail when another exercise is clicked', async () => {
-    fetchExerciseDetail.mockImplementation(async (id, level) =>
-      detailFixture({ id, level, title: level === 'beginner' ? 'Začátečník' : 'Pokročilý' }),
-    );
-    render(<Exercises />);
+  it('navigates to detail when a tile is clicked', async () => {
+    renderWithRouter();
 
-    await screen.findByText('1. Kliky');
-    fetchExerciseDetail.mockClear();
-    fireEvent.click(screen.getByText('2. Dřepy'));
+    const tile = await screen.findByRole('button', {
+      name: 'Otevřít cvik Kliky o zeď',
+    });
+    fireEvent.click(tile);
 
-    await waitFor(() =>
-      expect(fetchExerciseDetail).toHaveBeenCalledWith('squats', 'beginner'),
-    );
+    expect(await screen.findByTestId('detail-marker')).toBeInTheDocument();
   });
 
-  it('shows an error alert when list fails to load', async () => {
+  it('shows error alert when list fails to load', async () => {
     fetchExercises.mockRejectedValue(new Error('boom'));
-    render(<Exercises />);
+    renderWithRouter();
 
     expect(
       await screen.findByText('Nepodařilo se načíst seznam cviků.'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows empty state when no exercises in DB', async () => {
+    fetchExercises.mockResolvedValue([]);
+    renderWithRouter();
+
+    expect(
+      await screen.findByText('Žádné cviky v databázi.'),
     ).toBeInTheDocument();
   });
 });

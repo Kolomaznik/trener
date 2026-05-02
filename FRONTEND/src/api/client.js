@@ -39,9 +39,7 @@ export async function fetchExercises() {
   return response.data;
 }
 
-export async function fetchExerciseDetail(exerciseId, level) {
-  const response = await apiClient.get(`/exercises/${exerciseId}`, {
-    params: { level },
-  });
+export async function fetchExerciseDetail(exerciseId) {
+  const response = await apiClient.get(`/exercises/${exerciseId}`);
   return response.data;
 }

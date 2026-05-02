@@ -12,5 +12,19 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:github.com)"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/ruff-postedit.ps1",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
   }
 }

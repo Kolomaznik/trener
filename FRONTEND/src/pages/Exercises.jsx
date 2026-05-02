@@ -1,217 +1,121 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Alert,
   Card,
   Col,
-  List,
+  Empty,
   Row,
-  Segmented,
   Skeleton,
   Space,
   Tag,
   Typography,
 } from 'antd';
-import { fetchExerciseDetail, fetchExercises } from '../api/client.js';
+import { fetchExercises } from '../api/client.js';
 
 const { Title, Paragraph, Text } = Typography;
 
-function levelLabel(level) {
-  if (level === 'beginner') return 'Začátečník';
-  if (level === 'advanced') return 'Pokročilý';
-  return 'Expert';
-}
-
 export default function Exercises() {
+  const navigate = useNavigate();
   const [exercises, setExercises] = useState([]);
-  const [selectedExerciseId, setSelectedExerciseId] = useState(null);
-  const [selectedLevel, setSelectedLevel] = useState('beginner');
-  const [detail, setDetail] = useState(null);
-  const [loadingList, setLoadingList] = useState(true);
-  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     let active = true;
-
-    async function loadExercises() {
-      setLoadingList(true);
-      setError(null);
-      try {
-        const data = await fetchExercises();
+    setLoading(true);
+    setError(null);
+    fetchExercises()
+      .then((data) => {
+        if (active) setExercises(data);
+      })
+      .catch((err) => {
         if (!active) return;
-        setExercises(data);
-        if (data.length > 0) {
-          setSelectedExerciseId((previous) => previous ?? data[0].id);
-        }
-      } catch (loadError) {
-        console.error('Failed to load exercises:', loadError);
-        if (!active) return;
+        console.error('Failed to load exercises:', err);
         setError('Nepodařilo se načíst seznam cviků.');
-      } finally {
-        if (active) setLoadingList(false);
-      }
-    }
-
-    loadExercises();
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
     return () => {
       active = false;
     };
   }, []);
 
-  useEffect(() => {
-    let active = true;
-
-    async function loadDetail() {
-      if (!selectedExerciseId) return;
-      setLoadingDetail(true);
-      setError(null);
-      try {
-        const data = await fetchExerciseDetail(selectedExerciseId, selectedLevel);
-        if (!active) return;
-        setDetail(data);
-      } catch (loadError) {
-        console.error('Failed to load exercise detail:', loadError);
-        if (!active) return;
-        setError('Nepodařilo se načíst detail cviku.');
-      } finally {
-        if (active) setLoadingDetail(false);
-      }
-    }
-
-    loadDetail();
-    return () => {
-      active = false;
-    };
-  }, [selectedExerciseId, selectedLevel]);
-
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <Typography>
-        <Title level={2}>Cviky – Trénink vězně</Title>
+        <Title level={2}>Cviky</Title>
         <Paragraph>
-          MVP obsahuje jen základní cviky z knihy: kliky, dřepy, shyby, zvedání nohou, mosty a
-          stojky.
+          Vyberte cvik z dlaždic níže. Detail s instrukcemi, tempem a svalovou mapou se otevře
+          po kliknutí.
         </Paragraph>
       </Typography>
 
       {error && <Alert type="error" message={error} showIcon />}
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} md={10}>
-          <Card title="Seznam cviků">
-            {loadingList ? (
-              <Skeleton active paragraph={{ rows: 6 }} />
-            ) : (
-              <List
-                dataSource={exercises}
-                renderItem={(item) => (
-                  <List.Item
-                    style={{
-                      cursor: 'pointer',
-                      background: selectedExerciseId === item.id ? '#f5f5f5' : 'transparent',
-                      borderRadius: 8,
-                      paddingInline: 12,
-                    }}
-                    onClick={() => {
-                      setSelectedExerciseId(item.id);
-                      setSelectedLevel('beginner');
-                    }}
-                  >
-                    <List.Item.Meta
-                      title={`${item.order}. ${item.category}`}
-                      description={
-                        <Space direction="vertical" size={2}>
-                          <Text>{item.description}</Text>
-                          {item.next_exercise_id ? (
-                            <Text type="secondary">
-                              Další v pořadí: {item.next_exercise_name}
-                            </Text>
-                          ) : (
-                            <Text type="secondary">Poslední cvik v pevné návaznosti</Text>
-                          )}
-                        </Space>
-                      }
-                    />
-                  </List.Item>
-                )}
+      {loading ? (
+        <Row gutter={[16, 16]}>
+          {[0, 1, 2].map((i) => (
+            <Col key={i} xs={24} sm={12} lg={8}>
+              <Card>
+                <Skeleton active paragraph={{ rows: 3 }} />
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      ) : exercises.length === 0 ? (
+        <Empty description="Žádné cviky v databázi." />
+      ) : (
+        <Row gutter={[16, 16]}>
+          {exercises.map((item) => (
+            <Col key={item.id} xs={24} sm={12} lg={8}>
+              <ExerciseTile
+                item={item}
+                onClick={() => navigate(`/exercises/${item.id}`)}
               />
-            )}
-          </Card>
-        </Col>
-
-        <Col xs={24} md={14}>
-          <Card title="Detail cviku">
-            {loadingDetail || !detail ? (
-              <Skeleton active paragraph={{ rows: 8 }} />
-            ) : (
-              <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                <Space direction="vertical" size={4}>
-                  <Title level={3} style={{ margin: 0 }}>
-                    {detail.name}
-                  </Title>
-                  <Text type="secondary">{detail.category}</Text>
-                </Space>
-
-                <Paragraph style={{ marginBottom: 0 }}>{detail.description}</Paragraph>
-                <Text>
-                  <strong>Frekvence:</strong> {detail.frequency}
-                </Text>
-
-                <div>
-                  <Text strong>Zapojené svaly:</Text>
-                  <div style={{ marginTop: 8 }}>
-                    {detail.muscles.map((muscle) => (
-                      <Tag key={muscle}>{muscle}</Tag>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <Text strong>Úroveň:</Text>
-                  <div style={{ marginTop: 8 }}>
-                    <Segmented
-                      value={selectedLevel}
-                      options={detail.level_order.map((level) => ({
-                        value: level,
-                        label: levelLabel(level),
-                      }))}
-                      onChange={(value) => setSelectedLevel(value)}
-                    />
-                  </div>
-                </div>
-
-                <Card size="small" title={detail.level_detail.title}>
-                  <Paragraph style={{ marginBottom: 8 }}>
-                    <strong>Dávkování:</strong> {detail.level_detail.reps}
-                  </Paragraph>
-                  <Paragraph style={{ marginBottom: 0 }}>{detail.level_detail.note}</Paragraph>
-                </Card>
-
-                <Row gutter={[16, 16]}>
-                  <Col xs={24} sm={12}>
-                    <Card size="small" title="Správně">
-                      <ul style={{ margin: 0, paddingLeft: 18 }}>
-                        {detail.correct.map((item) => (
-                          <li key={item}>{item}</li>
-                        ))}
-                      </ul>
-                    </Card>
-                  </Col>
-                  <Col xs={24} sm={12}>
-                    <Card size="small" title="Špatně">
-                      <ul style={{ margin: 0, paddingLeft: 18 }}>
-                        {detail.incorrect.map((item) => (
-                          <li key={item}>{item}</li>
-                        ))}
-                      </ul>
-                    </Card>
-                  </Col>
-                </Row>
-              </Space>
-            )}
-          </Card>
-        </Col>
-      </Row>
+            </Col>
+          ))}
+        </Row>
+      )}
     </Space>
+  );
+}
+
+function ExerciseTile({ item, onClick }) {
+  return (
+    <Card
+      hoverable
+      onClick={onClick}
+      role="button"
+      aria-label={`Otevřít cvik ${item.name}`}
+      styles={{ body: { padding: 16 } }}
+      style={{ height: '100%' }}
+    >
+      <Space direction="vertical" size={8} style={{ width: '100%' }}>
+        <Space size={4} wrap>
+          <Tag color="blue">{item.family}</Tag>
+          <Tag>Level {item.level}</Tag>
+        </Space>
+        <Title level={4} style={{ margin: 0 }}>
+          {item.name}
+        </Title>
+        <Paragraph
+          style={{ marginBottom: 0 }}
+          ellipsis={{ rows: 3, expandable: false, tooltip: item.description }}
+        >
+          {item.description}
+        </Paragraph>
+        {item.next_exercise_id ? (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Další úroveň: {item.next_exercise_name}
+          </Text>
+        ) : (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Nejvyšší úroveň této rodiny
+          </Text>
+        )}
+      </Space>
+    </Card>
   );
 }

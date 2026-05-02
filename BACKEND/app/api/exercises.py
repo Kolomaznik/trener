@@ -1,289 +1,137 @@
-from typing import Literal
+from typing import Any
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from pymongo.database import Database
+
+from app.db import get_db
 
 router = APIRouter(prefix="/exercises", tags=["exercises"])
 
-Level = Literal["beginner", "advanced", "expert"]
-LEVEL_ORDER: tuple[Level, ...] = ("beginner", "advanced", "expert")
+
+class Cadence(BaseModel):
+    eccentric_sec: int
+    pause_bottom_sec: int
+    concentric_sec: int
+    pause_top_sec: int
+    total_rep_time_sec: int
+    coach_note: str
 
 
-class ExerciseLevel(BaseModel):
-    title: str
-    reps: str
-    note: str
+class ProgressionGoal(BaseModel):
+    sets: int
+    reps: int
 
 
-class Exercise(BaseModel):
-    id: str
-    order: int
-    category: str
-    name: str
-    description: str
-    image: str
-    muscles: list[str]
-    frequency: str
-    correct: list[str]
-    incorrect: list[str]
-    levels: dict[Level, ExerciseLevel]
+class ProgressionGoals(BaseModel):
+    beginner: ProgressionGoal
+    intermediate: ProgressionGoal
+    mastery: ProgressionGoal
+    coach_note: str
+
+
+class Media(BaseModel):
+    youtube_tutorial: str | None = None
+    thumbnail_url: str | None = None
 
 
 class ExerciseListItem(BaseModel):
     id: str
-    order: int
-    category: str
     name: str
+    family: str
+    level: int
     description: str
-    image: str
-    available_levels: list[Level]
-    next_exercise_id: str | None
-    next_exercise_name: str | None
+    next_exercise_id: str | None = None
+    next_exercise_name: str | None = None
 
 
 class ExerciseDetailResponse(BaseModel):
     id: str
-    order: int
-    category: str
     name: str
+    english_name: str | None = None
+    family: str
+    level: int
     description: str
-    image: str
-    muscles: list[str]
-    frequency: str
-    correct: list[str]
-    incorrect: list[str]
-    level: Level
-    level_detail: ExerciseLevel
-    level_order: list[Level]
+    instructions: list[str] = Field(default_factory=list)
+    media: Media | None = None
+    cadence: Cadence | None = None
+    progression_goals: ProgressionGoals | None = None
+    muscle_engagement_percent: dict[str, int] = Field(default_factory=dict)
+    next_exercise_id: str | None = None
+    next_exercise_name: str | None = None
 
 
-EXERCISES: list[Exercise] = [
-    Exercise(
-        id="pushups",
-        order=1,
-        category="Kliky",
-        name="Kliky",
-        description="Základní tlakový cvik na hrudník, ramena a triceps.",
-        image="/favicon.svg",
-        muscles=["hrudník", "triceps", "ramena", "střed těla"],
-        frequency="2–4x týdně",
-        correct=["Rovná linie těla od hlavy po paty", "Kontrolovaný pohyb bez zhoupnutí"],
-        incorrect=["Propadlá bedra", "Lokty příliš do stran"],
-        levels={
-            "beginner": ExerciseLevel(
-                title="Začátečník",
-                reps="3 série po 8–12 opakováních",
-                note="Zaměř se na techniku a plný rozsah pohybu.",
-            ),
-            "advanced": ExerciseLevel(
-                title="Pokročilý",
-                reps="4 série po 12–20 opakováních",
-                note="Přidej pomalejší negativní fázi nebo pauzu dole.",
-            ),
-            "expert": ExerciseLevel(
-                title="Expert",
-                reps="5 sérií po 20+ opakováních",
-                note="Udržuj čistou techniku i při vysokém objemu.",
-            ),
-        },
-    ),
-    Exercise(
-        id="squats",
-        order=2,
-        category="Dřepy",
-        name="Dřepy",
-        description="Základní cvik na nohy a sílu spodní části těla.",
-        image="/favicon.svg",
-        muscles=["kvadricepsy", "hýždě", "hamstringy", "střed těla"],
-        frequency="2–4x týdně",
-        correct=["Kolena sledují směr špiček", "Plná kontrola pohybu nahoru i dolů"],
-        incorrect=["Zvedání pat od země", "Kulacení zad"],
-        levels={
-            "beginner": ExerciseLevel(
-                title="Začátečník",
-                reps="3 série po 10–15 opakováních",
-                note="Začni stabilním postojem na šířku ramen.",
-            ),
-            "advanced": ExerciseLevel(
-                title="Pokročilý",
-                reps="4 série po 15–25 opakováních",
-                note="Přidej pauzu ve spodní pozici pro vyšší kontrolu.",
-            ),
-            "expert": ExerciseLevel(
-                title="Expert",
-                reps="5 sérií po 25+ opakováních",
-                note="Pracuj s vysokou kvalitou i únavou.",
-            ),
-        },
-    ),
-    Exercise(
-        id="pullups",
-        order=3,
-        category="Shyby",
-        name="Shyby",
-        description="Tahový cvik rozvíjející záda, biceps a sílu úchopu.",
-        image="/favicon.svg",
-        muscles=["široký sval zádový", "biceps", "zadní delty", "předloktí"],
-        frequency="2–3x týdně",
-        correct=["Aktivní lopatky před tahem", "Brada nad hrazdu bez švihu"],
-        incorrect=["Kipping a houpání", "Nedokončený rozsah pohybu"],
-        levels={
-            "beginner": ExerciseLevel(
-                title="Začátečník",
-                reps="3 série po 3–6 opakováních",
-                note="Použij asistenci a drž čistý tah.",
-            ),
-            "advanced": ExerciseLevel(
-                title="Pokročilý",
-                reps="4 série po 6–10 opakováních",
-                note="Kontroluj spouštění po každém opakování.",
-            ),
-            "expert": ExerciseLevel(
-                title="Expert",
-                reps="5 sérií po 10+ opakováních",
-                note="Přidej tempo nebo izometrické výdrže.",
-            ),
-        },
-    ),
-    Exercise(
-        id="leg-raises",
-        order=4,
-        category="Zvedání nohou",
-        name="Zvedání nohou",
-        description="Cvik na břišní svaly a přední stabilizaci trupu.",
-        image="/favicon.svg",
-        muscles=["přímý břišní sval", "ohýbače kyčlí", "hluboký stabilizační systém"],
-        frequency="2–4x týdně",
-        correct=["Bedra pod kontrolou", "Plynulý pohyb bez švihu"],
-        incorrect=["Prohnutí v bedrech", "Nekontrolované spouštění nohou"],
-        levels={
-            "beginner": ExerciseLevel(
-                title="Začátečník",
-                reps="3 série po 8–12 opakováních",
-                note="Začni s pokrčenými koleny, pokud je potřeba.",
-            ),
-            "advanced": ExerciseLevel(
-                title="Pokročilý",
-                reps="4 série po 12–18 opakováních",
-                note="Drž nohy rovné a pohyb kontrolovaný.",
-            ),
-            "expert": ExerciseLevel(
-                title="Expert",
-                reps="5 sérií po 18+ opakováních",
-                note="Přidej pauzu v horní fázi.",
-            ),
-        },
-    ),
-    Exercise(
-        id="bridges",
-        order=5,
-        category="Mosty",
-        name="Mosty",
-        description="Cvik na zadní řetězec a mobilitu páteře.",
-        image="/favicon.svg",
-        muscles=["hýždě", "vztyčovače páteře", "hamstringy", "ramena"],
-        frequency="2–3x týdně",
-        correct=["Plynulý nástup do mostu", "Aktivní zapojení hýždí"],
-        incorrect=["Tlak jen do beder", "Nedostatečná kontrola dechu"],
-        levels={
-            "beginner": ExerciseLevel(
-                title="Začátečník",
-                reps="3 série po 6–10 opakováních",
-                note="Začni glute bridge variantou na zemi.",
-            ),
-            "advanced": ExerciseLevel(
-                title="Pokročilý",
-                reps="4 série po 10–15 opakováních",
-                note="Postupně navyšuj rozsah a stabilitu ramen.",
-            ),
-            "expert": ExerciseLevel(
-                title="Expert",
-                reps="5 sérií po 15+ opakováních",
-                note="Udržuj hladký přechod bez ztráty kontroly.",
-            ),
-        },
-    ),
-    Exercise(
-        id="handstands",
-        order=6,
-        category="Stojky",
-        name="Stojky",
-        description="Cvik na sílu ramen, stabilitu a kontrolu těla.",
-        image="/favicon.svg",
-        muscles=["ramena", "triceps", "střed těla", "trapézy"],
-        frequency="2–4x týdně",
-        correct=["Aktivní ramena a zpevněný střed těla", "Kontrola rovnováhy přes prsty"],
-        incorrect=["Přehnané prohnutí zad", "Pasivní ramena"],
-        levels={
-            "beginner": ExerciseLevel(
-                title="Začátečník",
-                reps="5 sérií po 20–30 s",
-                note="Začni stojkou čelem ke zdi.",
-            ),
-            "advanced": ExerciseLevel(
-                title="Pokročilý",
-                reps="5 sérií po 30–45 s",
-                note="Zařaď odlepy chodidel od zdi.",
-            ),
-            "expert": ExerciseLevel(
-                title="Expert",
-                reps="5 sérií po 45–60 s",
-                note="Pracuj na volné stojce bez opory.",
-            ),
-        },
-    ),
-]
-
-
-ORDERED_EXERCISES = sorted(EXERCISES, key=lambda exercise: exercise.order)
-EXERCISES_BY_ID = {exercise.id: exercise for exercise in ORDERED_EXERCISES}
-NEXT_EXERCISE_ID_BY_ID = {
-    current.id: ORDERED_EXERCISES[index + 1].id if index + 1 < len(ORDERED_EXERCISES) else None
-    for index, current in enumerate(ORDERED_EXERCISES)
+SCHEMA_FILTER: dict[str, Any] = {
+    "level": {"$exists": True},
+    "family": {"$exists": True},
 }
-NEXT_EXERCISE_NAME_BY_ID = {
-    exercise_id: (EXERCISES_BY_ID[next_id].name if next_id else None)
-    for exercise_id, next_id in NEXT_EXERCISE_ID_BY_ID.items()
-}
+
+
+def _next_in_family(db: Database, doc: dict[str, Any]) -> dict[str, Any] | None:
+    return db["exercises"].find_one({"family": doc["family"], "level": doc["level"] + 1})
 
 
 @router.get("", response_model=list[ExerciseListItem])
-def list_exercises() -> list[ExerciseListItem]:
-    return [
-        ExerciseListItem(
-            id=exercise.id,
-            order=exercise.order,
-            category=exercise.category,
-            name=exercise.name,
-            description=exercise.description,
-            image=exercise.image,
-            available_levels=list(LEVEL_ORDER),
-            next_exercise_id=NEXT_EXERCISE_ID_BY_ID[exercise.id],
-            next_exercise_name=NEXT_EXERCISE_NAME_BY_ID[exercise.id],
+def list_exercises(db: Database = Depends(get_db)) -> list[ExerciseListItem]:
+    docs = list(db["exercises"].find(SCHEMA_FILTER).sort([("family", 1), ("level", 1)]))
+
+    by_family: dict[str, list[dict[str, Any]]] = {}
+    for doc in docs:
+        by_family.setdefault(doc["family"], []).append(doc)
+    for siblings in by_family.values():
+        siblings.sort(key=lambda d: d["level"])
+
+    next_by_id: dict[str, dict[str, Any]] = {}
+    for siblings in by_family.values():
+        for index, current in enumerate(siblings):
+            if index + 1 < len(siblings):
+                next_by_id[current["id"]] = siblings[index + 1]
+
+    items: list[ExerciseListItem] = []
+    for doc in docs:
+        nxt = next_by_id.get(doc["id"])
+        items.append(
+            ExerciseListItem(
+                id=doc["id"],
+                name=doc["name"],
+                family=doc["family"],
+                level=doc["level"],
+                description=doc.get("description", ""),
+                next_exercise_id=nxt["id"] if nxt else None,
+                next_exercise_name=nxt["name"] if nxt else None,
+            )
         )
-        for exercise in ORDERED_EXERCISES
-    ]
+    return items
 
 
 @router.get("/{exercise_id}", response_model=ExerciseDetailResponse)
-def get_exercise_detail(exercise_id: str, level: Level = "beginner") -> ExerciseDetailResponse:
-    exercise = EXERCISES_BY_ID.get(exercise_id)
-    if exercise is None:
+def get_exercise_detail(
+    exercise_id: str,
+    db: Database = Depends(get_db),
+) -> ExerciseDetailResponse:
+    doc = db["exercises"].find_one({"id": exercise_id, **SCHEMA_FILTER})
+    if doc is None:
         raise HTTPException(status_code=404, detail="Exercise not found")
 
-    level_data = exercise.levels[level]
+    nxt = _next_in_family(db, doc)
+    media_doc = doc.get("media") if isinstance(doc.get("media"), dict) else None
+    cadence_doc = doc.get("cadence") if isinstance(doc.get("cadence"), dict) else None
+    progression_doc = (
+        doc.get("progression_goals") if isinstance(doc.get("progression_goals"), dict) else None
+    )
+
     return ExerciseDetailResponse(
-        id=exercise.id,
-        order=exercise.order,
-        category=exercise.category,
-        name=exercise.name,
-        description=exercise.description,
-        image=exercise.image,
-        muscles=exercise.muscles,
-        frequency=exercise.frequency,
-        correct=exercise.correct,
-        incorrect=exercise.incorrect,
-        level=level,
-        level_detail=level_data,
-        level_order=list(LEVEL_ORDER),
+        id=doc["id"],
+        name=doc["name"],
+        english_name=doc.get("english_name"),
+        family=doc["family"],
+        level=doc["level"],
+        description=doc.get("description", ""),
+        instructions=list(doc.get("instructions", [])),
+        media=Media(**media_doc) if media_doc else None,
+        cadence=Cadence(**cadence_doc) if cadence_doc else None,
+        progression_goals=ProgressionGoals(**progression_doc) if progression_doc else None,
+        muscle_engagement_percent=dict(doc.get("muscle_engagement_percent", {})),
+        next_exercise_id=nxt["id"] if nxt else None,
+        next_exercise_name=nxt["name"] if nxt else None,
     )
