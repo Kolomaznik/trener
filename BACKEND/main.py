@@ -1,23 +1,14 @@
 import json
-from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
-
-    app_name: str = "trener-backend"
-    cors_origins: list[str] = ["http://localhost:5173"]
-    muscle_map_json_path: Path = (
-        Path(__file__).resolve().parents[1] / "FRONTEND" / "src" / "assets" / "muscle-map.json"
-    )
-
-
-settings = Settings()
+from app.api.health import router as health_router
+from app.api.root import router as root_router
+from app.api.user_settings import router as user_settings_router
+from app.api.yearly_overview import router as yearly_overview_router
+from config import settings
 
 app = FastAPI(title=settings.app_name)
 
@@ -29,15 +20,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
-
-
-@app.get("/")
-def root() -> dict[str, str]:
-    return {"app": settings.app_name}
+app.include_router(root_router)
+app.include_router(health_router)
+app.include_router(user_settings_router)
+app.include_router(yearly_overview_router)
 
 
 class MuscleMetrics(BaseModel):
@@ -78,7 +64,7 @@ def muscle_map_data() -> dict[str, MuscleMetrics]:
 def main() -> None:
     import uvicorn
 
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8001, reload=True)
 
 
 if __name__ == "__main__":

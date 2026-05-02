@@ -22,6 +22,28 @@ uv run uvicorn main:app --reload
 
 API běží na <http://127.0.0.1:8000>, dokumentace na `/docs`.
 
+## User settings endpoint
+
+Backend vrací základní nastavení uživatele přes:
+
+```bash
+GET /user/settings
+```
+
+Aktuálně vrací e-mail:
+
+```json
+{"email":"user@example.com"}
+```
+
+E-mail se nastavuje přes `.env`:
+
+```bash
+USER_EMAIL=user@example.com
+```
+
+Frontend tento e-mail používá jako `login_hint` při přesměrování na Google OAuth.
+
 ## Lint
 ```bash
 uv run --group dev ruff check .
