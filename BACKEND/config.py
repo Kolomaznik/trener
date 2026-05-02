@@ -1,4 +1,3 @@
-from pydantic import EmailStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,7 +6,9 @@ class Settings(BaseSettings):
 
     app_name: str = "trener-backend"
     cors_origins: list[str] = ["http://localhost:5173"]
-    user_email: EmailStr = "user@example.com"
+    mongo_uri: str = "mongodb://localhost:27017"
+    mongo_database: str = "trener"
+    google_userinfo_url: str = "https://www.googleapis.com/oauth2/v3/userinfo"
 
 
 settings = Settings()

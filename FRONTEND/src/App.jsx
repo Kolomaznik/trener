@@ -1,10 +1,16 @@
-import { useEffect, useState } from 'react';
-import { Button, Drawer, Grid, Layout, Menu, Spin, Typography } from 'antd';
-import { MenuOutlined, PlayCircleOutlined } from '@ant-design/icons';
-import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Avatar, Button, Drawer, Grid, Layout, Menu, Spin, Typography } from 'antd';
+import { MenuOutlined, PlayCircleOutlined, UserOutlined } from '@ant-design/icons';
+import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { apiClient } from './api/client.js';
+import { getUserSettings } from './api/getUserSettings.js';
+import {
+  UserSettingsContext,
+  isProfileComplete,
+} from './context/UserSettingsContext.jsx';
 import Home from './pages/Home.jsx';
 import Exercises from './pages/Exercises.jsx';
+import Settings from './pages/Settings.jsx';
 
 const { Header, Content } = Layout;
 const { useBreakpoint } = Grid;
@@ -12,16 +18,6 @@ const { Text } = Typography;
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const DEFAULT_GOOGLE_SCOPE = 'openid email profile';
 const AUTH_TOKEN_STORAGE_KEY = 'trainer_google_auth_token';
-
-const menuItems = [
-  { key: '/', label: <Link to="/">Overview</Link> },
-  { key: '/exercises', label: <Link to="/exercises">Exercises</Link> },
-];
-
-const drawerItems = [
-  { key: '/', label: 'Overview' },
-  { key: '/exercises', label: 'Exercises' },
-];
 
 function readTokenFromHash() {
   const hash = window.location.hash.replace(/^#/, '');
@@ -96,6 +92,7 @@ export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [userSettings, setUserSettings] = useState(null);
   const startButtonLabel = isMobile ? 'Začít' : 'Začít cvičit';
 
   useEffect(() => {
@@ -137,6 +134,59 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!authReady || authError) return undefined;
+    let cancelled = false;
+    getUserSettings()
+      .then((data) => {
+        if (!cancelled) setUserSettings(data);
+      })
+      .catch((error) => {
+        console.error('Failed to load user settings', error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authReady, authError]);
+
+  useEffect(() => {
+    if (!userSettings) return;
+    if (!isProfileComplete(userSettings) && pathname !== '/settings') {
+      navigate('/settings', { replace: true });
+    }
+  }, [userSettings, pathname, navigate]);
+
+  const contextValue = useMemo(
+    () => ({ userSettings, setUserSettings }),
+    [userSettings],
+  );
+
+  const avatarNode = (
+    <Avatar
+      size="small"
+      src={userSettings?.picture}
+      icon={!userSettings?.picture ? <UserOutlined /> : undefined}
+      alt={userSettings?.name ?? 'Settings'}
+    />
+  );
+
+  const drawerTopItems = [
+    { key: '/', label: 'Overview' },
+    { key: '/exercises', label: 'Exercises' },
+  ];
+
+  const drawerBottomItems = [
+    {
+      key: '/settings',
+      label: (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          {avatarNode}
+          <span>{userSettings?.name ?? 'Nastavení'}</span>
+        </span>
+      ),
+    },
+  ];
+
   if (!authReady) {
     return (
       <Layout style={{ minHeight: '100vh' }}>
@@ -159,81 +209,77 @@ export default function App() {
   }
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Header
-        className="safe-area-top"
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
-          display: 'flex',
-          alignItems: 'center',
-          padding: isMobile ? '0 12px' : '0 24px',
-        }}
-      >
-        {isMobile ? (
-          <>
-            <Button
-              type="text"
-              icon={<MenuOutlined style={{ color: '#fff', fontSize: 20 }} />}
-              onClick={() => setDrawerOpen(true)}
-              aria-label="Open menu"
-              style={{ marginRight: 8 }}
-            />
-            <span style={{ color: '#fff', fontSize: 18, fontWeight: 500 }}>Trainer</span>
-            <div style={{ flex: 1 }} />
-            <Button
-              type="primary"
-              icon={<PlayCircleOutlined />}
-              onClick={() => navigate('/exercises')}
-              size="middle"
-            >
-              {startButtonLabel}
-            </Button>
-            <Drawer
-              placement="left"
-              open={drawerOpen}
-              onClose={() => setDrawerOpen(false)}
-              width={260}
-              styles={{ body: { padding: 0 } }}
-              title="Trainer"
-            >
-              <Menu
-                mode="vertical"
-                selectedKeys={[pathname]}
-                items={drawerItems}
-                onClick={({ key }) => {
-                  navigate(key);
-                  setDrawerOpen(false);
-                }}
-                style={{ borderInlineEnd: 0 }}
-              />
-            </Drawer>
-          </>
-        ) : (
-          <>
+    <UserSettingsContext.Provider value={contextValue}>
+      <Layout style={{ minHeight: '100vh' }}>
+        <Header
+          className="safe-area-top"
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+            display: 'flex',
+            alignItems: 'center',
+            padding: isMobile ? '0 12px' : '0 24px',
+          }}
+        >
+          <Button
+            type="text"
+            icon={<MenuOutlined style={{ color: '#fff', fontSize: 20 }} />}
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Open menu"
+            style={{ marginRight: 8 }}
+          />
+          <span style={{ color: '#fff', fontSize: 18, fontWeight: 500 }}>Trainer</span>
+          <div style={{ flex: 1 }} />
+          <Button
+            type="primary"
+            icon={<PlayCircleOutlined />}
+            onClick={() => navigate('/exercises')}
+            size={isMobile ? 'middle' : 'large'}
+          >
+            {startButtonLabel}
+          </Button>
+          <Drawer
+            placement="left"
+            open={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
+            width={isMobile ? 260 : 300}
+            styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column' } }}
+            title="Trainer"
+          >
             <Menu
-              theme="dark"
-              mode="horizontal"
+              mode="vertical"
               selectedKeys={[pathname]}
-              items={menuItems}
-              style={{ flex: 1, minWidth: 0 }}
+              items={drawerTopItems}
+              onClick={({ key }) => {
+                navigate(key);
+                setDrawerOpen(false);
+              }}
+              style={{ borderInlineEnd: 0 }}
             />
-            <Button type="primary" icon={<PlayCircleOutlined />} onClick={() => navigate('/exercises')}>
-              {startButtonLabel}
-            </Button>
-          </>
-        )}
-      </Header>
-      <Content
-        className="safe-area-bottom"
-        style={{ padding: isMobile ? 16 : 24, maxWidth: 1024, width: '100%', margin: '0 auto' }}
-      >
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/exercises" element={<Exercises />} />
-        </Routes>
-      </Content>
-    </Layout>
+            <Menu
+              mode="vertical"
+              selectedKeys={[pathname]}
+              items={drawerBottomItems}
+              onClick={({ key }) => {
+                navigate(key);
+                setDrawerOpen(false);
+              }}
+              style={{ borderInlineEnd: 0, marginTop: 'auto', borderTop: '1px solid #f0f0f0' }}
+            />
+          </Drawer>
+        </Header>
+        <Content
+          className="safe-area-bottom"
+          style={{ padding: isMobile ? 16 : 24, maxWidth: 1024, width: '100%', margin: '0 auto' }}
+        >
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/exercises" element={<Exercises />} />
+            <Route path="/settings" element={<Settings />} />
+          </Routes>
+        </Content>
+      </Layout>
+    </UserSettingsContext.Provider>
   );
 }

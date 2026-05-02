@@ -94,9 +94,12 @@ const getGroupPaths = (group, view, pathsBySlug) => {
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function BodyHighlighter() {
+export default function BodyHighlighter({ gender: controlledGender }) {
   const svgId = useId().replace(/:/g, '');
-  const [gender, setGender] = useState('male');
+  const [internalGender, setInternalGender] = useState('male');
+  const isControlled = controlledGender === 'male' || controlledGender === 'female';
+  const gender = isControlled ? controlledGender : internalGender;
+  const setGender = isControlled ? () => {} : setInternalGender;
   const [muscleData, setMuscleData] = useState(initMuscleData);
   const [selected, setSelected] = useState(MUSCLE_GROUPS[0].id);
   const [hoveredGroupId, setHoveredGroupId] = useState(null);
@@ -232,14 +235,16 @@ export default function BodyHighlighter() {
           style={{ width: '100%', maxWidth: 340 }}
           styles={{ body: { padding: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 } }}
         >
-          <Space>
-            <Button type={gender === 'male' ? 'primary' : 'default'} size="small" onClick={() => setGender('male')}>
-              Muž
-            </Button>
-            <Button type={gender === 'female' ? 'primary' : 'default'} size="small" onClick={() => setGender('female')}>
-              Žena
-            </Button>
-          </Space>
+          {!isControlled && (
+            <Space>
+              <Button type={gender === 'male' ? 'primary' : 'default'} size="small" onClick={() => setGender('male')}>
+                Muž
+              </Button>
+              <Button type={gender === 'female' ? 'primary' : 'default'} size="small" onClick={() => setGender('female')}>
+                Žena
+              </Button>
+            </Space>
+          )}
 
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', alignItems: 'flex-start', width: '100%' }}>
             {renderBodyFigure('front', frontSvgData, frontPathsBySlug)}

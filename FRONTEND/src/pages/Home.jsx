@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Divider, Flex, Grid, Spin, Typography } from 'antd';
 import BodyHighlighter from '../components/BodyHighlighter.jsx';
 import { getYearlyOverview } from '../api/getYearlyOverview.js';
+import { useUserSettings } from '../context/UserSettingsContext.jsx';
 
 const { Title, Paragraph } = Typography;
 const HEATMAP_COLORS = ['#ebedf0', '#c6e48b', '#7bc96f', '#239a3b', '#196127'];
@@ -40,6 +41,7 @@ function getLevel(value, maxValue) {
 export default function Home() {
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
+  const { userSettings } = useUserSettings();
   const CELL_SIZE = isMobile ? 10 : 12;
   const CELL_GAP = isMobile ? 2 : 3;
   const DAY_LABEL_COL = isMobile ? 22 : 26;
@@ -255,7 +257,7 @@ export default function Home() {
         Interaktivní přehled svalových partií. Klikněte na sval nebo vyberte partii ze seznamu a
         upravte barvu a intenzitu zvýraznění.
       </Paragraph>
-      <BodyHighlighter />
+      <BodyHighlighter gender={userSettings?.gender} />
     </Typography>
   );
 }
