@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import enUS from 'antd/locale/en_US';
+import 'regenerator-runtime/runtime';
 import 'antd/dist/reset.css';
 import App from './App.jsx';
 import './index.css';

@@ -1,0 +1,28 @@
+{
+  "highlightableMuscleGroups": [
+    { "id": "chest", "label": "Prsní svaly", "slugs": { "front": ["chest"] } },
+    { "id": "deltoids", "label": "Ramena (deltoid)", "slugs": { "front": ["deltoids"], "back": ["deltoids"] } },
+    { "id": "biceps", "label": "Biceps", "slugs": { "front": ["biceps"] } },
+    { "id": "triceps", "label": "Triceps", "slugs": { "front": ["triceps"], "back": ["triceps"] } },
+    { "id": "forearms", "label": "Předloktí", "slugs": { "front": ["forearm"], "back": ["forearm"] } },
+    { "id": "abs", "label": "Břišní svaly (přímý)", "slugs": { "front": ["abs"] } },
+    { "id": "obliques", "label": "Šikmé svaly břišní", "slugs": { "front": ["obliques"] } },
+    { "id": "hip_flexors", "label": "Ohybače kyčlí", "slugs": { "front": ["hip-flexors"] } },
+    { "id": "trapezius", "label": "Trapézový sval", "slugs": { "front": ["trapezius"], "back": ["trapezius"] } },
+    { "id": "rhomboids", "label": "Mezilopatkové svaly", "slugs": { "back": ["rhomboids", "mid-back"] } },
+    { "id": "lats", "label": "Široký sval zádový", "slugs": { "back": ["upper-back", "lats"] } },
+    { "id": "lower_back", "label": "Dolní záda (vzpřimovače)", "slugs": { "back": ["lower-back"] } },
+    { "id": "quadriceps", "label": "Stehenní svaly (přední)", "slugs": { "front": ["quadriceps"] } },
+    { "id": "hamstrings", "label": "Zadní svaly stehna", "slugs": { "back": ["hamstring"] } },
+    { "id": "glutes", "label": "Hýžďové svaly (velký)", "slugs": { "back": ["gluteal"] } },
+    { "id": "abductors", "label": "Abduktory (vnější stehna/kyčle)", "slugs": { "front": ["abductors"], "back": ["abductors"] } },
+    { "id": "adductors", "label": "Adduktory (vnitřní stehna)", "slugs": { "front": ["adductors"], "back": ["adductors"] } },
+    { "id": "calves", "label": "Lýtkové svaly", "slugs": { "front": ["calves"], "back": ["calves"] } },
+    { "id": "tibialis", "label": "Přední holenní sval", "slugs": { "front": ["tibialis"] } },
+    { "id": "neck", "label": "Krk", "slugs": { "front": ["neck"], "back": ["neck"] } },
+    { "id": "knees", "label": "Kolena (vazy/klouby)", "slugs": { "front": ["knees"] } },
+    { "id": "hands", "label": "Úchop a dlaně", "slugs": { "front": ["hands"], "back": ["hands"] } },
+    { "id": "ankles", "label": "Kotníky", "slugs": { "front": ["ankles"], "back": ["ankles"] } },
+    { "id": "feet", "label": "Chodidla", "slugs": { "front": ["feet"], "back": ["feet"] } }
+  ]
+}

@@ -7,13 +7,20 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi[standard]>=0.115",
     "pydantic-settings>=2.6",
+    "pymongo>=4.10",
 ]
 
 [dependency-groups]
 dev = [
     "ruff>=0.7",
     "pre-commit>=4.0",
+    "pytest>=8.0",
+    "mongomock>=4.3",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
 
 [tool.ruff]
 line-length = 100
@@ -21,3 +28,16 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "fastapi.Body",
+    "fastapi.Cookie",
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Header",
+    "fastapi.Path",
+    "fastapi.Query",
+    "fastapi.Security",
+]
