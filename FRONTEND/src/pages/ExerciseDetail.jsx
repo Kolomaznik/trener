@@ -251,13 +251,6 @@ function ProgressionAndMuscleCard({ detail }) {
 
   const tabItems = DIFFICULTIES.map(({ key, label }) => {
     const goal = detail.progression_goals?.[key];
-    const tierLoad = hasLoadData ? (loadByDifficulty[key] ?? {}) : null;
-    // Total "Přemístěná zátěž" for this difficulty = sum of per-muscle loads
-    // (valid when muscle percents sum to 100, as they do for well-formed exercises).
-    const totalKg =
-      tierLoad !== null && Object.keys(tierLoad).length > 0
-        ? Math.round(Object.values(tierLoad).reduce((s, m) => s + m.muscle_load, 0))
-        : null;
 
     return {
       key,
@@ -267,16 +260,6 @@ function ProgressionAndMuscleCard({ detail }) {
           <Title level={2} style={{ margin: 0, lineHeight: 1 }}>
             {goal.sets} × {goal.reps}
           </Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>
-            série × opakování
-          </Text>
-          {totalKg !== null && (
-            <div style={{ marginTop: 8 }}>
-              <Text type="secondary" style={{ fontSize: 13 }}>
-                Přemístěná zátěž: <strong>{totalKg} kg</strong>
-              </Text>
-            </div>
-          )}
         </div>
       ) : (
         <Text type="secondary">Žádné cíle pro tuto úroveň.</Text>
@@ -305,17 +288,7 @@ function ProgressionAndMuscleCard({ detail }) {
       <Divider />
 
       {/* ── Muscle map section ──────────────────────────────────────────── */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 12,
-        }}
-      >
-        <Text strong style={{ fontSize: 15 }}>
-          Zapojené svaly
-        </Text>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
         <Segmented
           options={[
             { label: '% Zapojení', value: 'percent' },

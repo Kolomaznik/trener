@@ -181,34 +181,6 @@ describe('ExerciseDetail page', () => {
     expect(await screen.findByText('Po zvládnutí mastery na level 2.')).toBeInTheDocument();
   });
 
-  // ── Přemístěná zátěž in tabs ───────────────────────────────────────────────
-
-  it('shows total kg in Začátečník tab when load data is present', async () => {
-    renderWithRouter();
-
-    await screen.findByText('Kliky o zeď');
-    // beginner: chest 64 + triceps 48 + lower_back 8 = 120 kg total
-    expect(screen.getByText(/Přemístěná zátěž:/)).toBeInTheDocument();
-    expect(screen.getByText('120 kg')).toBeInTheDocument();
-  });
-
-  it('shows different total kg after switching to Mistr tab', async () => {
-    renderWithRouter();
-
-    await screen.findByText('Kliky o zeď');
-    fireEvent.click(screen.getByRole('tab', { name: 'Mistr' }));
-    // mastery: chest 960 + triceps 720 + lower_back 120 = 1800 kg
-    expect(await screen.findByText('1800 kg')).toBeInTheDocument();
-  });
-
-  it('does NOT show kg when load data is absent', async () => {
-    fetchExerciseDetail.mockResolvedValue(detailFixtureNoLoad);
-    renderWithRouter();
-
-    await screen.findByText('Kliky o zeď');
-    expect(screen.queryByText(/Přemístěná zátěž:/)).not.toBeInTheDocument();
-  });
-
   // ── Muscle map ─────────────────────────────────────────────────────────────
 
   it('renders the muscle map', async () => {
@@ -232,7 +204,7 @@ describe('ExerciseDetail page', () => {
   it('renders the toggle: % Zapojení and Přemístěná zátěž (kg)', async () => {
     renderWithRouter();
 
-    await screen.findByText('Zapojené svaly');
+    await screen.findByText('% Zapojení');
     expect(screen.getByText('% Zapojení')).toBeInTheDocument();
     expect(screen.getByText('Přemístěná zátěž (kg)')).toBeInTheDocument();
   });
@@ -241,7 +213,7 @@ describe('ExerciseDetail page', () => {
     fetchExerciseDetail.mockResolvedValue(detailFixtureNoLoad);
     renderWithRouter();
 
-    await screen.findByText('Zapojené svaly');
+    await screen.findByText('% Zapojení');
     const option = screen.getByText('Přemístěná zátěž (kg)').closest('.ant-segmented-item');
     expect(option).toHaveClass('ant-segmented-item-disabled');
   });
@@ -263,7 +235,7 @@ describe('ExerciseDetail page', () => {
   it('switching to Přemístěná zátěž mode does not call fetchExerciseDetail again', async () => {
     renderWithRouter();
 
-    await screen.findByText('Zapojené svaly');
+    await screen.findByText('% Zapojení');
     fireEvent.click(screen.getByText('Přemístěná zátěž (kg)'));
 
     // Still exactly 1 call — no extra API request
@@ -273,7 +245,7 @@ describe('ExerciseDetail page', () => {
   it('muscle map updates immediately when switching to load mode (no spinner needed)', async () => {
     renderWithRouter();
 
-    await screen.findByText('Zapojené svaly');
+    await screen.findByText('% Zapojení');
     fireEvent.click(screen.getByText('Přemístěná zátěž (kg)'));
 
     // The map should still be present (no loading state)
@@ -285,14 +257,14 @@ describe('ExerciseDetail page', () => {
   it('shows "Zapojení" legend title in default % mode', async () => {
     renderWithRouter();
 
-    await screen.findByText('Zapojené svaly');
+    await screen.findByText('% Zapojení');
     expect(screen.getByTestId('muscle-map-scale')).toHaveTextContent('Zapojení');
   });
 
   it('switches legend title to "Přemístěná zátěž" when load mode is active', async () => {
     renderWithRouter();
 
-    await screen.findByText('Zapojené svaly');
+    await screen.findByText('% Zapojení');
     fireEvent.click(screen.getByText('Přemístěná zátěž (kg)'));
 
     expect(screen.getByTestId('muscle-map-scale')).toHaveTextContent('Přemístěná zátěž');
@@ -301,7 +273,7 @@ describe('ExerciseDetail page', () => {
   it('shows qualitative load labels (not % labels) when load mode is active', async () => {
     renderWithRouter();
 
-    await screen.findByText('Zapojené svaly');
+    await screen.findByText('% Zapojení');
     fireEvent.click(screen.getByText('Přemístěná zátěž (kg)'));
 
     const scale = screen.getByTestId('muscle-map-scale');
@@ -314,7 +286,7 @@ describe('ExerciseDetail page', () => {
   it('shows 5 tonne stops in load mode matching fixture min/max (beginner tier)', async () => {
     renderWithRouter();
 
-    await screen.findByText('Zapojené svaly');
+    await screen.findByText('% Zapojení');
     fireEvent.click(screen.getByText('Přemístěná zátěž (kg)'));
 
     // beginner: chest=64, triceps=48, lower_back=8 → max=64, min=8
@@ -330,7 +302,7 @@ describe('ExerciseDetail page', () => {
   it('restores % labels when switching back to % mode', async () => {
     renderWithRouter();
 
-    await screen.findByText('Zapojené svaly');
+    await screen.findByText('% Zapojení');
     fireEvent.click(screen.getByText('Přemístěná zátěž (kg)'));
     fireEvent.click(screen.getByText('% Zapojení'));
 

@@ -91,7 +91,11 @@ function MuscleMapScale({ color, mode = 'percent', loadRange = null }) {
       }}
     >
       <div style={{ fontWeight: 500, marginBottom: 2 }}>{title}</div>
-      {stops.map((stop) => (
+      {stops.map((stop, i) => {
+        // Spread alpha evenly from 1.0 (top/max) down to 0.18 (bottom/min)
+        // so every swatch is visually distinct regardless of the pct values.
+        const alpha = 1.0 - (i / Math.max(stops.length - 1, 1)) * 0.82;
+        return (
         <div
           key={stop.label}
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}
@@ -100,13 +104,14 @@ function MuscleMapScale({ color, mode = 'percent', loadRange = null }) {
             style={{
               width: 14,
               height: 14,
-              background: blendWithWhite(color, intensityOpacity(stop.pct)),
+              background: blendWithWhite(color, alpha),
               borderRadius: 3,
             }}
           />
           <span style={{ color: 'rgba(0, 0, 0, 0.65)' }}>{stop.label}</span>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
