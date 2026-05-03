@@ -2,17 +2,40 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ExerciseDetail from './ExerciseDetail.jsx';
-import { UserSettingsContext } from '../context/UserSettingsContext.jsx';
 
 vi.mock('../api/client.js', () => ({
   fetchExercises: vi.fn(),
   fetchExerciseDetail: vi.fn(),
-  fetchMuscleLoad: vi.fn(),
 }));
 
-import { fetchExerciseDetail, fetchMuscleLoad } from '../api/client.js';
+import { fetchExerciseDetail } from '../api/client.js';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
+
+/**
+ * Muscle load for pushups_level_1 (level_coefficient = 0.20), user weight = 80 kg.
+ * Formula: total_load = weight_kg × total_reps × level_coefficient
+ *   beginner     (1×10  = 10  reps): 80 × 10  × 0.20 = 160 kg total
+ *   intermediate (2×25  = 50  reps): 80 × 50  × 0.20 = 800 kg total
+ *   mastery      (3×50  = 150 reps): 80 × 150 × 0.20 = 2400 kg total
+ */
+const muscleLoadByDifficulty = {
+  beginner: {
+    chest: { percent: 40, muscle_load: 64.0 },   // 160 × 0.40
+    triceps: { percent: 30, muscle_load: 48.0 },  // 160 × 0.30
+    lower_back: { percent: 5, muscle_load: 8.0 }, // 160 × 0.05
+  },
+  intermediate: {
+    chest: { percent: 40, muscle_load: 320.0 },
+    triceps: { percent: 30, muscle_load: 240.0 },
+    lower_back: { percent: 5, muscle_load: 40.0 },
+  },
+  mastery: {
+    chest: { percent: 40, muscle_load: 960.0 },
+    triceps: { percent: 30, muscle_load: 720.0 },
+    lower_back: { percent: 5, muscle_load: 120.0 },
+  },
+};
 
 const detailFixture = {
   id: 'pushups_level_1',
@@ -44,10 +67,17 @@ const detailFixture = {
     coach_note: 'Po zvládnutí mastery na level 2.',
   },
   muscle_engagement_percent: { chest: 40, triceps: 30, lower_back: 5 },
+  muscle_load_by_difficulty: muscleLoadByDifficulty,
   next_exercise_id: 'pushups_level_2',
   next_exercise_name: 'Kliky v předklonu',
   level_coefficient: 0.20,
   height_multiplier: 0.40,
+};
+
+/** Fixture without load data — simulates an unauthenticated / no-profile response. */
+const detailFixtureNoLoad = {
+  ...detailFixture,
+  muscle_load_by_difficulty: null,
 };
 
 const detailFixtureLevel2 = {
@@ -61,42 +91,16 @@ const detailFixtureLevel2 = {
   level_coefficient: 0.35,
 };
 
-/** A complete user profile (all fields required by isProfileComplete). */
-const completeSettings = {
-  gender: 'male',
-  height_cm: 175,
-  weight_kg: 80,
-  birth_year: 1990,
-};
-
-/** Realistic muscle-load API response for the load-mode tests. */
-const muscleLoadResponse = {
-  muscle_engagement: {
-    chest: { percent: 40, muscle_load: 200 },
-    triceps: { percent: 30, muscle_load: 150 },
-    lower_back: { percent: 5, muscle_load: 25 },
-  },
-};
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * Renders the ExerciseDetail page inside a UserSettingsContext provider and a
- * MemoryRouter so that router hooks and context hooks both work.
- *
- * @param {string} initialPath - URL to start at.
- * @param {object|null} settings - Value to put in UserSettingsContext.
- */
-function renderWithRouter(initialPath = '/exercises/pushups_level_1', settings = null) {
+function renderWithRouter(initialPath = '/exercises/pushups_level_1') {
   return render(
-    <UserSettingsContext.Provider value={{ userSettings: settings, setUserSettings: vi.fn() }}>
-      <MemoryRouter initialEntries={[initialPath]}>
-        <Routes>
-          <Route path="/exercises" element={<div data-testid="list-marker" />} />
-          <Route path="/exercises/:id" element={<ExerciseDetail />} />
-        </Routes>
-      </MemoryRouter>
-    </UserSettingsContext.Provider>,
+    <MemoryRouter initialEntries={[initialPath]}>
+      <Routes>
+        <Route path="/exercises" element={<div data-testid="list-marker" />} />
+        <Route path="/exercises/:id" element={<ExerciseDetail />} />
+      </Routes>
+    </MemoryRouter>,
   );
 }
 
@@ -105,9 +109,7 @@ function renderWithRouter(initialPath = '/exercises/pushups_level_1', settings =
 describe('ExerciseDetail page', () => {
   beforeEach(() => {
     fetchExerciseDetail.mockReset();
-    fetchMuscleLoad.mockReset();
     fetchExerciseDetail.mockResolvedValue(detailFixture);
-    fetchMuscleLoad.mockResolvedValue(muscleLoadResponse);
   });
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -120,11 +122,11 @@ describe('ExerciseDetail page', () => {
     );
   });
 
-  it('does NOT call fetchMuscleLoad on initial load (percent mode by default)', async () => {
+  it('makes exactly one API call on load (no separate muscle-load request)', async () => {
     renderWithRouter();
 
     await screen.findByText('Kliky o zeď');
-    expect(fetchMuscleLoad).not.toHaveBeenCalled();
+    expect(fetchExerciseDetail).toHaveBeenCalledTimes(1);
   });
 
   // ── Header card ────────────────────────────────────────────────────────────
@@ -154,7 +156,6 @@ describe('ExerciseDetail page', () => {
     renderWithRouter();
 
     await screen.findByText('Kliky o zeď');
-    // The beginner goal is 1 série × 10 opakování.
     expect(screen.getByText('1 × 10')).toBeInTheDocument();
   });
 
@@ -180,6 +181,34 @@ describe('ExerciseDetail page', () => {
     expect(await screen.findByText('Po zvládnutí mastery na level 2.')).toBeInTheDocument();
   });
 
+  // ── Přemístěná zátěž in tabs ───────────────────────────────────────────────
+
+  it('shows total kg in Začátečník tab when load data is present', async () => {
+    renderWithRouter();
+
+    await screen.findByText('Kliky o zeď');
+    // beginner: chest 64 + triceps 48 + lower_back 8 = 120 kg total
+    expect(screen.getByText(/Přemístěná zátěž:/)).toBeInTheDocument();
+    expect(screen.getByText('120 kg')).toBeInTheDocument();
+  });
+
+  it('shows different total kg after switching to Mistr tab', async () => {
+    renderWithRouter();
+
+    await screen.findByText('Kliky o zeď');
+    fireEvent.click(screen.getByRole('tab', { name: 'Mistr' }));
+    // mastery: chest 960 + triceps 720 + lower_back 120 = 1800 kg
+    expect(await screen.findByText('1800 kg')).toBeInTheDocument();
+  });
+
+  it('does NOT show kg when load data is absent', async () => {
+    fetchExerciseDetail.mockResolvedValue(detailFixtureNoLoad);
+    renderWithRouter();
+
+    await screen.findByText('Kliky o zeď');
+    expect(screen.queryByText(/Přemístěná zátěž:/)).not.toBeInTheDocument();
+  });
+
   // ── Muscle map ─────────────────────────────────────────────────────────────
 
   it('renders the muscle map', async () => {
@@ -198,73 +227,57 @@ describe('ExerciseDetail page', () => {
     expect(style).toContain('[data-slug="triceps"]');
   });
 
-  // ── % / Svalová zátěž toggle ───────────────────────────────────────────────
+  // ── % / Přemístěná zátěž toggle ───────────────────────────────────────────
 
-  it('renders the % / Svalová zátěž segmented control', async () => {
+  it('renders the toggle: % Zapojení and Přemístěná zátěž (kg)', async () => {
     renderWithRouter();
 
     await screen.findByText('Zapojené svaly');
     expect(screen.getByText('% Zapojení')).toBeInTheDocument();
-    expect(screen.getByText('Svalová zátěž')).toBeInTheDocument();
+    expect(screen.getByText('Přemístěná zátěž (kg)')).toBeInTheDocument();
   });
 
-  it('Svalová zátěž option is disabled when user profile is incomplete', async () => {
-    renderWithRouter('/exercises/pushups_level_1', null);
+  it('Přemístěná zátěž option is disabled when load data is absent', async () => {
+    fetchExerciseDetail.mockResolvedValue(detailFixtureNoLoad);
+    renderWithRouter();
 
     await screen.findByText('Zapojené svaly');
-    // antd Segmented marks disabled items with ant-segmented-item-disabled class.
-    const option = screen.getByText('Svalová zátěž').closest('.ant-segmented-item');
+    const option = screen.getByText('Přemístěná zátěž (kg)').closest('.ant-segmented-item');
     expect(option).toHaveClass('ant-segmented-item-disabled');
   });
 
-  it('shows an info alert when load mode is somehow active without a profile', async () => {
-    // Render without a profile and programmatically verify the alert appears
-    // only when the mode reaches 'load' (edge case guard).
-    renderWithRouter('/exercises/pushups_level_1', null);
-    await screen.findByText('Zapojené svaly');
+  it('shows an info alert when load data is absent', async () => {
+    fetchExerciseDetail.mockResolvedValue(detailFixtureNoLoad);
+    renderWithRouter();
 
-    // The disabled button cannot be clicked normally; verify no alert yet.
-    expect(
-      screen.queryByText(/vyplňte tělesné údaje/i),
-    ).not.toBeInTheDocument();
+    expect(await screen.findByText(/Přihlaste se a vyplňte hmotnost/i)).toBeInTheDocument();
   });
 
-  it('calls fetchMuscleLoad when switching to load mode with a complete profile', async () => {
-    renderWithRouter('/exercises/pushups_level_1', completeSettings);
+  it('does NOT show the info alert when load data is present', async () => {
+    renderWithRouter();
 
-    await screen.findByText('Zapojené svaly');
-    fireEvent.click(screen.getByText('Svalová zátěž'));
-
-    await waitFor(() =>
-      expect(fetchMuscleLoad).toHaveBeenCalledWith(
-        'pushups_level_1',
-        expect.objectContaining({
-          weight_kg: 80,
-          height_cm: 175,
-          gender: 'M',
-          // beginner: 1 set × 10 reps = 10 total_reps
-          total_reps: 10,
-        }),
-      ),
-    );
+    await screen.findByText('Kliky o zeď');
+    expect(screen.queryByText(/Přihlaste se a vyplňte hmotnost/i)).not.toBeInTheDocument();
   });
 
-  it('re-fetches muscle load when the active difficulty tab changes in load mode', async () => {
-    renderWithRouter('/exercises/pushups_level_1', completeSettings);
+  it('switching to Přemístěná zátěž mode does not call fetchExerciseDetail again', async () => {
+    renderWithRouter();
 
     await screen.findByText('Zapojené svaly');
-    fireEvent.click(screen.getByText('Svalová zátěž'));
+    fireEvent.click(screen.getByText('Přemístěná zátěž (kg)'));
 
-    // Wait for the first call (beginner tab).
-    await waitFor(() => expect(fetchMuscleLoad).toHaveBeenCalledTimes(1));
+    // Still exactly 1 call — no extra API request
+    expect(fetchExerciseDetail).toHaveBeenCalledTimes(1);
+  });
 
-    // Switch to Mistr tab — should trigger a new fetch with mastery total_reps.
-    fireEvent.click(screen.getByRole('tab', { name: 'Mistr' }));
-    await waitFor(() => expect(fetchMuscleLoad).toHaveBeenCalledTimes(2));
-    expect(fetchMuscleLoad).toHaveBeenLastCalledWith(
-      'pushups_level_1',
-      expect.objectContaining({ total_reps: 150 }), // mastery: 3 × 50
-    );
+  it('muscle map updates immediately when switching to load mode (no spinner needed)', async () => {
+    renderWithRouter();
+
+    await screen.findByText('Zapojené svaly');
+    fireEvent.click(screen.getByText('Přemístěná zátěž (kg)'));
+
+    // The map should still be present (no loading state)
+    expect(screen.getByTestId('exercise-muscle-map')).toBeInTheDocument();
   });
 
   // ── Static detail cards ────────────────────────────────────────────────────

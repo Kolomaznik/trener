@@ -1,6 +1,8 @@
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pymongo.database import Database
 
 from app.db import get_db
@@ -9,11 +11,11 @@ from app.schemas.exercises import (
     ExerciseDetailResponse,
     ExerciseListItem,
     Media,
-    MuscleLoadRequest,
-    MuscleLoadResponse,
+    MuscleLoadByDifficulty,
     ProgressionGoals,
 )
 from app.services.muscle_load import calculate_muscle_load
+from config import settings as app_settings
 
 router = APIRouter(prefix="/exercises", tags=["exercises"])
 
@@ -22,12 +24,86 @@ SCHEMA_FILTER: dict[str, Any] = {
     "family": {"$exists": True},
 }
 
+_optional_bearer = HTTPBearer(auto_error=False)
+
+
+async def _get_weight_kg(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_optional_bearer),
+    db: Database = Depends(get_db),
+) -> float | None:
+    """Return the authenticated user's weight_kg from the database, or None.
+
+    Returns None when:
+    - no Authorization header is present,
+    - the token is invalid / Google rejects it,
+    - the user has no profile yet, or
+    - weight_kg has not been filled in.
+    """
+    if credentials is None:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(
+                app_settings.google_userinfo_url,
+                headers={"Authorization": f"Bearer {credentials.credentials}"},
+            )
+    except httpx.HTTPError:
+        return None
+
+    if resp.status_code != 200:
+        return None
+
+    email = resp.json().get("email")
+    if not email:
+        return None
+
+    user_doc = db["users"].find_one({"email": email})
+    if user_doc is None:
+        return None
+
+    raw = user_doc.get("weight_kg")
+    return float(raw) if raw is not None else None
+
+
+def _compute_load_for_all_difficulties(
+    doc: dict[str, Any],
+    weight_kg: float,
+) -> MuscleLoadByDifficulty:
+    """Compute volume load (kg) per muscle for each of the three difficulty tiers."""
+    level_coefficient: float = doc.get("level_coefficient", 0.5)
+    muscle_engagement: dict[str, int] = dict(doc.get("muscle_engagement_percent", {}))
+    progression: dict[str, Any] = doc.get("progression_goals") or {}
+
+    tiers: dict[str, dict] = {}
+    for tier in ("beginner", "intermediate", "mastery"):
+        goal = progression.get(tier)
+        if goal and muscle_engagement:
+            total_reps = int(goal.get("sets", 1)) * int(goal.get("reps", 1))
+            tiers[tier] = calculate_muscle_load(
+                weight_kg=weight_kg,
+                total_reps=total_reps,
+                level_coefficient=level_coefficient,
+                muscle_engagement_percent=muscle_engagement,
+            )
+        else:
+            tiers[tier] = {}
+
+    return MuscleLoadByDifficulty(
+        beginner=tiers["beginner"],
+        intermediate=tiers["intermediate"],
+        mastery=tiers["mastery"],
+    )
+
 
 def _next_in_family(db: Database, doc: dict[str, Any]) -> dict[str, Any] | None:
     return db["exercises"].find_one({"family": doc["family"], "level": doc["level"] + 1})
 
 
-def _doc_to_detail(doc: dict[str, Any], nxt: dict[str, Any] | None) -> ExerciseDetailResponse:
+def _doc_to_detail(
+    doc: dict[str, Any],
+    nxt: dict[str, Any] | None,
+    muscle_load_by_difficulty: MuscleLoadByDifficulty | None = None,
+) -> ExerciseDetailResponse:
     media_doc = doc.get("media") if isinstance(doc.get("media"), dict) else None
     cadence_doc = doc.get("cadence") if isinstance(doc.get("cadence"), dict) else None
     progression_doc = (
@@ -49,6 +125,7 @@ def _doc_to_detail(doc: dict[str, Any], nxt: dict[str, Any] | None) -> ExerciseD
         height_multiplier=doc.get("height_multiplier", 0.5),
         next_exercise_id=nxt["id"] if nxt else None,
         next_exercise_name=nxt["name"] if nxt else None,
+        muscle_load_by_difficulty=muscle_load_by_difficulty,
     )
 
 
@@ -108,37 +185,29 @@ def list_exercises_by_family(
 
 
 @router.get("/{exercise_id}", response_model=ExerciseDetailResponse)
-def get_exercise_detail(
+async def get_exercise_detail(
     exercise_id: str,
     db: Database = Depends(get_db),
+    weight_kg: float | None = Depends(_get_weight_kg),
 ) -> ExerciseDetailResponse:
+    """Return full exercise detail, including pre-computed per-difficulty muscle load.
+
+    The function is ``async`` because the optional authentication dependency
+    ``_get_weight_kg`` makes an outbound HTTP request to Google's userinfo
+    endpoint to identify the caller.
+
+    The ``muscle_load_by_difficulty`` field is populated only when the request
+    carries a valid Google access token and the authenticated user has
+    ``weight_kg`` set in their profile.  It is ``null`` otherwise.
+    """
     doc = db["exercises"].find_one({"id": exercise_id, **SCHEMA_FILTER})
     if doc is None:
         raise HTTPException(status_code=404, detail="Exercise not found")
 
     nxt = _next_in_family(db, doc)
-    return _doc_to_detail(doc, nxt)
 
+    muscle_load_by_difficulty: MuscleLoadByDifficulty | None = None
+    if weight_kg is not None:
+        muscle_load_by_difficulty = _compute_load_for_all_difficulties(doc, weight_kg)
 
-@router.post("/{exercise_id}/muscle-load", response_model=MuscleLoadResponse)
-def get_muscle_load(
-    exercise_id: str,
-    payload: MuscleLoadRequest,
-    db: Database = Depends(get_db),
-) -> MuscleLoadResponse:
-    """Compute per-muscle absolute load (Joules) for a given workout set."""
-    doc = db["exercises"].find_one({"id": exercise_id, **SCHEMA_FILTER})
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Exercise not found")
-
-    muscle_engagement = calculate_muscle_load(
-        weight_kg=payload.weight_kg,
-        height_cm=payload.height_cm,
-        age=payload.age,
-        gender=payload.gender,
-        total_reps=payload.total_reps,
-        level_coefficient=doc.get("level_coefficient", 0.5),
-        height_multiplier=doc.get("height_multiplier", 0.5),
-        muscle_engagement_percent=dict(doc.get("muscle_engagement_percent", {})),
-    )
-    return MuscleLoadResponse(muscle_engagement=muscle_engagement)
+    return _doc_to_detail(doc, nxt, muscle_load_by_difficulty)

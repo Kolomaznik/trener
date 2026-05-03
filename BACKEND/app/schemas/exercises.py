@@ -34,10 +34,23 @@ class Media(BaseModel):
 
 
 class MuscleEngagement(BaseModel):
-    """Per-muscle engagement with optional computed absolute load."""
+    """Per-muscle engagement with computed volume load in kg."""
 
     percent: int
-    muscle_load: int = 0
+    muscle_load: float = 0.0  # "Přemístěná zátěž" in kg
+
+
+class MuscleLoadByDifficulty(BaseModel):
+    """Volume load (kg) per muscle for each difficulty tier.
+
+    Computed server-side from the authenticated user's weight and
+    the exercise's progression_goals.  Absent (None) when the user
+    is not authenticated or has no weight recorded in their profile.
+    """
+
+    beginner: dict[str, MuscleEngagement] = Field(default_factory=dict)
+    intermediate: dict[str, MuscleEngagement] = Field(default_factory=dict)
+    mastery: dict[str, MuscleEngagement] = Field(default_factory=dict)
 
 
 class ExerciseDocument(BaseModel):
@@ -75,15 +88,4 @@ class ExerciseListItem(BaseModel):
 class ExerciseDetailResponse(ExerciseDocument):
     next_exercise_id: str | None = None
     next_exercise_name: str | None = None
-
-
-class MuscleLoadRequest(BaseModel):
-    weight_kg: float = Field(ge=20, le=300)
-    height_cm: float = Field(ge=50, le=250)
-    age: int = Field(ge=5, le=120)
-    gender: str = Field(pattern="^(M|F)$")
-    total_reps: int = Field(ge=1)
-
-
-class MuscleLoadResponse(BaseModel):
-    muscle_engagement: dict[str, MuscleEngagement]
+    muscle_load_by_difficulty: MuscleLoadByDifficulty | None = None

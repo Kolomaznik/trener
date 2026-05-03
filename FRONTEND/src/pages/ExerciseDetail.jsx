@@ -11,15 +11,13 @@ import {
   Segmented,
   Skeleton,
   Space,
-  Spin,
   Tabs,
   Tag,
   Typography,
 } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import ExerciseMuscleMap from '../components/ExerciseMuscleMap.jsx';
-import { fetchExerciseDetail, fetchMuscleLoad } from '../api/client.js';
-import { isProfileComplete, useUserSettings } from '../context/UserSettingsContext.jsx';
+import { fetchExerciseDetail } from '../api/client.js';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -204,80 +202,54 @@ function ExerciseDetailBody({ detail, navigate }) {
 
 /**
  * Card containing:
- *  1. Tabs: Začátečník | Středně pokročilý | Mistr — each shows sets × reps
- *  2. Coach note (below tabs, shared)
+ *  1. Tabs: Začátečník | Středně pokročilý | Mistr
+ *     Each tab shows sets × reps and, when available, the total "Přemístěná
+ *     zátěž" in kg (= weight_kg × reps × level_coefficient).
+ *  2. Coach note (shared below all tabs)
  *  3. Divider
- *  4. Muscle map with % / Svalová zátěž toggle
+ *  4. Muscle map with toggle: % Zapojení ↔ Přemístěná zátěž (kg)
  *
- * When "Svalová zátěž" is selected and the user profile is complete, the
- * muscle-load API is called and the map is coloured by relative load instead
- * of raw engagement percentage.
+ * The muscle load data is pre-computed by the backend and embedded directly
+ * in `detail.muscle_load_by_difficulty`.  No separate API call is made.
+ * The toggle is disabled when the backend could not compute the load (user not
+ * authenticated or has no weight_kg in their profile).
  */
 function ProgressionAndMuscleCard({ detail }) {
-  const { userSettings } = useUserSettings();
   const [activeTab, setActiveTab] = useState('beginner');
   const [mapMode, setMapMode] = useState('percent'); // 'percent' | 'load'
-  const [loadEngagement, setLoadEngagement] = useState(null);
-  const [loadFetching, setLoadFetching] = useState(false);
 
-  const profileComplete = isProfileComplete(userSettings);
+  const loadByDifficulty = detail.muscle_load_by_difficulty; // null or { beginner, intermediate, mastery }
+  const hasLoadData = loadByDifficulty != null;
 
-  // Fetch muscle load whenever the mode, active tab, or exercise changes.
-  useEffect(() => {
-    if (mapMode !== 'load' || !profileComplete) return undefined;
-
-    const goal = detail.progression_goals?.[activeTab];
-    const total_reps = goal ? goal.sets * goal.reps : 10;
-    const age = new Date().getFullYear() - userSettings.birth_year;
-    // Age is approximated as (current_year − birth_year); it may be off by 1
-    // for users who haven't yet had their birthday this year.  The impact on
-    // the physiological coefficient is negligible (≤ 0.05).
-    const gender = userSettings.gender === 'male' ? 'M' : 'F';
-
-    let active = true;
-    setLoadFetching(true);
-
-    fetchMuscleLoad(detail.id, {
-      weight_kg: userSettings.weight_kg,
-      height_cm: userSettings.height_cm,
-      age,
-      gender,
-      total_reps,
-    })
-      .then((data) => {
-        if (!active) return;
-        // Normalise absolute loads to 0–100 scale so ExerciseMuscleMap can
-        // colour muscles by relative intensity without any internal changes.
-        const entries = Object.entries(data.muscle_engagement);
-        const maxLoad = Math.max(...entries.map(([, m]) => m.muscle_load), 1);
-        const normalized = Object.fromEntries(
-          entries.map(([muscle, { muscle_load }]) => [
-            muscle,
-            Math.round((muscle_load / maxLoad) * 100),
-          ]),
-        );
-        setLoadEngagement(normalized);
-      })
-      .catch(() => {
-        if (active) setLoadEngagement(null);
-      })
-      .finally(() => {
-        if (active) setLoadFetching(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [mapMode, activeTab, detail, profileComplete, userSettings]);
-
-  // What to render on the muscle map.
-  const displayEngagement =
-    mapMode === 'load' && loadEngagement
-      ? loadEngagement
-      : (detail.muscle_engagement_percent ?? {});
+  // Derive what to show on the muscle map.
+  const displayEngagement = (() => {
+    if (mapMode === 'load' && hasLoadData) {
+      const tierData = loadByDifficulty[activeTab] ?? {};
+      const entries = Object.entries(tierData);
+      if (entries.length === 0) return detail.muscle_engagement_percent ?? {};
+      // Normalise to 0–100 so ExerciseMuscleMap can colour muscles by relative
+      // intensity without any internal changes.
+      const maxLoad = Math.max(...entries.map(([, m]) => m.muscle_load), 1);
+      return Object.fromEntries(
+        entries.map(([muscle, { muscle_load }]) => [
+          muscle,
+          Math.round((muscle_load / maxLoad) * 100),
+        ]),
+      );
+    }
+    return detail.muscle_engagement_percent ?? {};
+  })();
 
   const tabItems = DIFFICULTIES.map(({ key, label }) => {
     const goal = detail.progression_goals?.[key];
+    const tierLoad = hasLoadData ? (loadByDifficulty[key] ?? {}) : null;
+    // Total "Přemístěná zátěž" for this difficulty = sum of per-muscle loads
+    // (valid when muscle percents sum to 100, as they do for well-formed exercises).
+    const totalKg =
+      tierLoad !== null && Object.keys(tierLoad).length > 0
+        ? Math.round(Object.values(tierLoad).reduce((s, m) => s + m.muscle_load, 0))
+        : null;
+
     return {
       key,
       label,
@@ -289,6 +261,13 @@ function ProgressionAndMuscleCard({ detail }) {
           <Text type="secondary" style={{ fontSize: 13 }}>
             série × opakování
           </Text>
+          {totalKg !== null && (
+            <div style={{ marginTop: 8 }}>
+              <Text type="secondary" style={{ fontSize: 13 }}>
+                Přemístěná zátěž: <strong>{totalKg} kg</strong>
+              </Text>
+            </div>
+          )}
         </div>
       ) : (
         <Text type="secondary">Žádné cíle pro tuto úroveň.</Text>
@@ -331,25 +310,23 @@ function ProgressionAndMuscleCard({ detail }) {
         <Segmented
           options={[
             { label: '% Zapojení', value: 'percent' },
-            { label: 'Svalová zátěž', value: 'load', disabled: !profileComplete },
+            { label: 'Přemístěná zátěž (kg)', value: 'load', disabled: !hasLoadData },
           ]}
           value={mapMode}
           onChange={setMapMode}
         />
       </div>
 
-      {mapMode === 'load' && !profileComplete && (
+      {!hasLoadData && (
         <Alert
           type="info"
           showIcon
-          message="Pro výpočet svalové zátěže vyplňte tělesné údaje v nastavení profilu."
+          message="Přihlaste se a vyplňte hmotnost v profilu pro výpočet přemístěné zátěže."
           style={{ marginBottom: 12 }}
         />
       )}
 
-      <Spin spinning={loadFetching}>
-        <ExerciseMuscleMap engagement={displayEngagement} />
-      </Spin>
+      <ExerciseMuscleMap engagement={displayEngagement} />
     </Card>
   );
 }

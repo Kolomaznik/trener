@@ -1,6 +1,12 @@
-"""Tests for new exercise endpoints: family listing and muscle-load calculation."""
+"""Tests for exercise endpoints: family listing and embedded muscle-load in detail."""
+
+from datetime import UTC, datetime
 
 import pytest
+
+from tests.conftest import google_payload
+
+AUTH = {"Authorization": "Bearer dummy-token"}
 
 PUSHUPS_LEVEL_1 = {
     "_id": "pushups_level_1",
@@ -67,6 +73,17 @@ def seeded_db(mock_db):
     return mock_db
 
 
+def _seed_user(mock_db, weight_kg: float | None = 80.0) -> None:
+    """Insert a user profile directly into mock_db without going through the API."""
+    mock_db["users"].insert_one(
+        {
+            "email": "alice@example.com",
+            "weight_kg": weight_kg,
+            "created_at": datetime.now(UTC),
+        }
+    )
+
+
 # ── /exercises/family/{family} ────────────────────────────────────────────────
 
 
@@ -105,70 +122,84 @@ def test_family_includes_coefficients(client, seeded_db):
     assert item["height_multiplier"] == pytest.approx(0.40)
 
 
-# ── POST /exercises/{id}/muscle-load ─────────────────────────────────────────
-
-VALID_PAYLOAD = {
-    "weight_kg": 80.0,
-    "height_cm": 175.0,
-    "age": 25,
-    "gender": "M",
-    "total_reps": 10,
-}
+# ── GET /exercises/{id} — unauthenticated ─────────────────────────────────────
 
 
-def test_muscle_load_returns_engagement(client, seeded_db):
-    response = client.post("/exercises/pushups_level_1/muscle-load", json=VALID_PAYLOAD)
+def test_detail_returns_exercise(client, seeded_db):
+    response = client.get("/exercises/pushups_level_1")
 
     assert response.status_code == 200
-    body = response.json()
-    assert "muscle_engagement" in body
-    engagement = body["muscle_engagement"]
-    assert "chest" in engagement
-    assert engagement["chest"]["percent"] == 40
-    assert isinstance(engagement["chest"]["muscle_load"], int)
-    assert engagement["chest"]["muscle_load"] > 0
+    assert response.json()["id"] == "pushups_level_1"
 
 
-def test_muscle_load_correct_formula(client, seeded_db):
-    """Verify formula: h=1.75*0.40=0.70, W=80*9.81*0.70*10*0.20, C_phys=1.0"""
-    response = client.post("/exercises/pushups_level_1/muscle-load", json=VALID_PAYLOAD)
+def test_detail_has_null_muscle_load_when_unauthenticated(client, seeded_db):
+    response = client.get("/exercises/pushups_level_1")
 
-    h = 1.75 * 0.40
-    w = 80 * 9.81 * h * 10 * 0.20
-    expected_chest = round(w * 1.0 * 40 / 100)
-
-    assert response.json()["muscle_engagement"]["chest"]["muscle_load"] == expected_chest
+    assert response.status_code == 200
+    assert response.json()["muscle_load_by_difficulty"] is None
 
 
-def test_muscle_load_404_unknown_exercise(client, seeded_db):
-    response = client.post("/exercises/neexistuje/muscle-load", json=VALID_PAYLOAD)
+def test_detail_404_for_unknown_exercise(client, seeded_db):
+    response = client.get("/exercises/neexistuje")
 
     assert response.status_code == 404
 
 
-def test_muscle_load_validation_rejects_bad_gender(client, seeded_db):
-    bad_payload = {**VALID_PAYLOAD, "gender": "X"}
-    response = client.post("/exercises/pushups_level_1/muscle-load", json=bad_payload)
-
-    assert response.status_code == 422
+# ── GET /exercises/{id} — authenticated, weight set ──────────────────────────
 
 
-def test_muscle_load_validation_rejects_zero_reps(client, seeded_db):
-    bad_payload = {**VALID_PAYLOAD, "total_reps": 0}
-    response = client.post("/exercises/pushups_level_1/muscle-load", json=bad_payload)
+def test_detail_includes_muscle_load_when_authenticated(client, seeded_db, fake_google, mock_db):
+    """Verify that muscle_load_by_difficulty is populated and uses the kg formula."""
+    _seed_user(mock_db, weight_kg=80.0)
+    fake_google.set_user(google_payload())
 
-    assert response.status_code == 422
+    response = client.get("/exercises/pushups_level_1", headers=AUTH)
+
+    assert response.status_code == 200
+    mld = response.json()["muscle_load_by_difficulty"]
+    assert mld is not None
+
+    # beginner: 1×10 = 10 reps → 80 * 10 * 0.20 = 160 kg total; chest 40% = 64 kg
+    assert mld["beginner"]["chest"]["muscle_load"] == pytest.approx(64.0)
+    # intermediate: 2×25 = 50 reps → 80 * 50 * 0.20 = 800 kg total; chest 40% = 320 kg
+    assert mld["intermediate"]["chest"]["muscle_load"] == pytest.approx(320.0)
+    # mastery: 3×50 = 150 reps → 80 * 150 * 0.20 = 2400 kg total; chest 40% = 960 kg
+    assert mld["mastery"]["chest"]["muscle_load"] == pytest.approx(960.0)
 
 
-def test_muscle_load_female_higher_than_male(client, seeded_db):
-    male = client.post(
-        "/exercises/pushups_level_1/muscle-load",
-        json={**VALID_PAYLOAD, "gender": "M"},
-    ).json()["muscle_engagement"]["chest"]["muscle_load"]
+def test_detail_muscle_load_preserves_percent(client, seeded_db, fake_google, mock_db):
+    _seed_user(mock_db, weight_kg=80.0)
+    fake_google.set_user(google_payload())
 
-    female = client.post(
-        "/exercises/pushups_level_1/muscle-load",
-        json={**VALID_PAYLOAD, "gender": "F"},
-    ).json()["muscle_engagement"]["chest"]["muscle_load"]
+    response = client.get("/exercises/pushups_level_1", headers=AUTH)
 
-    assert female > male
+    mld = response.json()["muscle_load_by_difficulty"]
+    assert mld["beginner"]["chest"]["percent"] == 40
+    assert mld["beginner"]["triceps"]["percent"] == 30
+
+
+def test_detail_has_null_muscle_load_when_weight_not_set(client, seeded_db, fake_google, mock_db):
+    """Weight_kg=None in user profile → muscle_load_by_difficulty must be null."""
+    _seed_user(mock_db, weight_kg=None)
+    fake_google.set_user(google_payload())
+
+    response = client.get("/exercises/pushups_level_1", headers=AUTH)
+
+    assert response.status_code == 200
+    assert response.json()["muscle_load_by_difficulty"] is None
+
+
+def test_detail_scales_with_user_weight(client, seeded_db, fake_google, mock_db):
+    """A user twice as heavy should produce exactly twice the muscle load."""
+    _seed_user(mock_db, weight_kg=80.0)
+    fake_google.set_user(google_payload())
+    body_80 = client.get("/exercises/pushups_level_1", headers=AUTH).json()
+
+    mock_db["users"].update_one({"email": "alice@example.com"}, {"$set": {"weight_kg": 160.0}})
+    fake_google.set_user(google_payload())
+    body_160 = client.get("/exercises/pushups_level_1", headers=AUTH).json()
+
+    load_80 = body_80["muscle_load_by_difficulty"]["beginner"]["chest"]["muscle_load"]
+    load_160 = body_160["muscle_load_by_difficulty"]["beginner"]["chest"]["muscle_load"]
+    assert load_160 == pytest.approx(2 * load_80)
+
