@@ -32,9 +32,27 @@ function slugsFor(key) {
   return ENGAGEMENT_TO_SLUGS[key] ?? [key.replace(/_/g, '-')];
 }
 
+/** Colours for each mode — load: red ramp, percent: blue ramp. */
+const MODE_COLOR = {
+  load: '#c62828',
+  percent: '#1565c0',
+};
+
 function intensityOpacity(pct) {
   if (pct <= 0) return 0;
   return Math.min(1, 0.35 + (pct / 50) * 0.65);
+}
+
+/** Blend hexColor with white at given alpha (0–1) to produce a solid RGB string. */
+function blendWithWhite(hexColor, alpha) {
+  const r = parseInt(hexColor.slice(1, 3), 16);
+  const g = parseInt(hexColor.slice(3, 5), 16);
+  const b = parseInt(hexColor.slice(5, 7), 16);
+  return (
+    `rgb(${Math.round(r * alpha + 255 * (1 - alpha))},` +
+    `${Math.round(g * alpha + 255 * (1 - alpha))},` +
+    `${Math.round(b * alpha + 255 * (1 - alpha))})`
+  );
 }
 
 const PERCENT_SCALE_STOPS = [
@@ -82,8 +100,7 @@ function MuscleMapScale({ color, mode = 'percent', loadRange = null }) {
             style={{
               width: 14,
               height: 14,
-              background: color,
-              opacity: intensityOpacity(stop.pct),
+              background: blendWithWhite(color, intensityOpacity(stop.pct)),
               borderRadius: 3,
             }}
           />
@@ -96,12 +113,13 @@ function MuscleMapScale({ color, mode = 'percent', loadRange = null }) {
 
 export default function ExerciseMuscleMap({
   engagement = {},
-  color = '#e63946',
+  color = null,
   maxWidth = 420,
   showScale = true,
   mode = 'percent',
   loadRange = null,
 }) {
+  const effectiveColor = color ?? MODE_COLOR[mode] ?? '#c62828';
   const reactId = useId().replace(/:/g, '');
   const scopeId = `muscle-map-${reactId}`;
 
@@ -114,13 +132,13 @@ export default function ExerciseMuscleMap({
       const opacity = intensityOpacity(pct);
       for (const slug of slugsFor(key)) {
         lines.push(
-          `#${scopeId} [data-slug="${slug}"] path { fill: ${color} !important; ` +
+          `#${scopeId} [data-slug="${slug}"] path { fill: ${effectiveColor} !important; ` +
             `fill-opacity: ${opacity.toFixed(3)} !important; }`,
         );
       }
     }
     return lines.join('\n');
-  }, [engagement, color, scopeId]);
+  }, [engagement, effectiveColor, scopeId]);
 
   const figure = (
     <div
@@ -147,7 +165,7 @@ export default function ExerciseMuscleMap({
       }}
     >
       {figure}
-      {showScale && <MuscleMapScale color={color} mode={mode} loadRange={loadRange} />}
+      {showScale && <MuscleMapScale color={effectiveColor} mode={mode} loadRange={loadRange} />}
     </div>
   );
 }
