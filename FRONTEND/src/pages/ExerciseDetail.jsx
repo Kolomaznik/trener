@@ -6,21 +6,25 @@ import {
   Card,
   Col,
   Descriptions,
+  Divider,
   Row,
+  Segmented,
   Skeleton,
   Space,
-  Table,
+  Spin,
   Tabs,
   Tag,
   Typography,
 } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import ExerciseMuscleMap from '../components/ExerciseMuscleMap.jsx';
-import { fetchExerciseDetail, fetchExercisesByFamily } from '../api/client.js';
+import { fetchExerciseDetail, fetchMuscleLoad } from '../api/client.js';
+import { isProfileComplete, useUserSettings } from '../context/UserSettingsContext.jsx';
 
 const { Title, Paragraph, Text } = Typography;
 
-const PROGRESSION_LABELS = [
+/** The three difficulty tiers every exercise has. */
+const DIFFICULTIES = [
   { key: 'beginner', label: 'Začátečník' },
   { key: 'intermediate', label: 'Středně pokročilý' },
   { key: 'mastery', label: 'Mistr' },
@@ -30,7 +34,6 @@ export default function ExerciseDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [detail, setDetail] = useState(null);
-  const [familyExercises, setFamilyExercises] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -41,11 +44,7 @@ export default function ExerciseDetail() {
     setError(null);
     fetchExerciseDetail(id)
       .then((data) => {
-        if (!active) return;
-        setDetail(data);
-        return fetchExercisesByFamily(data.family).then((siblings) => {
-          if (active) setFamilyExercises(siblings);
-        });
+        if (active) setDetail(data);
       })
       .catch((err) => {
         if (!active) return;
@@ -82,17 +81,13 @@ export default function ExerciseDetail() {
           <Skeleton active paragraph={{ rows: 10 }} />
         </Card>
       ) : (
-        <ExerciseDetailBody
-          detail={detail}
-          familyExercises={familyExercises}
-          navigate={navigate}
-        />
+        <ExerciseDetailBody detail={detail} navigate={navigate} />
       )}
     </Space>
   );
 }
 
-function ExerciseDetailBody({ detail, familyExercises, navigate }) {
+function ExerciseDetailBody({ detail, navigate }) {
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       {/* ── Header card: name, tags, description ─────────────────────────── */}
@@ -114,16 +109,12 @@ function ExerciseDetailBody({ detail, familyExercises, navigate }) {
         </Paragraph>
       </Card>
 
-      {/* ── Level tabs: progression goals + muscle map per level ─────────── */}
-      {familyExercises.length > 0 && (
-        <LevelTabs
-          familyExercises={familyExercises}
-          currentLevel={detail.level}
-          navigate={navigate}
-        />
+      {/* ── Difficulty tabs (Začátečník/Středně pokročilý/Mistr) + muscle map */}
+      {detail.progression_goals && (
+        <ProgressionAndMuscleCard detail={detail} />
       )}
 
-      {/* ── Static detail cards for the currently viewed exercise ────────── */}
+      {/* ── Static detail cards ──────────────────────────────────────────── */}
       <Row gutter={[16, 16]}>
         <Col xs={24} md={14}>
           <Space direction="vertical" size={16} style={{ width: '100%' }}>
@@ -211,80 +202,154 @@ function ExerciseDetailBody({ detail, familyExercises, navigate }) {
   );
 }
 
-function LevelTabs({ familyExercises, currentLevel, navigate }) {
-  const [activeKey, setActiveKey] = useState(String(currentLevel));
+/**
+ * Card containing:
+ *  1. Tabs: Začátečník | Středně pokročilý | Mistr — each shows sets × reps
+ *  2. Coach note (below tabs, shared)
+ *  3. Divider
+ *  4. Muscle map with % / Svalová zátěž toggle
+ *
+ * When "Svalová zátěž" is selected and the user profile is complete, the
+ * muscle-load API is called and the map is coloured by relative load instead
+ * of raw engagement percentage.
+ */
+function ProgressionAndMuscleCard({ detail }) {
+  const { userSettings } = useUserSettings();
+  const [activeTab, setActiveTab] = useState('beginner');
+  const [mapMode, setMapMode] = useState('percent'); // 'percent' | 'load'
+  const [loadEngagement, setLoadEngagement] = useState(null);
+  const [loadFetching, setLoadFetching] = useState(false);
 
-  function handleTabChange(key) {
-    const target = familyExercises.find((ex) => String(ex.level) === key);
-    if (target && target.level !== currentLevel) {
-      setActiveKey(key);
-      navigate(`/exercises/${target.id}`);
-    }
-  }
+  const profileComplete = isProfileComplete(userSettings);
 
-  const items = familyExercises.map((ex) => ({
-    key: String(ex.level),
-    label: `Level ${ex.level}`,
-    children: <LevelTabContent exercise={ex} />,
-  }));
+  // Fetch muscle load whenever the mode, active tab, or exercise changes.
+  useEffect(() => {
+    if (mapMode !== 'load' || !profileComplete) return undefined;
+
+    const goal = detail.progression_goals?.[activeTab];
+    const total_reps = goal ? goal.sets * goal.reps : 10;
+    const age = new Date().getFullYear() - userSettings.birth_year;
+    // Age is approximated as (current_year − birth_year); it may be off by 1
+    // for users who haven't yet had their birthday this year.  The impact on
+    // the physiological coefficient is negligible (≤ 0.05).
+    const gender = userSettings.gender === 'male' ? 'M' : 'F';
+
+    let active = true;
+    setLoadFetching(true);
+
+    fetchMuscleLoad(detail.id, {
+      weight_kg: userSettings.weight_kg,
+      height_cm: userSettings.height_cm,
+      age,
+      gender,
+      total_reps,
+    })
+      .then((data) => {
+        if (!active) return;
+        // Normalise absolute loads to 0–100 scale so ExerciseMuscleMap can
+        // colour muscles by relative intensity without any internal changes.
+        const entries = Object.entries(data.muscle_engagement);
+        const maxLoad = Math.max(...entries.map(([, m]) => m.muscle_load), 1);
+        const normalized = Object.fromEntries(
+          entries.map(([muscle, { muscle_load }]) => [
+            muscle,
+            Math.round((muscle_load / maxLoad) * 100),
+          ]),
+        );
+        setLoadEngagement(normalized);
+      })
+      .catch(() => {
+        if (active) setLoadEngagement(null);
+      })
+      .finally(() => {
+        if (active) setLoadFetching(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [mapMode, activeTab, detail, profileComplete, userSettings]);
+
+  // What to render on the muscle map.
+  const displayEngagement =
+    mapMode === 'load' && loadEngagement
+      ? loadEngagement
+      : (detail.muscle_engagement_percent ?? {});
+
+  const tabItems = DIFFICULTIES.map(({ key, label }) => {
+    const goal = detail.progression_goals?.[key];
+    return {
+      key,
+      label,
+      children: goal ? (
+        <div style={{ textAlign: 'center', padding: '16px 0 8px' }}>
+          <Title level={2} style={{ margin: 0, lineHeight: 1 }}>
+            {goal.sets} × {goal.reps}
+          </Title>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            série × opakování
+          </Text>
+        </div>
+      ) : (
+        <Text type="secondary">Žádné cíle pro tuto úroveň.</Text>
+      ),
+    };
+  });
 
   return (
-    <Card size="small">
+    <Card>
+      <Text strong style={{ fontSize: 15 }}>
+        Postup
+      </Text>
       <Tabs
-        activeKey={activeKey}
-        onChange={handleTabChange}
-        items={items}
-        data-testid="level-tabs"
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={tabItems}
+        style={{ marginTop: 4 }}
       />
-    </Card>
-  );
-}
 
-function LevelTabContent({ exercise }) {
-  return (
-    <Row gutter={[16, 16]}>
-      <Col xs={24} md={14}>
-        {exercise.progression_goals ? (
-          <Space direction="vertical" size={8} style={{ width: '100%' }}>
-            <Text strong>Postup</Text>
-            <Table
-              size="small"
-              bordered
-              pagination={false}
-              columns={PROGRESSION_LABELS.map(({ key, label }) => ({
-                title: label,
-                dataIndex: key,
-                key,
-                align: 'center',
-              }))}
-              dataSource={[
-                {
-                  key: 'goals',
-                  ...Object.fromEntries(
-                    PROGRESSION_LABELS.map(({ key }) => {
-                      const goal = exercise.progression_goals[key];
-                      return [key, goal ? `${goal.sets} × ${goal.reps}` : '—'];
-                    }),
-                  ),
-                },
-              ]}
-            />
-            {exercise.progression_goals.coach_note && (
-              <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-                {exercise.progression_goals.coach_note}
-              </Paragraph>
-            )}
-          </Space>
-        ) : (
-          <Text type="secondary">Žádné cíle pro tuto úroveň.</Text>
-        )}
-      </Col>
-      <Col xs={24} md={10}>
-        <Text strong style={{ display: 'block', marginBottom: 8 }}>
+      {detail.progression_goals?.coach_note && (
+        <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+          {detail.progression_goals.coach_note}
+        </Paragraph>
+      )}
+
+      <Divider />
+
+      {/* ── Muscle map section ──────────────────────────────────────────── */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 12,
+        }}
+      >
+        <Text strong style={{ fontSize: 15 }}>
           Zapojené svaly
         </Text>
-        <ExerciseMuscleMap engagement={exercise.muscle_engagement_percent ?? {}} />
-      </Col>
-    </Row>
+        <Segmented
+          options={[
+            { label: '% Zapojení', value: 'percent' },
+            { label: 'Svalová zátěž', value: 'load', disabled: !profileComplete },
+          ]}
+          value={mapMode}
+          onChange={setMapMode}
+        />
+      </div>
+
+      {mapMode === 'load' && !profileComplete && (
+        <Alert
+          type="info"
+          showIcon
+          message="Pro výpočet svalové zátěže vyplňte tělesné údaje v nastavení profilu."
+          style={{ marginBottom: 12 }}
+        />
+      )}
+
+      <Spin spinning={loadFetching}>
+        <ExerciseMuscleMap engagement={displayEngagement} />
+      </Spin>
+    </Card>
   );
 }

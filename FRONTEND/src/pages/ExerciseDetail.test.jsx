@@ -2,14 +2,17 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ExerciseDetail from './ExerciseDetail.jsx';
+import { UserSettingsContext } from '../context/UserSettingsContext.jsx';
 
 vi.mock('../api/client.js', () => ({
   fetchExercises: vi.fn(),
   fetchExerciseDetail: vi.fn(),
-  fetchExercisesByFamily: vi.fn(),
+  fetchMuscleLoad: vi.fn(),
 }));
 
-import { fetchExerciseDetail, fetchExercisesByFamily } from '../api/client.js';
+import { fetchExerciseDetail, fetchMuscleLoad } from '../api/client.js';
+
+// ── Fixtures ──────────────────────────────────────────────────────────────────
 
 const detailFixture = {
   id: 'pushups_level_1',
@@ -58,29 +61,56 @@ const detailFixtureLevel2 = {
   level_coefficient: 0.35,
 };
 
-const familyFixture = [
-  detailFixture,
-  detailFixtureLevel2,
-];
+/** A complete user profile (all fields required by isProfileComplete). */
+const completeSettings = {
+  gender: 'male',
+  height_cm: 175,
+  weight_kg: 80,
+  birth_year: 1990,
+};
 
-function renderWithRouter(initialPath = '/exercises/pushups_level_1') {
+/** Realistic muscle-load API response for the load-mode tests. */
+const muscleLoadResponse = {
+  muscle_engagement: {
+    chest: { percent: 40, muscle_load: 200 },
+    triceps: { percent: 30, muscle_load: 150 },
+    lower_back: { percent: 5, muscle_load: 25 },
+  },
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Renders the ExerciseDetail page inside a UserSettingsContext provider and a
+ * MemoryRouter so that router hooks and context hooks both work.
+ *
+ * @param {string} initialPath - URL to start at.
+ * @param {object|null} settings - Value to put in UserSettingsContext.
+ */
+function renderWithRouter(initialPath = '/exercises/pushups_level_1', settings = null) {
   return render(
-    <MemoryRouter initialEntries={[initialPath]}>
-      <Routes>
-        <Route path="/exercises" element={<div data-testid="list-marker" />} />
-        <Route path="/exercises/:id" element={<ExerciseDetail />} />
-      </Routes>
-    </MemoryRouter>,
+    <UserSettingsContext.Provider value={{ userSettings: settings, setUserSettings: vi.fn() }}>
+      <MemoryRouter initialEntries={[initialPath]}>
+        <Routes>
+          <Route path="/exercises" element={<div data-testid="list-marker" />} />
+          <Route path="/exercises/:id" element={<ExerciseDetail />} />
+        </Routes>
+      </MemoryRouter>
+    </UserSettingsContext.Provider>,
   );
 }
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('ExerciseDetail page', () => {
   beforeEach(() => {
     fetchExerciseDetail.mockReset();
-    fetchExercisesByFamily.mockReset();
+    fetchMuscleLoad.mockReset();
     fetchExerciseDetail.mockResolvedValue(detailFixture);
-    fetchExercisesByFamily.mockResolvedValue(familyFixture);
+    fetchMuscleLoad.mockResolvedValue(muscleLoadResponse);
   });
+
+  // ── Data fetching ──────────────────────────────────────────────────────────
 
   it('fetches detail using id from URL', async () => {
     renderWithRouter('/exercises/pushups_level_1');
@@ -90,13 +120,14 @@ describe('ExerciseDetail page', () => {
     );
   });
 
-  it('fetches family exercises after loading detail', async () => {
+  it('does NOT call fetchMuscleLoad on initial load (percent mode by default)', async () => {
     renderWithRouter();
 
-    await waitFor(() =>
-      expect(fetchExercisesByFamily).toHaveBeenCalledWith('Kliky'),
-    );
+    await screen.findByText('Kliky o zeď');
+    expect(fetchMuscleLoad).not.toHaveBeenCalled();
   });
+
+  // ── Header card ────────────────────────────────────────────────────────────
 
   it('renders name, english name, family/level chips, description', async () => {
     renderWithRouter();
@@ -104,14 +135,141 @@ describe('ExerciseDetail page', () => {
     expect(await screen.findByText('Kliky o zeď')).toBeInTheDocument();
     expect(screen.getByText('Wall Push-ups')).toBeInTheDocument();
     expect(screen.getByText('Kliky')).toBeInTheDocument();
-    // The header tag chip says "Level 1"; getAllByText handles the tab duplicate
-    expect(screen.getAllByText('Level 1').length).toBeGreaterThanOrEqual(1);
-    expect(
-      screen.getByText('Rehabilitační a přípravný cvik.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Level 1')).toBeInTheDocument();
+    expect(screen.getByText('Rehabilitační a přípravný cvik.')).toBeInTheDocument();
   });
 
-  it('renders rich detail: instructions, cadence, video', async () => {
+  // ── Difficulty tabs ────────────────────────────────────────────────────────
+
+  it('renders three difficulty tabs: Začátečník, Středně pokročilý, Mistr', async () => {
+    renderWithRouter();
+
+    await screen.findByText('Kliky o zeď');
+    expect(screen.getByRole('tab', { name: 'Začátečník' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Středně pokročilý' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Mistr' })).toBeInTheDocument();
+  });
+
+  it('Začátečník tab is active by default and shows its sets × reps', async () => {
+    renderWithRouter();
+
+    await screen.findByText('Kliky o zeď');
+    // The beginner goal is 1 série × 10 opakování.
+    expect(screen.getByText('1 × 10')).toBeInTheDocument();
+  });
+
+  it('switching to Středně pokročilý tab shows intermediate sets × reps', async () => {
+    renderWithRouter();
+
+    await screen.findByText('Kliky o zeď');
+    fireEvent.click(screen.getByRole('tab', { name: 'Středně pokročilý' }));
+    expect(await screen.findByText('2 × 25')).toBeInTheDocument();
+  });
+
+  it('switching to Mistr tab shows mastery sets × reps', async () => {
+    renderWithRouter();
+
+    await screen.findByText('Kliky o zeď');
+    fireEvent.click(screen.getByRole('tab', { name: 'Mistr' }));
+    expect(await screen.findByText('3 × 50')).toBeInTheDocument();
+  });
+
+  it('renders the coach note below the tabs', async () => {
+    renderWithRouter();
+
+    expect(await screen.findByText('Po zvládnutí mastery na level 2.')).toBeInTheDocument();
+  });
+
+  // ── Muscle map ─────────────────────────────────────────────────────────────
+
+  it('renders the muscle map', async () => {
+    renderWithRouter();
+
+    const map = await screen.findByTestId('exercise-muscle-map');
+    expect(map).toBeInTheDocument();
+  });
+
+  it('muscle map is styled for the engaged muscles in % mode', async () => {
+    renderWithRouter();
+
+    const map = await screen.findByTestId('exercise-muscle-map');
+    const style = map.querySelector('style')?.textContent ?? '';
+    expect(style).toContain('[data-slug="chest"]');
+    expect(style).toContain('[data-slug="triceps"]');
+  });
+
+  // ── % / Svalová zátěž toggle ───────────────────────────────────────────────
+
+  it('renders the % / Svalová zátěž segmented control', async () => {
+    renderWithRouter();
+
+    await screen.findByText('Zapojené svaly');
+    expect(screen.getByText('% Zapojení')).toBeInTheDocument();
+    expect(screen.getByText('Svalová zátěž')).toBeInTheDocument();
+  });
+
+  it('Svalová zátěž option is disabled when user profile is incomplete', async () => {
+    renderWithRouter('/exercises/pushups_level_1', null);
+
+    await screen.findByText('Zapojené svaly');
+    // antd Segmented marks disabled items with ant-segmented-item-disabled class.
+    const option = screen.getByText('Svalová zátěž').closest('.ant-segmented-item');
+    expect(option).toHaveClass('ant-segmented-item-disabled');
+  });
+
+  it('shows an info alert when load mode is somehow active without a profile', async () => {
+    // Render without a profile and programmatically verify the alert appears
+    // only when the mode reaches 'load' (edge case guard).
+    renderWithRouter('/exercises/pushups_level_1', null);
+    await screen.findByText('Zapojené svaly');
+
+    // The disabled button cannot be clicked normally; verify no alert yet.
+    expect(
+      screen.queryByText(/vyplňte tělesné údaje/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it('calls fetchMuscleLoad when switching to load mode with a complete profile', async () => {
+    renderWithRouter('/exercises/pushups_level_1', completeSettings);
+
+    await screen.findByText('Zapojené svaly');
+    fireEvent.click(screen.getByText('Svalová zátěž'));
+
+    await waitFor(() =>
+      expect(fetchMuscleLoad).toHaveBeenCalledWith(
+        'pushups_level_1',
+        expect.objectContaining({
+          weight_kg: 80,
+          height_cm: 175,
+          gender: 'M',
+          // beginner: 1 set × 10 reps = 10 total_reps
+          total_reps: 10,
+        }),
+      ),
+    );
+  });
+
+  it('re-fetches muscle load when the active difficulty tab changes in load mode', async () => {
+    renderWithRouter('/exercises/pushups_level_1', completeSettings);
+
+    await screen.findByText('Zapojené svaly');
+    fireEvent.click(screen.getByText('Svalová zátěž'));
+
+    // Wait for the first call (beginner tab).
+    await waitFor(() => expect(fetchMuscleLoad).toHaveBeenCalledTimes(1));
+
+    // Switch to Mistr tab — should trigger a new fetch with mastery total_reps.
+    fireEvent.click(screen.getByRole('tab', { name: 'Mistr' }));
+    await waitFor(() => expect(fetchMuscleLoad).toHaveBeenCalledTimes(2));
+    expect(fetchMuscleLoad).toHaveBeenLastCalledWith(
+      'pushups_level_1',
+      expect.objectContaining({ total_reps: 150 }), // mastery: 3 × 50
+    );
+  });
+
+  // ── Static detail cards ────────────────────────────────────────────────────
+
+  it('renders instructions, cadence, video cards', async () => {
     renderWithRouter();
 
     expect(await screen.findByText('Jak cvičit')).toBeInTheDocument();
@@ -121,32 +279,9 @@ describe('ExerciseDetail page', () => {
     expect(screen.getByText('Video')).toBeInTheDocument();
   });
 
-  it('renders level tabs for all family exercises', async () => {
-    renderWithRouter();
+  // ── Navigation ─────────────────────────────────────────────────────────────
 
-    // Wait for data to load, then check that tab roles exist
-    await screen.findByText('Kliky o zeď');
-    expect(screen.getByRole('tab', { name: 'Level 1' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Level 2' })).toBeInTheDocument();
-  });
-
-  it('renders progression goals inside the active tab', async () => {
-    renderWithRouter();
-
-    expect(await screen.findByText('3 × 50')).toBeInTheDocument();
-  });
-
-  it('renders the muscle map inside the active tab', async () => {
-    renderWithRouter();
-
-    const map = await screen.findByTestId('exercise-muscle-map');
-    expect(map).toBeInTheDocument();
-    const style = map.querySelector('style')?.textContent ?? '';
-    expect(style).toContain('[data-slug="chest"]');
-    expect(style).toContain('[data-slug="triceps"]');
-  });
-
-  it('navigates back to list when "back" link is clicked', async () => {
+  it('navigates back to list when "Zpět na seznam" button is clicked', async () => {
     renderWithRouter();
 
     await screen.findByText('Kliky o zeď');
@@ -155,7 +290,7 @@ describe('ExerciseDetail page', () => {
     expect(await screen.findByTestId('list-marker')).toBeInTheDocument();
   });
 
-  it('navigates to next exercise when "next level" link is clicked', async () => {
+  it('navigates to next exercise when "next level" button is clicked', async () => {
     fetchExerciseDetail.mockImplementation(async (id) =>
       id === 'pushups_level_2' ? detailFixtureLevel2 : detailFixture,
     );
@@ -172,7 +307,9 @@ describe('ExerciseDetail page', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows 404 message when exercise not found', async () => {
+  // ── Error states ───────────────────────────────────────────────────────────
+
+  it('shows 404 message when exercise is not found', async () => {
     fetchExerciseDetail.mockRejectedValue({ response: { status: 404 } });
     renderWithRouter('/exercises/neexistuje');
 

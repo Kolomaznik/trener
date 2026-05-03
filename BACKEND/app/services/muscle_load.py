@@ -25,6 +25,10 @@ def _physiological_coefficient(age: int, gender: str) -> float:
         A float coefficient ≥ 1.0.
     """
     base = 1.0 if gender.upper() == "M" else 1.1
+    # Any value other than "M" / "m" intentionally defaults to the female
+    # coefficient (1.1), matching the API-layer validation that only accepts
+    # "M" and "F".  The Pydantic request model enforces this before the
+    # service is ever called.
 
     if age <= 30:
         age_factor = 0.0

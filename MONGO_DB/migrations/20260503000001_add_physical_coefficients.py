@@ -41,6 +41,9 @@ _EXERCISE_OVERRIDES: dict[str, dict] = {
     "pullups_level_7": {"level_coefficient": 0.90, "height_multiplier": 0.55},
     "pullups_level_8": {"level_coefficient": 0.95, "height_multiplier": 0.55},
     "pullups_level_9": {"level_coefficient": 1.00, "height_multiplier": 0.55},
+    # Level 10 also caps at 1.00 — the full body-weight is lifted at both
+    # levels 9 and 10; the progression difficulty lies in stability and range,
+    # not in the fraction of body-weight engaged.
     "pullups_level_10": {"level_coefficient": 1.00, "height_multiplier": 0.55},
     # ── Zdvihy nohou (Leg raises) ─────────────────────────────────────────────
     "legraises_level_1": {"level_coefficient": 0.20, "height_multiplier": 0.30},
