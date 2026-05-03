@@ -269,36 +269,15 @@ function ProgressionAndMuscleCard({ detail }) {
 
   return (
     <Card>
-      <Text strong style={{ fontSize: 15 }}>
-        Postup
-      </Text>
       <Tabs
         activeKey={activeTab}
         onChange={setActiveTab}
         items={tabItems}
         style={{ marginTop: 4 }}
       />
-
-      {detail.progression_goals?.coach_note && (
-        <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          {detail.progression_goals.coach_note}
-        </Paragraph>
-      )}
-
       <Divider />
 
       {/* ── Muscle map section ──────────────────────────────────────────── */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-        <Segmented
-          options={[
-            { label: '% Zapojení', value: 'percent' },
-            { label: 'Přemístěná zátěž (kg)', value: 'load', disabled: !hasLoadData },
-          ]}
-          value={mapMode}
-          onChange={setMapMode}
-        />
-      </div>
-
       {!hasLoadData && (
         <Alert
           type="info"
@@ -309,6 +288,17 @@ function ProgressionAndMuscleCard({ detail }) {
       )}
 
       <ExerciseMuscleMap engagement={displayEngagement} mode={mapMode} loadRange={activeLoadRange} />
+
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+        <Segmented
+          options={[
+            { label: '% Zapojení', value: 'percent' },
+            { label: 'Zátěž (kg)', value: 'load', disabled: !hasLoadData },
+          ]}
+          value={mapMode}
+          onChange={setMapMode}
+        />
+      </div>
     </Card>
   );
 }

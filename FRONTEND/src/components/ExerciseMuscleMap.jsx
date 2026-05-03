@@ -77,7 +77,7 @@ function buildLoadStops(loadRange) {
 function MuscleMapScale({ color, mode = 'percent', loadRange = null }) {
   const isLoad = mode === 'load';
   const stops = isLoad ? buildLoadStops(loadRange) : PERCENT_SCALE_STOPS;
-  const title = isLoad ? 'Přemístěná zátěž' : 'Zapojení';
+  const title = isLoad ? 'Zátěž' : 'Zapojení';
   return (
     <div
       data-testid="muscle-map-scale"
