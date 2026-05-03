@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ruff check *)"
+      "Bash(ruff check *)",
+      "Bash(npx vitest *)",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(echo '{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"C:\\\\\\\\Users\\\\\\\\janko\\\\\\\\Git\\\\\\\\trener\\\\\\\\BACKEND\\\\\\\\app\\\\\\\\api\\\\\\\\exercises.py\"}}')",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"C:\\\\\\\\Users\\\\\\\\janko\\\\\\\\Git\\\\\\\\trener\\\\\\\\.claude\\\\\\\\hooks\\\\\\\\ruff-postedit.ps1\")",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(pwsh -NoProfile -Command \"\\(Get-Content C:\\\\Users\\\\janko\\\\Git\\\\trener\\\\.claude\\\\settings.json | ConvertFrom-Json\\).hooks.PostToolUse[0].hooks[0].command\")",
+      "Bash(xargs grep *)",
+      "Bash(pwsh -NoProfile -Command \"Get-Content 'C:\\\\Users\\\\janko\\\\Git\\\\trener\\\\trener.code-workspace' | ConvertFrom-Json | ConvertTo-Json -Depth 10\")"
     ]
   }
 }

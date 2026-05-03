@@ -10,6 +10,8 @@ import {
 } from './context/UserSettingsContext.jsx';
 import Home from './pages/Home.jsx';
 import Exercises from './pages/Exercises.jsx';
+import ExerciseDetail from './pages/ExerciseDetail.jsx';
+import VoiceCounting from './pages/VoiceCounting.jsx';
 import Settings from './pages/Settings.jsx';
 
 const { Header, Content } = Layout;
@@ -173,6 +175,7 @@ export default function App() {
   const drawerTopItems = [
     { key: '/', label: 'Overview' },
     { key: '/exercises', label: 'Exercises' },
+    { key: '/voice-counting', label: 'Voice counting' },
   ];
 
   const drawerBottomItems = [
@@ -276,6 +279,8 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/exercises" element={<Exercises />} />
+            <Route path="/exercises/:id" element={<ExerciseDetail />} />
+            <Route path="/voice-counting" element={<VoiceCounting />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </Content>

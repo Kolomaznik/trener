@@ -33,3 +33,13 @@ apiClient.interceptors.request.use((config) => {
   }
   return config;
 });
+
+export async function fetchExercises() {
+  const response = await apiClient.get('/exercises');
+  return response.data;
+}
+
+export async function fetchExerciseDetail(exerciseId) {
+  const response = await apiClient.get(`/exercises/${exerciseId}`);
+  return response.data;
+}

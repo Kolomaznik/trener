@@ -1,126 +1,98 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Exercises from './Exercises.jsx';
 
-vi.mock('react-speech-recognition', () => {
-  const initialState = {
-    transcript: '',
-    listening: false,
-    browserSupportsSpeechRecognition: true,
-    isMicrophoneAvailable: true,
-  };
+vi.mock('../api/client.js', () => ({
+  fetchExercises: vi.fn(),
+  fetchExerciseDetail: vi.fn(),
+}));
 
-  let state = { ...initialState };
+import { fetchExercises } from '../api/client.js';
 
-  const startListening = vi.fn(async () => {
-    state = { ...state, listening: true };
-  });
-  const stopListening = vi.fn(async () => {
-    state = { ...state, listening: false };
-  });
-  const resetTranscript = vi.fn(() => {
-    state = { ...state, transcript: '' };
-  });
-  const setMockState = (patch) => {
-    state = { ...state, ...patch };
-  };
-  const resetMock = () => {
-    state = { ...initialState };
-    startListening.mockClear();
-    stopListening.mockClear();
-    resetTranscript.mockClear();
-  };
+const listFixture = [
+  {
+    id: 'pushups_level_1',
+    name: 'Kliky o zeď',
+    family: 'Kliky',
+    level: 1,
+    description: 'Rehabilitační a přípravný cvik.',
+    next_exercise_id: 'pushups_level_2',
+    next_exercise_name: 'Kliky v předklonu',
+  },
+  {
+    id: 'pushups_level_2',
+    name: 'Kliky v předklonu',
+    family: 'Kliky',
+    level: 2,
+    description: 'Náročnější varianta.',
+    next_exercise_id: null,
+    next_exercise_name: null,
+  },
+];
 
-  return {
-    default: {
-      startListening,
-      stopListening,
-    },
-    useSpeechRecognition: () => ({
-      ...state,
-      resetTranscript,
-    }),
-    __setMockState: setMockState,
-    __resetMockState: resetMock,
-    __mocks: {
-      startListening,
-      stopListening,
-    },
-  };
-});
+function renderWithRouter(initialPath = '/exercises') {
+  return render(
+    <MemoryRouter initialEntries={[initialPath]}>
+      <Routes>
+        <Route path="/exercises" element={<Exercises />} />
+        <Route path="/exercises/:id" element={<div data-testid="detail-marker" />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
-import * as speechModule from 'react-speech-recognition';
-
-describe('Exercises voice counting', () => {
+describe('Exercises page (tile grid)', () => {
   beforeEach(() => {
-    speechModule.__resetMockState();
+    fetchExercises.mockReset();
+    fetchExercises.mockResolvedValue(listFixture);
   });
 
-  it('starts and stops session', async () => {
-    const { rerender } = render(<Exercises />);
+  it('renders tiles for each exercise', async () => {
+    renderWithRouter();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Začít poslouchat' }));
-    rerender(<Exercises />);
-    expect(speechModule.__mocks.startListening).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/Stav relace: listening/)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Zastavit počítání' }));
-    expect(speechModule.__mocks.stopListening).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(screen.getByText(/Stav relace:\s*stopped/)).toBeInTheDocument());
+    await waitFor(() => expect(fetchExercises).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText('Kliky o zeď')).toBeInTheDocument();
+    expect(screen.getByText('Kliky v předklonu')).toBeInTheDocument();
+    expect(screen.getAllByText('Kliky').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/Level \d/).length).toBeGreaterThanOrEqual(2);
   });
 
-  it('updates number and event list from transcript', async () => {
-    const { rerender } = render(<Exercises />);
+  it('shows "next level" hint on tiles that have one, "highest" otherwise', async () => {
+    renderWithRouter();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Začít poslouchat' }));
-    speechModule.__setMockState({ transcript: 'ahoj 7 7' });
-    rerender(<Exercises />);
-
-    expect(screen.getByText('Aktuální číslo')).toBeInTheDocument();
-    expect(screen.getByText(/7 \(7\)/)).toBeInTheDocument();
-    expect(screen.getByText('Rozpoznáno čísel')).toBeInTheDocument();
-    expect(screen.getByText('Události (1)')).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Další úroveň: Kliky v předklonu/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Nejvyšší úroveň této rodiny')).toBeInTheDocument();
   });
 
-  it('ignores non-number transcript', () => {
-    const { rerender } = render(<Exercises />);
+  it('navigates to detail when a tile is clicked', async () => {
+    renderWithRouter();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Začít poslouchat' }));
-    speechModule.__setMockState({ transcript: 'ahoj svete' });
-    rerender(<Exercises />);
-
-    expect(screen.getByText('Události (0)')).toBeInTheDocument();
-  });
-
-  it('resets session data', async () => {
-    const { rerender } = render(<Exercises />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Začít poslouchat' }));
-    speechModule.__setMockState({ transcript: '8' });
-    rerender(<Exercises />);
-    expect(screen.getByText('Události (1)')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Nová relace' }));
-    rerender(<Exercises />);
-    await waitFor(() => expect(screen.getByText('Události (0)')).toBeInTheDocument());
-  });
-
-  it('shows unsupported browser fallback', () => {
-    speechModule.__setMockState({ browserSupportsSpeechRecognition: false });
-    render(<Exercises />);
-
-    expect(screen.getByText(/nepodporuje rozpoznávání řeči/i)).toBeInTheDocument();
-  });
-
-  it('shows microphone permission error', async () => {
-    const { rerender } = render(<Exercises />);
-
-    speechModule.__setMockState({
-      browserSupportsSpeechRecognition: true,
-      isMicrophoneAvailable: false,
+    const tile = await screen.findByRole('button', {
+      name: 'Otevřít cvik Kliky o zeď',
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Začít poslouchat' }));
-    rerender(<Exercises />);
-    await waitFor(() => expect(screen.getByText(/Mikrofon není dostupný/i)).toBeInTheDocument());
+    fireEvent.click(tile);
+
+    expect(await screen.findByTestId('detail-marker')).toBeInTheDocument();
+  });
+
+  it('shows error alert when list fails to load', async () => {
+    fetchExercises.mockRejectedValue(new Error('boom'));
+    renderWithRouter();
+
+    expect(
+      await screen.findByText('Nepodařilo se načíst seznam cviků.'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows empty state when no exercises in DB', async () => {
+    fetchExercises.mockResolvedValue([]);
+    renderWithRouter();
+
+    expect(
+      await screen.findByText('Žádné cviky v databázi.'),
+    ).toBeInTheDocument();
   });
 });

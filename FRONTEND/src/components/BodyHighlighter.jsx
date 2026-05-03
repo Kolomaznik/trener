@@ -1,10 +1,8 @@
 import { useCallback, useId, useMemo, useState } from 'react';
 import { Button, Card, Col, Row, Select, Slider, Space, Tag, Tooltip, Typography } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
-import frontSvgRaw from '../assets/muscle-map-front.svg?raw';
-import backSvgRaw from '../assets/muscle-map-back.svg?raw';
-import femaleFrontSvgRaw from '../assets/muscle-map-female-front.svg?raw';
-import femaleBackSvgRaw from '../assets/muscle-map-female-back.svg?raw';
+import maleSvgRaw from '../assets/muscle-map-male.svg?raw';
+import femaleSvgRaw from '../assets/muscle-map-female.svg?raw';
 
 const { Text } = Typography;
 
@@ -27,75 +25,68 @@ const intensityToOpacity = (i) => [0, 0.3, 0.62, 0.9][i];
 const randomColor = () => COLORS[Math.floor(Math.random() * COLORS.length)].value;
 const randomIntensity = () => Math.ceil(Math.random() * 3); // 1–3
 
-function parseBodySvg(svgRaw, fallbackViewBox) {
-  if (typeof DOMParser === 'undefined') {
-    return { viewBox: fallbackViewBox, pathsBySlug: {} };
-  }
-
-  const doc = new DOMParser().parseFromString(svgRaw, 'image/svg+xml');
-  const svgEl = doc.querySelector('svg');
-  if (!svgEl) {
-    return { viewBox: fallbackViewBox, pathsBySlug: {} };
-  }
-
-  const pathsBySlug = {};
-  doc.querySelectorAll('g[data-slug]').forEach((groupEl) => {
-    const slug = groupEl.getAttribute('data-slug');
-    if (!slug) return;
-    pathsBySlug[slug] = Array.from(groupEl.querySelectorAll('path'))
-      .map((pathEl) => pathEl.getAttribute('d'))
-      .filter(Boolean);
-  });
-
-  return {
-    viewBox: svgEl.getAttribute('viewBox') || fallbackViewBox,
-    pathsBySlug,
-  };
-}
-
-const FRONT_SVG = parseBodySvg(frontSvgRaw, '0 0 724 1448');
-const BACK_SVG = parseBodySvg(backSvgRaw, '724 0 724 1448');
-const FEMALE_FRONT_SVG = parseBodySvg(femaleFrontSvgRaw, '-50 -40 734 1538');
-const FEMALE_BACK_SVG = parseBodySvg(femaleBackSvgRaw, '756 0 774 1448');
-
 const MUSCLE_GROUPS = [
-  { id: 'chest', label: 'Prsní svaly', slugs: { front: ['chest'] } },
-  { id: 'deltoids', label: 'Ramena (deltoid)', slugs: { front: ['deltoids'], back: ['deltoids'] } },
-  { id: 'biceps', label: 'Biceps', slugs: { front: ['biceps'] } },
-  { id: 'triceps', label: 'Triceps', slugs: { front: ['triceps'], back: ['triceps'] } },
-  { id: 'forearms', label: 'Předloktí', slugs: { front: ['forearm'], back: ['forearm'] } },
-  { id: 'abs', label: 'Břišní svaly', slugs: { front: ['abs'] } },
-  { id: 'obliques', label: 'Šikmé svaly', slugs: { front: ['obliques'] } },
-  { id: 'trapezius', label: 'Trapézový sval', slugs: { front: ['trapezius'], back: ['trapezius'] } },
-  { id: 'lats', label: 'Široký sval zádový', slugs: { back: ['upper-back'] } },
-  { id: 'lower_back', label: 'Dolní záda', slugs: { back: ['lower-back'] } },
-  { id: 'quadriceps', label: 'Stehenní svaly', slugs: { front: ['quadriceps'] } },
-  { id: 'hamstrings', label: 'Zadní svaly stehna', slugs: { back: ['hamstring'] } },
-  { id: 'glutes', label: 'Hýžďové svaly', slugs: { back: ['gluteal'] } },
-  { id: 'calves', label: 'Lýtkové svaly', slugs: { front: ['calves'], back: ['calves'] } },
-  { id: 'adductors', label: 'Adduktory', slugs: { front: ['adductors'], back: ['adductors'] } },
-  { id: 'tibialis', label: 'Holenní sval', slugs: { front: ['tibialis'] } },
-  { id: 'neck', label: 'Krk', slugs: { front: ['neck'], back: ['neck'] } },
-  { id: 'knees', label: 'Kolena', slugs: { front: ['knees'] } },
-  { id: 'hands', label: 'Ruce', slugs: { front: ['hands'], back: ['hands'] } },
-  { id: 'ankles', label: 'Kotníky', slugs: { front: ['ankles'], back: ['ankles'] } },
-  { id: 'feet', label: 'Chodidla', slugs: { front: ['feet'], back: ['feet'] } },
+  { id: 'chest', label: 'Prsní svaly', slugs: ['chest'] },
+  { id: 'deltoids', label: 'Ramena (deltoid)', slugs: ['deltoids'] },
+  { id: 'biceps', label: 'Biceps', slugs: ['biceps'] },
+  { id: 'triceps', label: 'Triceps', slugs: ['triceps'] },
+  { id: 'forearms', label: 'Předloktí', slugs: ['forearm'] },
+  { id: 'abs', label: 'Břišní svaly', slugs: ['abs'] },
+  { id: 'obliques', label: 'Šikmé svaly', slugs: ['obliques'] },
+  { id: 'trapezius', label: 'Trapézový sval', slugs: ['trapezius'] },
+  { id: 'lats', label: 'Široký sval zádový', slugs: ['upper-back'] },
+  { id: 'lower_back', label: 'Dolní záda', slugs: ['lower-back'] },
+  { id: 'quadriceps', label: 'Stehenní svaly', slugs: ['quadriceps'] },
+  { id: 'hamstrings', label: 'Zadní svaly stehna', slugs: ['hamstring'] },
+  { id: 'glutes', label: 'Hýžďové svaly', slugs: ['gluteal'] },
+  { id: 'calves', label: 'Lýtkové svaly', slugs: ['calves'] },
+  { id: 'adductors', label: 'Adduktory', slugs: ['adductors'] },
+  { id: 'tibialis', label: 'Holenní sval', slugs: ['tibialis'] },
+  { id: 'neck', label: 'Krk', slugs: ['neck'] },
+  { id: 'knees', label: 'Kolena', slugs: ['knees'] },
+  { id: 'hands', label: 'Ruce', slugs: ['hands'] },
+  { id: 'ankles', label: 'Kotníky', slugs: ['ankles'] },
+  { id: 'feet', label: 'Chodidla', slugs: ['feet'] },
 ];
 
-const initMuscleData = () =>
-  Object.fromEntries(MUSCLE_GROUPS.map((g) => [g.id, { color: randomColor(), intensity: randomIntensity() }]));
+const MUSCLE_BY_SLUG = (() => {
+  const map = {};
+  for (const group of MUSCLE_GROUPS) {
+    for (const slug of group.slugs) {
+      map[slug] = group.id;
+    }
+  }
+  return map;
+})();
 
-const getGroupPaths = (group, view, pathsBySlug) => {
-  const slugs = group.slugs[view] || [];
-  return slugs.flatMap((slug) => pathsBySlug[slug] || []);
-};
+const HIGHLIGHTABLE_SLUGS = Object.keys(MUSCLE_BY_SLUG);
+
+const initMuscleData = () =>
+  Object.fromEntries(
+    MUSCLE_GROUPS.map((g) => [g.id, { color: randomColor(), intensity: randomIntensity() }]),
+  );
+
+function extractAvailableSlugs(svgRaw) {
+  if (typeof DOMParser === 'undefined') return new Set();
+  const doc = new DOMParser().parseFromString(svgRaw, 'image/svg+xml');
+  const slugs = new Set();
+  doc.querySelectorAll('g[data-slug]').forEach((el) => {
+    const slug = el.getAttribute('data-slug');
+    if (slug) slugs.add(slug);
+  });
+  return slugs;
+}
+
+const MALE_AVAILABLE = extractAvailableSlugs(maleSvgRaw);
+const FEMALE_AVAILABLE = extractAvailableSlugs(femaleSvgRaw);
 
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
 export default function BodyHighlighter({ gender: controlledGender }) {
-  const svgId = useId().replace(/:/g, '');
+  const reactId = useId().replace(/:/g, '');
+  const scopeId = `body-highlighter-${reactId}`;
   const [internalGender, setInternalGender] = useState('male');
   const isControlled = controlledGender === 'male' || controlledGender === 'female';
   const gender = isControlled ? controlledGender : internalGender;
@@ -104,10 +95,13 @@ export default function BodyHighlighter({ gender: controlledGender }) {
   const [selected, setSelected] = useState(MUSCLE_GROUPS[0].id);
   const [hoveredGroupId, setHoveredGroupId] = useState(null);
 
-  const frontSvgData = gender === 'female' ? FEMALE_FRONT_SVG : FRONT_SVG;
-  const backSvgData = gender === 'female' ? FEMALE_BACK_SVG : BACK_SVG;
-  const frontPathsBySlug = frontSvgData.pathsBySlug;
-  const backPathsBySlug = backSvgData.pathsBySlug;
+  const svgRaw = gender === 'female' ? femaleSvgRaw : maleSvgRaw;
+  const availableSlugs = gender === 'female' ? FEMALE_AVAILABLE : MALE_AVAILABLE;
+
+  const visibleGroups = useMemo(
+    () => MUSCLE_GROUPS.filter((g) => g.slugs.some((slug) => availableSlugs.has(slug))),
+    [availableSlugs],
+  );
 
   const handleRandomize = useCallback(() => setMuscleData(initMuscleData()), []);
 
@@ -118,110 +112,67 @@ export default function BodyHighlighter({ gender: controlledGender }) {
   const selectedMeta = MUSCLE_GROUPS.find((g) => g.id === selected);
   const hoveredMeta = MUSCLE_GROUPS.find((g) => g.id === hoveredGroupId);
 
-  const visibleGroups = useMemo(
-    () =>
-      MUSCLE_GROUPS.filter(
-        (g) => getGroupPaths(g, 'front', frontPathsBySlug).length > 0 || getGroupPaths(g, 'back', backPathsBySlug).length > 0,
-      ),
-    [frontPathsBySlug, backPathsBySlug],
-  );
+  const cssRules = useMemo(() => {
+    const lines = [
+      `#${scopeId} svg { width: 100%; height: auto; display: block; }`,
+    ];
+    // Make all highlightable muscles clickable.
+    for (const slug of HIGHLIGHTABLE_SLUGS) {
+      lines.push(
+        `#${scopeId} [data-slug="${slug}"] { cursor: pointer; }`,
+      );
+    }
+    // Apply color + intensity per group.
+    for (const group of MUSCLE_GROUPS) {
+      const data = muscleData[group.id];
+      if (!data || data.intensity === 0) continue;
+      const opacity = intensityToOpacity(data.intensity);
+      for (const slug of group.slugs) {
+        lines.push(
+          `#${scopeId} [data-slug="${slug}"] path { ` +
+            `fill: ${data.color} !important; ` +
+            `fill-opacity: ${opacity} !important; ` +
+            `transition: fill-opacity 0.25s; }`,
+        );
+      }
+    }
+    // Selection ring (dashed white outline).
+    if (selectedMeta) {
+      for (const slug of selectedMeta.slugs) {
+        lines.push(
+          `#${scopeId} [data-slug="${slug}"] path { ` +
+            `stroke: #ffffff !important; stroke-width: 0.6 !important; ` +
+            `stroke-dasharray: 1.4 0.7 !important; }`,
+        );
+      }
+    }
+    return lines.join('\n');
+  }, [muscleData, scopeId, selectedMeta]);
 
-  const renderBodyFigure = (side, svgData, pathsBySlug) => {
-    const backgroundPaths = Object.values(pathsBySlug).flatMap((paths) => paths);
-    const gradientId = `bodyGrad-${svgId}-${side}`;
-    const shadowId = `bodyShadow-${svgId}-${side}`;
+  const findSlug = (target) => {
+    if (!target?.closest) return null;
+    const groupEl = target.closest('[data-slug]');
+    if (!groupEl) return null;
+    return groupEl.getAttribute('data-slug');
+  };
 
-    return (
-      <div style={{ width: '48%' }}>
-        <Text type="secondary" style={{ display: 'block', textAlign: 'center', marginBottom: 6 }}>
-          {side === 'front' ? 'Přední' : 'Zadní'} pohled
-        </Text>
-        <svg
-          viewBox={svgData.viewBox}
-          width="100%"
-          style={{ userSelect: 'none' }}
-          aria-label={`Lidská postava, ${side === 'front' ? 'přední' : 'zadní'} pohled`}
-        >
-          <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#f4f5f6" />
-              <stop offset="100%" stopColor="#d8dadd" />
-            </linearGradient>
-            <filter id={shadowId} x="-12%" y="-12%" width="124%" height="124%">
-              <feDropShadow dx="0" dy="1.5" stdDeviation="1.2" floodColor="#5b5e66" floodOpacity="0.25" />
-            </filter>
-          </defs>
+  const handleClick = (event) => {
+    const slug = findSlug(event.target);
+    const muscleId = slug ? MUSCLE_BY_SLUG[slug] : null;
+    if (muscleId) setSelected(muscleId);
+  };
 
-          <g>
-            {backgroundPaths.map((d, i) => (
-              <path
-                key={`bg-${side}-${i}`}
-                d={d}
-                fill={`url(#${gradientId})`}
-                fillOpacity={0.52}
-                stroke="#7f8791"
-                strokeWidth={0.45}
-                filter={`url(#${shadowId})`}
-                style={{ pointerEvents: 'none' }}
-              />
-            ))}
-          </g>
+  const handleMouseOver = (event) => {
+    const slug = findSlug(event.target);
+    const muscleId = slug ? MUSCLE_BY_SLUG[slug] : null;
+    setHoveredGroupId(muscleId ?? null);
+  };
 
-          {visibleGroups.map((group) => {
-            const groupPaths = getGroupPaths(group, side, pathsBySlug);
-            const data = muscleData[group.id];
-            if (!data || data.intensity === 0 || groupPaths.length === 0) return null;
-            const opacity = intensityToOpacity(data.intensity);
-            const isSelected = group.id === selected;
-
-            return (
-              <g key={`${side}-${group.id}`}>
-                {groupPaths.map((d, i) => (
-                  <path
-                    key={i}
-                    d={d}
-                    fill={data.color}
-                    fillOpacity={opacity}
-                    stroke={isSelected ? '#ffffff' : 'none'}
-                    strokeWidth={isSelected ? 1.8 : 0}
-                    style={{ cursor: 'pointer', transition: 'fill-opacity 0.25s' }}
-                    onClick={() => setSelected(group.id)}
-                    onMouseEnter={() => setHoveredGroupId(group.id)}
-                    onMouseLeave={() => setHoveredGroupId(null)}
-                  />
-                ))}
-                {isSelected &&
-                  groupPaths.map((d, i) => (
-                    <path
-                      key={`ring-${i}`}
-                      d={d}
-                      fill="none"
-                      stroke="#ffffff"
-                      strokeWidth={1.7}
-                      strokeDasharray="4 2"
-                      style={{ pointerEvents: 'none' }}
-                    />
-                  ))}
-              </g>
-            );
-          })}
-
-          {visibleGroups.map((group) => {
-            const groupPaths = getGroupPaths(group, side, pathsBySlug);
-            if (groupPaths.length === 0) return null;
-            return (
-              <g key={`title-${side}-${group.id}`} style={{ pointerEvents: 'none' }}>
-                {groupPaths.map((d, i) => (
-                  <path key={i} d={d} fill="transparent" stroke="none">
-                    <title>{group.label}</title>
-                  </path>
-                ))}
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-    );
+  const handleMouseOut = (event) => {
+    // Only clear if mouse left the SVG entirely (relatedTarget is outside).
+    const next = event.relatedTarget;
+    if (next && next.closest && next.closest('[data-slug]')) return;
+    setHoveredGroupId(null);
   };
 
   return (
@@ -232,27 +183,52 @@ export default function BodyHighlighter({ gender: controlledGender }) {
       <Col xs={24} sm={12} style={{ display: 'flex', justifyContent: 'center' }}>
         <Card
           size="small"
-          style={{ width: '100%', maxWidth: 340 }}
-          styles={{ body: { padding: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 } }}
+          style={{ width: '100%', maxWidth: 420 }}
+          styles={{
+            body: {
+              padding: 12,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 12,
+            },
+          }}
         >
           {!isControlled && (
             <Space>
-              <Button type={gender === 'male' ? 'primary' : 'default'} size="small" onClick={() => setGender('male')}>
+              <Button
+                type={gender === 'male' ? 'primary' : 'default'}
+                size="small"
+                onClick={() => setGender('male')}
+              >
                 Muž
               </Button>
-              <Button type={gender === 'female' ? 'primary' : 'default'} size="small" onClick={() => setGender('female')}>
+              <Button
+                type={gender === 'female' ? 'primary' : 'default'}
+                size="small"
+                onClick={() => setGender('female')}
+              >
                 Žena
               </Button>
             </Space>
           )}
 
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', alignItems: 'flex-start', width: '100%' }}>
-            {renderBodyFigure('front', frontSvgData, frontPathsBySlug)}
-            {renderBodyFigure('back', backSvgData, backPathsBySlug)}
+          <div
+            id={scopeId}
+            data-testid="body-highlighter-svg"
+            style={{ width: '100%' }}
+            onClick={handleClick}
+            onMouseOver={handleMouseOver}
+            onMouseOut={handleMouseOut}
+          >
+            <style>{cssRules}</style>
+            <div dangerouslySetInnerHTML={{ __html: svgRaw }} />
           </div>
 
           <Text type="secondary" style={{ textAlign: 'center' }}>
-            {hoveredMeta ? `Nadjeto: ${hoveredMeta.label}` : 'Najeď nebo klikni na svalovou partii v mapě.'}
+            {hoveredMeta
+              ? `Nadjeto: ${hoveredMeta.label}`
+              : 'Najeď nebo klikni na svalovou partii v mapě.'}
           </Text>
         </Card>
       </Col>
@@ -271,7 +247,7 @@ export default function BodyHighlighter({ gender: controlledGender }) {
               value={selected}
               onChange={setSelected}
               style={{ width: '100%' }}
-              options={MUSCLE_GROUPS.map((g) => ({ value: g.id, label: g.label }))}
+              options={visibleGroups.map((g) => ({ value: g.id, label: g.label }))}
             />
           </Card>
 
@@ -306,7 +282,8 @@ export default function BodyHighlighter({ gender: controlledGender }) {
                         tabIndex={0}
                         onClick={() => updateSelected('color', c.value)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') updateSelected('color', c.value);
+                          if (e.key === 'Enter' || e.key === ' ')
+                            updateSelected('color', c.value);
                         }}
                         style={{
                           width: 28,
@@ -314,7 +291,10 @@ export default function BodyHighlighter({ gender: controlledGender }) {
                           borderRadius: 6,
                           backgroundColor: c.value,
                           cursor: 'pointer',
-                          border: selectedData.color === c.value ? '3px solid #333' : '2px solid transparent',
+                          border:
+                            selectedData.color === c.value
+                              ? '3px solid #333'
+                              : '2px solid transparent',
                           outline: selectedData.color === c.value ? '2px solid #fff' : 'none',
                           outlineOffset: '-4px',
                           transition: 'border 0.15s',
