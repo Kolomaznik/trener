@@ -60,6 +60,9 @@ function useElapsedTimer(active) {
 
   useEffect(() => {
     if (active) {
+      // Read elapsed once to resume from the current position when restarting.
+      // It is intentionally omitted from deps to avoid restarting the RAF loop
+      // on every tick. eslint-disable-next-line react-hooks/exhaustive-deps
       startRef.current = Date.now() - elapsed * 1000;
       const tick = () => {
         setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
@@ -140,6 +143,7 @@ export default function WorkoutSession() {
   useEffect(() => {
     if (!exerciseId) return undefined;
     let active = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDetailLoading(true);
     setDetailError(null);
 
