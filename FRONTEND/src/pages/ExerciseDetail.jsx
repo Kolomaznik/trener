@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Alert,
@@ -240,6 +240,15 @@ function ProgressionAndMuscleCard({ detail }) {
     return detail.muscle_engagement_percent ?? {};
   })();
 
+  // Min/max per-muscle load (kg) for the active tier — used by the legend.
+  const activeLoadRange = useMemo(() => {
+    if (!hasLoadData) return null;
+    const tierData = loadByDifficulty[activeTab] ?? {};
+    const loads = Object.values(tierData).map((m) => m.muscle_load);
+    if (loads.length === 0) return null;
+    return { min: Math.min(...loads), max: Math.max(...loads) };
+  }, [hasLoadData, loadByDifficulty, activeTab]);
+
   const tabItems = DIFFICULTIES.map(({ key, label }) => {
     const goal = detail.progression_goals?.[key];
     const tierLoad = hasLoadData ? (loadByDifficulty[key] ?? {}) : null;
@@ -326,7 +335,7 @@ function ProgressionAndMuscleCard({ detail }) {
         />
       )}
 
-      <ExerciseMuscleMap engagement={displayEngagement} mode={mapMode} />
+      <ExerciseMuscleMap engagement={displayEngagement} mode={mapMode} loadRange={activeLoadRange} />
     </Card>
   );
 }

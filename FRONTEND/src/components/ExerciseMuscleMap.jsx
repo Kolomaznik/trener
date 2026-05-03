@@ -44,16 +44,21 @@ const PERCENT_SCALE_STOPS = [
   { label: '< 10 %', pct: 1 },
 ];
 
-const LOAD_SCALE_STOPS = [
-  { label: 'Nejvíce', pct: 100 },
-  { label: 'Hodně', pct: 66 },
-  { label: 'Méně', pct: 33 },
-  { label: 'Nejméně', pct: 10 },
-];
+function buildLoadStops(loadRange) {
+  if (!loadRange || loadRange.max <= 0) return [];
+  const { min, max } = loadRange;
+  return Array.from({ length: 5 }, (_, i) => {
+    const value = max - (i * (max - min)) / 4;
+    return {
+      pct: (value / max) * 100,
+      label: (value / 1000).toFixed(2) + '\u202ft',
+    };
+  });
+}
 
-function MuscleMapScale({ color, mode = 'percent' }) {
+function MuscleMapScale({ color, mode = 'percent', loadRange = null }) {
   const isLoad = mode === 'load';
-  const stops = isLoad ? LOAD_SCALE_STOPS : PERCENT_SCALE_STOPS;
+  const stops = isLoad ? buildLoadStops(loadRange) : PERCENT_SCALE_STOPS;
   const title = isLoad ? 'Přemístěná zátěž' : 'Zapojení';
   return (
     <div
@@ -95,6 +100,7 @@ export default function ExerciseMuscleMap({
   maxWidth = 420,
   showScale = true,
   mode = 'percent',
+  loadRange = null,
 }) {
   const reactId = useId().replace(/:/g, '');
   const scopeId = `muscle-map-${reactId}`;
@@ -141,7 +147,7 @@ export default function ExerciseMuscleMap({
       }}
     >
       {figure}
-      {showScale && <MuscleMapScale color={color} mode={mode} />}
+      {showScale && <MuscleMapScale color={color} mode={mode} loadRange={loadRange} />}
     </div>
   );
 }

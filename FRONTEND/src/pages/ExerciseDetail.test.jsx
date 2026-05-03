@@ -305,8 +305,26 @@ describe('ExerciseDetail page', () => {
     fireEvent.click(screen.getByText('Přemístěná zátěž (kg)'));
 
     const scale = screen.getByTestId('muscle-map-scale');
-    expect(scale).toHaveTextContent('Nejvíce');
+    // Should show actual tonne values, not % labels or the old qualitative words
+    expect(scale.textContent).toMatch(/\d+\.\d+\s*t/);
     expect(scale).not.toHaveTextContent('50 %+');
+    expect(scale).not.toHaveTextContent('Nejvíce');
+  });
+
+  it('shows 5 tonne stops in load mode matching fixture min/max (beginner tier)', async () => {
+    renderWithRouter();
+
+    await screen.findByText('Zapojené svaly');
+    fireEvent.click(screen.getByText('Přemístěná zátěž (kg)'));
+
+    // beginner: chest=64, triceps=48, lower_back=8 → max=64, min=8
+    // 5 stops: 64, 50, 36, 22, 8 kg → 0.06, 0.05, 0.04, 0.02, 0.01 t (toFixed(2))
+    const scale = screen.getByTestId('muscle-map-scale');
+    const swatches = scale.querySelectorAll('span');
+    expect(swatches).toHaveLength(5);
+    // Top stop = max (0.06 t), bottom stop = min (0.01 t)
+    expect(swatches[0].textContent).toBe('0.06\u202ft');
+    expect(swatches[4].textContent).toBe('0.01\u202ft');
   });
 
   it('restores % labels when switching back to % mode', async () => {
@@ -318,7 +336,7 @@ describe('ExerciseDetail page', () => {
 
     const scale = screen.getByTestId('muscle-map-scale');
     expect(scale).toHaveTextContent('50 %+');
-    expect(scale).not.toHaveTextContent('Nejvíce');
+    expect(scale.textContent).not.toMatch(/\d+\.\d+\s*t/);
   });
 
   // ── Static detail cards ────────────────────────────────────────────────────
