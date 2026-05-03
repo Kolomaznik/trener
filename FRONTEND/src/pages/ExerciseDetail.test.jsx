@@ -280,6 +280,47 @@ describe('ExerciseDetail page', () => {
     expect(screen.getByTestId('exercise-muscle-map')).toBeInTheDocument();
   });
 
+  // ── Map legend switches between modes ──────────────────────────────────────
+
+  it('shows "Zapojení" legend title in default % mode', async () => {
+    renderWithRouter();
+
+    await screen.findByText('Zapojené svaly');
+    expect(screen.getByTestId('muscle-map-scale')).toHaveTextContent('Zapojení');
+  });
+
+  it('switches legend title to "Přemístěná zátěž" when load mode is active', async () => {
+    renderWithRouter();
+
+    await screen.findByText('Zapojené svaly');
+    fireEvent.click(screen.getByText('Přemístěná zátěž (kg)'));
+
+    expect(screen.getByTestId('muscle-map-scale')).toHaveTextContent('Přemístěná zátěž');
+  });
+
+  it('shows qualitative load labels (not % labels) when load mode is active', async () => {
+    renderWithRouter();
+
+    await screen.findByText('Zapojené svaly');
+    fireEvent.click(screen.getByText('Přemístěná zátěž (kg)'));
+
+    const scale = screen.getByTestId('muscle-map-scale');
+    expect(scale).toHaveTextContent('Nejvíce');
+    expect(scale).not.toHaveTextContent('50 %+');
+  });
+
+  it('restores % labels when switching back to % mode', async () => {
+    renderWithRouter();
+
+    await screen.findByText('Zapojené svaly');
+    fireEvent.click(screen.getByText('Přemístěná zátěž (kg)'));
+    fireEvent.click(screen.getByText('% Zapojení'));
+
+    const scale = screen.getByTestId('muscle-map-scale');
+    expect(scale).toHaveTextContent('50 %+');
+    expect(scale).not.toHaveTextContent('Nejvíce');
+  });
+
   // ── Static detail cards ────────────────────────────────────────────────────
 
   it('renders instructions, cadence, video cards', async () => {

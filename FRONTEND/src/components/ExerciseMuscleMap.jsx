@@ -37,14 +37,24 @@ function intensityOpacity(pct) {
   return Math.min(1, 0.35 + (pct / 50) * 0.65);
 }
 
-const SCALE_STOPS = [
+const PERCENT_SCALE_STOPS = [
   { label: '50 %+', pct: 50 },
   { label: '25 %', pct: 25 },
   { label: '10 %', pct: 10 },
   { label: '< 10 %', pct: 1 },
 ];
 
-function MuscleMapScale({ color }) {
+const LOAD_SCALE_STOPS = [
+  { label: 'Nejvíce', pct: 100 },
+  { label: 'Hodně', pct: 66 },
+  { label: 'Méně', pct: 33 },
+  { label: 'Nejméně', pct: 10 },
+];
+
+function MuscleMapScale({ color, mode = 'percent' }) {
+  const isLoad = mode === 'load';
+  const stops = isLoad ? LOAD_SCALE_STOPS : PERCENT_SCALE_STOPS;
+  const title = isLoad ? 'Přemístěná zátěž' : 'Zapojení';
   return (
     <div
       data-testid="muscle-map-scale"
@@ -57,8 +67,8 @@ function MuscleMapScale({ color }) {
         lineHeight: 1.2,
       }}
     >
-      <div style={{ fontWeight: 500, marginBottom: 2 }}>Zapojení</div>
-      {SCALE_STOPS.map((stop) => (
+      <div style={{ fontWeight: 500, marginBottom: 2 }}>{title}</div>
+      {stops.map((stop) => (
         <div
           key={stop.label}
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}
@@ -84,6 +94,7 @@ export default function ExerciseMuscleMap({
   color = '#e63946',
   maxWidth = 420,
   showScale = true,
+  mode = 'percent',
 }) {
   const reactId = useId().replace(/:/g, '');
   const scopeId = `muscle-map-${reactId}`;
@@ -130,7 +141,7 @@ export default function ExerciseMuscleMap({
       }}
     >
       {figure}
-      {showScale && <MuscleMapScale color={color} />}
+      {showScale && <MuscleMapScale color={color} mode={mode} />}
     </div>
   );
 }

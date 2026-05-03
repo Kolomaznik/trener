@@ -326,7 +326,7 @@ function ProgressionAndMuscleCard({ detail }) {
         />
       )}
 
-      <ExerciseMuscleMap engagement={displayEngagement} />
+      <ExerciseMuscleMap engagement={displayEngagement} mode={mapMode} />
     </Card>
   );
 }
