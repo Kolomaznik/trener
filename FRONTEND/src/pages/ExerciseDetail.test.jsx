@@ -60,6 +60,7 @@ function renderWithRouter(initialPath = '/exercises/pushups_level_1') {
       <Routes>
         <Route path="/exercises" element={<div data-testid="list-marker" />} />
         <Route path="/exercises/:id" element={<ExerciseDetail />} />
+        <Route path="/exercises/:id/workout" element={<div data-testid="workout-marker" />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -144,5 +145,14 @@ describe('ExerciseDetail page', () => {
     renderWithRouter('/exercises/neexistuje');
 
     expect(await screen.findByText('Cvik nebyl nalezen.')).toBeInTheDocument();
+  });
+
+  it('renders "Začít cvičit" button that navigates to workout page', async () => {
+    renderWithRouter();
+
+    await screen.findByText('Kliky o zeď');
+    fireEvent.click(screen.getByRole('button', { name: /Začít cvičit/ }));
+
+    expect(await screen.findByTestId('workout-marker')).toBeInTheDocument();
   });
 });

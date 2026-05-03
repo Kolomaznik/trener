@@ -13,7 +13,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import { ArrowLeftOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import ExerciseMuscleMap from '../components/ExerciseMuscleMap.jsx';
 import { fetchExerciseDetail } from '../api/client.js';
 
@@ -76,13 +76,13 @@ export default function ExerciseDetail() {
           <Skeleton active paragraph={{ rows: 10 }} />
         </Card>
       ) : (
-        <ExerciseDetailBody detail={detail} navigate={navigate} />
+        <ExerciseDetailBody detail={detail} navigate={navigate} id={id} />
       )}
     </Space>
   );
 }
 
-function ExerciseDetailBody({ detail, navigate }) {
+function ExerciseDetailBody({ detail, navigate, id }) {
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <Card>
@@ -98,9 +98,17 @@ function ExerciseDetailBody({ detail, navigate }) {
             <Tag>Level {detail.level}</Tag>
           </Space>
         </Space>
-        <Paragraph style={{ marginTop: 12, marginBottom: 0 }}>
+        <Paragraph style={{ marginTop: 12, marginBottom: 12 }}>
           {detail.description}
         </Paragraph>
+        <Button
+          type="primary"
+          icon={<PlayCircleOutlined />}
+          onClick={() => navigate(`/exercises/${id}/workout`)}
+          size="large"
+        >
+          Začít cvičit
+        </Button>
       </Card>
 
       <Row gutter={[16, 16]}>
