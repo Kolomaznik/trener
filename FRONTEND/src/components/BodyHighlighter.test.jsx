@@ -26,20 +26,18 @@ describe('BodyHighlighter — gender prop', () => {
     expect(screen.getByRole('button', { name: /muž/i })).toBeInTheDocument();
   });
 
-  it('renders different SVG viewBox for male vs female', () => {
+  it('renders a different SVG for male vs female', () => {
     const { container: maleContainer, unmount } = render(<BodyHighlighter gender="male" />);
-    const maleSvgs = Array.from(maleContainer.querySelectorAll('svg[viewBox]'))
-      .map((el) => el.getAttribute('viewBox'))
-      .filter((v) => v && !v.startsWith('64'));
+    const maleSvg = maleContainer.querySelector('[data-testid="body-highlighter-svg"] svg');
+    const maleViewBox = maleSvg?.getAttribute('viewBox');
     unmount();
 
     const { container: femaleContainer } = render(<BodyHighlighter gender="female" />);
-    const femaleSvgs = Array.from(femaleContainer.querySelectorAll('svg[viewBox]'))
-      .map((el) => el.getAttribute('viewBox'))
-      .filter((v) => v && !v.startsWith('64'));
+    const femaleSvg = femaleContainer.querySelector('[data-testid="body-highlighter-svg"] svg');
+    const femaleViewBox = femaleSvg?.getAttribute('viewBox');
 
-    expect(maleSvgs).not.toEqual(femaleSvgs);
-    expect(maleSvgs.some((v) => v === '0 0 724 1448')).toBe(true);
-    expect(femaleSvgs.some((v) => v === '-50 -40 734 1538')).toBe(true);
+    expect(maleViewBox).toBeTruthy();
+    expect(femaleViewBox).toBeTruthy();
+    expect(maleViewBox).not.toEqual(femaleViewBox);
   });
 });

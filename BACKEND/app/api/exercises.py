@@ -1,65 +1,18 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
 from pymongo.database import Database
 
 from app.db import get_db
+from app.schemas.exercises import (
+    Cadence,
+    ExerciseDetailResponse,
+    ExerciseListItem,
+    Media,
+    ProgressionGoals,
+)
 
 router = APIRouter(prefix="/exercises", tags=["exercises"])
-
-
-class Cadence(BaseModel):
-    eccentric_sec: int
-    pause_bottom_sec: int
-    concentric_sec: int
-    pause_top_sec: int
-    total_rep_time_sec: int
-    coach_note: str
-
-
-class ProgressionGoal(BaseModel):
-    sets: int
-    reps: int
-
-
-class ProgressionGoals(BaseModel):
-    beginner: ProgressionGoal
-    intermediate: ProgressionGoal
-    mastery: ProgressionGoal
-    coach_note: str
-
-
-class Media(BaseModel):
-    youtube_tutorial: str | None = None
-    thumbnail_url: str | None = None
-
-
-class ExerciseListItem(BaseModel):
-    id: str
-    name: str
-    family: str
-    level: int
-    description: str
-    next_exercise_id: str | None = None
-    next_exercise_name: str | None = None
-
-
-class ExerciseDetailResponse(BaseModel):
-    id: str
-    name: str
-    english_name: str | None = None
-    family: str
-    level: int
-    description: str
-    instructions: list[str] = Field(default_factory=list)
-    media: Media | None = None
-    cadence: Cadence | None = None
-    progression_goals: ProgressionGoals | None = None
-    muscle_engagement_percent: dict[str, int] = Field(default_factory=dict)
-    next_exercise_id: str | None = None
-    next_exercise_name: str | None = None
-
 
 SCHEMA_FILTER: dict[str, Any] = {
     "level": {"$exists": True},

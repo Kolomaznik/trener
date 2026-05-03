@@ -6,10 +6,10 @@ import {
   Card,
   Col,
   Descriptions,
-  Progress,
   Row,
   Skeleton,
   Space,
+  Table,
   Tag,
   Typography,
 } from 'antd';
@@ -83,10 +83,6 @@ export default function ExerciseDetail() {
 }
 
 function ExerciseDetailBody({ detail, navigate }) {
-  const muscles = Object.entries(detail.muscle_engagement_percent ?? {}).sort(
-    (a, b) => b[1] - a[1],
-  );
-
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <Card>
@@ -149,21 +145,28 @@ function ExerciseDetailBody({ detail, navigate }) {
 
             {detail.progression_goals && (
               <Card size="small" title="Postup">
-                <Row gutter={[8, 8]}>
-                  {PROGRESSION_LABELS.map(({ key, label }) => {
-                    const goal = detail.progression_goals[key];
-                    if (!goal) return null;
-                    return (
-                      <Col xs={24} sm={8} key={key}>
-                        <Card size="small" title={label}>
-                          <Text>
-                            {goal.sets} × {goal.reps}
-                          </Text>
-                        </Card>
-                      </Col>
-                    );
-                  })}
-                </Row>
+                <Table
+                  size="small"
+                  bordered
+                  pagination={false}
+                  columns={PROGRESSION_LABELS.map(({ key, label }) => ({
+                    title: label,
+                    dataIndex: key,
+                    key,
+                    align: 'center',
+                  }))}
+                  dataSource={[
+                    {
+                      key: 'goals',
+                      ...Object.fromEntries(
+                        PROGRESSION_LABELS.map(({ key }) => {
+                          const goal = detail.progression_goals[key];
+                          return [key, goal ? `${goal.sets} × ${goal.reps}` : '—'];
+                        }),
+                      ),
+                    },
+                  ]}
+                />
                 {detail.progression_goals.coach_note && (
                   <Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
                     {detail.progression_goals.coach_note}
@@ -197,19 +200,6 @@ function ExerciseDetailBody({ detail, navigate }) {
         <Col xs={24} md={10}>
           <Card size="small" title="Zapojené svaly">
             <ExerciseMuscleMap engagement={detail.muscle_engagement_percent ?? {}} />
-            {muscles.length > 0 && (
-              <div style={{ marginTop: 12 }}>
-                {muscles.map(([muscle, pct]) => (
-                  <div key={muscle} style={{ marginBottom: 6 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Text>{muscle}</Text>
-                      <Text type="secondary">{pct} %</Text>
-                    </div>
-                    <Progress percent={pct} showInfo={false} size="small" />
-                  </div>
-                ))}
-              </div>
-            )}
           </Card>
         </Col>
       </Row>

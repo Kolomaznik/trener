@@ -37,16 +37,61 @@ function intensityOpacity(pct) {
   return Math.min(1, 0.35 + (pct / 50) * 0.65);
 }
 
+const SCALE_STOPS = [
+  { label: '50 %+', pct: 50 },
+  { label: '25 %', pct: 25 },
+  { label: '10 %', pct: 10 },
+  { label: '< 10 %', pct: 1 },
+];
+
+function MuscleMapScale({ color }) {
+  return (
+    <div
+      data-testid="muscle-map-scale"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+        fontSize: 12,
+        flexShrink: 0,
+        lineHeight: 1.2,
+      }}
+    >
+      <div style={{ fontWeight: 500, marginBottom: 2 }}>Zapojení</div>
+      {SCALE_STOPS.map((stop) => (
+        <div
+          key={stop.label}
+          style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          <div
+            style={{
+              width: 14,
+              height: 14,
+              background: color,
+              opacity: intensityOpacity(stop.pct),
+              borderRadius: 3,
+            }}
+          />
+          <span style={{ color: 'rgba(0, 0, 0, 0.65)' }}>{stop.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ExerciseMuscleMap({
   engagement = {},
   color = '#e63946',
-  maxWidth = 360,
+  maxWidth = 420,
+  showScale = true,
 }) {
   const reactId = useId().replace(/:/g, '');
   const scopeId = `muscle-map-${reactId}`;
 
   const cssRules = useMemo(() => {
-    const lines = [];
+    const lines = [
+      `#${scopeId} svg { width: 100%; height: auto; display: block; }`,
+    ];
     for (const [key, pct] of Object.entries(engagement)) {
       if (!pct || pct <= 0) continue;
       const opacity = intensityOpacity(pct);
@@ -60,14 +105,32 @@ export default function ExerciseMuscleMap({
     return lines.join('\n');
   }, [engagement, color, scopeId]);
 
-  return (
+  const figure = (
     <div
       id={scopeId}
       data-testid="exercise-muscle-map"
-      style={{ width: '100%', maxWidth, margin: '0 auto' }}
+      style={{
+        flex: '1 1 auto',
+        minWidth: 0,
+        maxWidth: `min(100%, max(240px, min(${maxWidth}px, 60vh)))`,
+      }}
     >
-      {cssRules && <style>{cssRules}</style>}
+      <style>{cssRules}</style>
       <div dangerouslySetInnerHTML={{ __html: maleSvgRaw }} />
+    </div>
+  );
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+      }}
+    >
+      {figure}
+      {showScale && <MuscleMapScale color={color} />}
     </div>
   );
 }

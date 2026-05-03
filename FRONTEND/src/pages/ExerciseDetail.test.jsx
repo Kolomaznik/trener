@@ -103,12 +103,14 @@ describe('ExerciseDetail page', () => {
     expect(screen.getByText('Video')).toBeInTheDocument();
   });
 
-  it('renders muscle map and engagement list', async () => {
+  it('renders the muscle map with engaged-muscle styles', async () => {
     renderWithRouter();
 
-    expect(await screen.findByTestId('exercise-muscle-map')).toBeInTheDocument();
-    expect(screen.getByText('chest')).toBeInTheDocument();
-    expect(screen.getByText('40 %')).toBeInTheDocument();
+    const map = await screen.findByTestId('exercise-muscle-map');
+    expect(map).toBeInTheDocument();
+    const style = map.querySelector('style')?.textContent ?? '';
+    expect(style).toContain('[data-slug="chest"]');
+    expect(style).toContain('[data-slug="triceps"]');
   });
 
   it('navigates back to list when "back" link is clicked', async () => {

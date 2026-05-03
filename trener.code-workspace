@@ -1,0 +1,18 @@
+{
+  "folders": [
+    { "name": "BACKEND", "path": "BACKEND" },
+    { "name": "MONGO_DB", "path": "MONGO_DB" },
+    { "name": "FRONTEND", "path": "FRONTEND" },
+    { "name": "Trener (root)", "path": "." }
+  ],
+  "settings": {
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false,
+    "files.exclude": {
+      "**/.venv": true,
+      "**/__pycache__": true,
+      "**/.ruff_cache": true,
+      "**/.pytest_cache": true
+    }
+  }
+}
