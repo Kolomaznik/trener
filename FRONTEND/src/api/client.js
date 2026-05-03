@@ -43,3 +43,13 @@ export async function fetchExerciseDetail(exerciseId) {
   const response = await apiClient.get(`/exercises/${exerciseId}`);
   return response.data;
 }
+
+export async function fetchExercisesByFamily(family) {
+  const response = await apiClient.get(`/exercises/family/${encodeURIComponent(family)}`);
+  return response.data;
+}
+
+export async function fetchMuscleLoad(exerciseId, workoutData) {
+  const response = await apiClient.post(`/exercises/${exerciseId}/muscle-load`, workoutData);
+  return response.data;
+}

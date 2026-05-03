@@ -6,9 +6,10 @@ import ExerciseDetail from './ExerciseDetail.jsx';
 vi.mock('../api/client.js', () => ({
   fetchExercises: vi.fn(),
   fetchExerciseDetail: vi.fn(),
+  fetchExercisesByFamily: vi.fn(),
 }));
 
-import { fetchExerciseDetail } from '../api/client.js';
+import { fetchExerciseDetail, fetchExercisesByFamily } from '../api/client.js';
 
 const detailFixture = {
   id: 'pushups_level_1',
@@ -42,6 +43,8 @@ const detailFixture = {
   muscle_engagement_percent: { chest: 40, triceps: 30, lower_back: 5 },
   next_exercise_id: 'pushups_level_2',
   next_exercise_name: 'Kliky v předklonu',
+  level_coefficient: 0.20,
+  height_multiplier: 0.40,
 };
 
 const detailFixtureLevel2 = {
@@ -52,7 +55,13 @@ const detailFixtureLevel2 = {
   level: 2,
   next_exercise_id: null,
   next_exercise_name: null,
+  level_coefficient: 0.35,
 };
+
+const familyFixture = [
+  detailFixture,
+  detailFixtureLevel2,
+];
 
 function renderWithRouter(initialPath = '/exercises/pushups_level_1') {
   return render(
@@ -68,7 +77,9 @@ function renderWithRouter(initialPath = '/exercises/pushups_level_1') {
 describe('ExerciseDetail page', () => {
   beforeEach(() => {
     fetchExerciseDetail.mockReset();
+    fetchExercisesByFamily.mockReset();
     fetchExerciseDetail.mockResolvedValue(detailFixture);
+    fetchExercisesByFamily.mockResolvedValue(familyFixture);
   });
 
   it('fetches detail using id from URL', async () => {
@@ -79,31 +90,53 @@ describe('ExerciseDetail page', () => {
     );
   });
 
+  it('fetches family exercises after loading detail', async () => {
+    renderWithRouter();
+
+    await waitFor(() =>
+      expect(fetchExercisesByFamily).toHaveBeenCalledWith('Kliky'),
+    );
+  });
+
   it('renders name, english name, family/level chips, description', async () => {
     renderWithRouter();
 
     expect(await screen.findByText('Kliky o zeď')).toBeInTheDocument();
     expect(screen.getByText('Wall Push-ups')).toBeInTheDocument();
     expect(screen.getByText('Kliky')).toBeInTheDocument();
-    expect(screen.getByText('Level 1')).toBeInTheDocument();
+    // The header tag chip says "Level 1"; getAllByText handles the tab duplicate
+    expect(screen.getAllByText('Level 1').length).toBeGreaterThanOrEqual(1);
     expect(
       screen.getByText('Rehabilitační a přípravný cvik.'),
     ).toBeInTheDocument();
   });
 
-  it('renders rich detail: instructions, cadence, progression, video', async () => {
+  it('renders rich detail: instructions, cadence, video', async () => {
     renderWithRouter();
 
     expect(await screen.findByText('Jak cvičit')).toBeInTheDocument();
     expect(screen.getByText(/Postav se čelem ke zdi/)).toBeInTheDocument();
     expect(screen.getByText('Tempo')).toBeInTheDocument();
     expect(screen.getByText('6 s / opakování')).toBeInTheDocument();
-    expect(screen.getByText('Postup')).toBeInTheDocument();
-    expect(screen.getByText('3 × 50')).toBeInTheDocument();
     expect(screen.getByText('Video')).toBeInTheDocument();
   });
 
-  it('renders the muscle map with engaged-muscle styles', async () => {
+  it('renders level tabs for all family exercises', async () => {
+    renderWithRouter();
+
+    // Wait for data to load, then check that tab roles exist
+    await screen.findByText('Kliky o zeď');
+    expect(screen.getByRole('tab', { name: 'Level 1' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Level 2' })).toBeInTheDocument();
+  });
+
+  it('renders progression goals inside the active tab', async () => {
+    renderWithRouter();
+
+    expect(await screen.findByText('3 × 50')).toBeInTheDocument();
+  });
+
+  it('renders the muscle map inside the active tab', async () => {
     renderWithRouter();
 
     const map = await screen.findByTestId('exercise-muscle-map');

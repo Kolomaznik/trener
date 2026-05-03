@@ -10,12 +10,13 @@ import {
   Skeleton,
   Space,
   Table,
+  Tabs,
   Tag,
   Typography,
 } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import ExerciseMuscleMap from '../components/ExerciseMuscleMap.jsx';
-import { fetchExerciseDetail } from '../api/client.js';
+import { fetchExerciseDetail, fetchExercisesByFamily } from '../api/client.js';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -29,6 +30,7 @@ export default function ExerciseDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [detail, setDetail] = useState(null);
+  const [familyExercises, setFamilyExercises] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -39,7 +41,11 @@ export default function ExerciseDetail() {
     setError(null);
     fetchExerciseDetail(id)
       .then((data) => {
-        if (active) setDetail(data);
+        if (!active) return;
+        setDetail(data);
+        return fetchExercisesByFamily(data.family).then((siblings) => {
+          if (active) setFamilyExercises(siblings);
+        });
       })
       .catch((err) => {
         if (!active) return;
@@ -76,15 +82,20 @@ export default function ExerciseDetail() {
           <Skeleton active paragraph={{ rows: 10 }} />
         </Card>
       ) : (
-        <ExerciseDetailBody detail={detail} navigate={navigate} />
+        <ExerciseDetailBody
+          detail={detail}
+          familyExercises={familyExercises}
+          navigate={navigate}
+        />
       )}
     </Space>
   );
 }
 
-function ExerciseDetailBody({ detail, navigate }) {
+function ExerciseDetailBody({ detail, familyExercises, navigate }) {
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      {/* ── Header card: name, tags, description ─────────────────────────── */}
       <Card>
         <Space direction="vertical" size={4}>
           <Title level={2} style={{ margin: 0 }}>
@@ -103,6 +114,16 @@ function ExerciseDetailBody({ detail, navigate }) {
         </Paragraph>
       </Card>
 
+      {/* ── Level tabs: progression goals + muscle map per level ─────────── */}
+      {familyExercises.length > 0 && (
+        <LevelTabs
+          familyExercises={familyExercises}
+          currentLevel={detail.level}
+          navigate={navigate}
+        />
+      )}
+
+      {/* ── Static detail cards for the currently viewed exercise ────────── */}
       <Row gutter={[16, 16]}>
         <Col xs={24} md={14}>
           <Space direction="vertical" size={16} style={{ width: '100%' }}>
@@ -143,38 +164,6 @@ function ExerciseDetailBody({ detail, navigate }) {
               </Card>
             )}
 
-            {detail.progression_goals && (
-              <Card size="small" title="Postup">
-                <Table
-                  size="small"
-                  bordered
-                  pagination={false}
-                  columns={PROGRESSION_LABELS.map(({ key, label }) => ({
-                    title: label,
-                    dataIndex: key,
-                    key,
-                    align: 'center',
-                  }))}
-                  dataSource={[
-                    {
-                      key: 'goals',
-                      ...Object.fromEntries(
-                        PROGRESSION_LABELS.map(({ key }) => {
-                          const goal = detail.progression_goals[key];
-                          return [key, goal ? `${goal.sets} × ${goal.reps}` : '—'];
-                        }),
-                      ),
-                    },
-                  ]}
-                />
-                {detail.progression_goals.coach_note && (
-                  <Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
-                    {detail.progression_goals.coach_note}
-                  </Paragraph>
-                )}
-              </Card>
-            )}
-
             {detail.media?.youtube_tutorial && (
               <Card size="small" title="Video">
                 <a
@@ -195,12 +184,6 @@ function ExerciseDetailBody({ detail, navigate }) {
               </Card>
             )}
           </Space>
-        </Col>
-
-        <Col xs={24} md={10}>
-          <Card size="small" title="Zapojené svaly">
-            <ExerciseMuscleMap engagement={detail.muscle_engagement_percent ?? {}} />
-          </Card>
         </Col>
       </Row>
 
@@ -225,5 +208,83 @@ function ExerciseDetailBody({ detail, navigate }) {
         <Alert type="success" showIcon message="Nejvyšší úroveň této rodiny" />
       )}
     </Space>
+  );
+}
+
+function LevelTabs({ familyExercises, currentLevel, navigate }) {
+  const [activeKey, setActiveKey] = useState(String(currentLevel));
+
+  function handleTabChange(key) {
+    const target = familyExercises.find((ex) => String(ex.level) === key);
+    if (target && target.level !== currentLevel) {
+      setActiveKey(key);
+      navigate(`/exercises/${target.id}`);
+    }
+  }
+
+  const items = familyExercises.map((ex) => ({
+    key: String(ex.level),
+    label: `Level ${ex.level}`,
+    children: <LevelTabContent exercise={ex} />,
+  }));
+
+  return (
+    <Card size="small">
+      <Tabs
+        activeKey={activeKey}
+        onChange={handleTabChange}
+        items={items}
+        data-testid="level-tabs"
+      />
+    </Card>
+  );
+}
+
+function LevelTabContent({ exercise }) {
+  return (
+    <Row gutter={[16, 16]}>
+      <Col xs={24} md={14}>
+        {exercise.progression_goals ? (
+          <Space direction="vertical" size={8} style={{ width: '100%' }}>
+            <Text strong>Postup</Text>
+            <Table
+              size="small"
+              bordered
+              pagination={false}
+              columns={PROGRESSION_LABELS.map(({ key, label }) => ({
+                title: label,
+                dataIndex: key,
+                key,
+                align: 'center',
+              }))}
+              dataSource={[
+                {
+                  key: 'goals',
+                  ...Object.fromEntries(
+                    PROGRESSION_LABELS.map(({ key }) => {
+                      const goal = exercise.progression_goals[key];
+                      return [key, goal ? `${goal.sets} × ${goal.reps}` : '—'];
+                    }),
+                  ),
+                },
+              ]}
+            />
+            {exercise.progression_goals.coach_note && (
+              <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                {exercise.progression_goals.coach_note}
+              </Paragraph>
+            )}
+          </Space>
+        ) : (
+          <Text type="secondary">Žádné cíle pro tuto úroveň.</Text>
+        )}
+      </Col>
+      <Col xs={24} md={10}>
+        <Text strong style={{ display: 'block', marginBottom: 8 }}>
+          Zapojené svaly
+        </Text>
+        <ExerciseMuscleMap engagement={exercise.muscle_engagement_percent ?? {}} />
+      </Col>
+    </Row>
   );
 }
