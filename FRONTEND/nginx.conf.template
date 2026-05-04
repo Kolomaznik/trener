@@ -1,0 +1,63 @@
+server {
+  listen       ${PORT} default_server;
+  listen       [::]:${PORT} default_server;
+  server_name  _;
+
+  root   /usr/share/nginx/html;
+  index  index.html;
+
+  # ── Compression ───────────────────────────────────────────────────────────
+  gzip               on;
+  gzip_vary          on;
+  gzip_comp_level    6;
+  gzip_min_length    1024;
+  gzip_types
+      text/plain
+      text/css
+      text/javascript
+      application/javascript
+      application/json
+      application/xml
+      application/xml+rss
+      image/svg+xml;
+
+  # ── Healthcheck (Railway / docker run / load balancer) ────────────────────
+  location = /healthz {
+    access_log off;
+    add_header Content-Type text/plain;
+    return 200 "ok\n";
+  }
+
+  # ── API proxy: /api/* → ${BACKEND_URL}/* (mirrors vite dev proxy) ─────────
+  location /api/ {
+    rewrite ^/api/(.*)$ /$1 break;
+    proxy_pass               ${BACKEND_URL};
+    proxy_http_version       1.1;
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Upgrade           $http_upgrade;
+    proxy_set_header Connection        "upgrade";
+    proxy_read_timeout 60s;
+  }
+
+  # ── Hashed assets (Vite emits /assets/<name>-<hash>.<ext>) — long cache ───
+  location /assets/ {
+    expires    1y;
+    add_header Cache-Control "public, immutable";
+    try_files  $uri =404;
+  }
+
+  # ── SPA fallback: try real file, then directory, then index.html ──────────
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+
+  # ── index.html must never be cached, otherwise users keep stale deploys ───
+  location = /index.html {
+    add_header Cache-Control "no-cache, no-store, must-revalidate";
+    add_header Pragma        "no-cache";
+    add_header Expires       "0";
+  }
+}

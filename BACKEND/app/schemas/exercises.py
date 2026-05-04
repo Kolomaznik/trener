@@ -33,6 +33,26 @@ class Media(BaseModel):
     thumbnail_url: str | None = None
 
 
+class MuscleEngagement(BaseModel):
+    """Per-muscle engagement with computed volume load in kg."""
+
+    percent: int
+    muscle_load: float = 0.0  # "Přemístěná zátěž" in kg
+
+
+class MuscleLoadByDifficulty(BaseModel):
+    """Volume load (kg) per muscle for each difficulty tier.
+
+    Computed server-side from the authenticated user's weight and
+    the exercise's progression_goals.  Absent (None) when the user
+    is not authenticated or has no weight recorded in their profile.
+    """
+
+    beginner: dict[str, MuscleEngagement] = Field(default_factory=dict)
+    intermediate: dict[str, MuscleEngagement] = Field(default_factory=dict)
+    mastery: dict[str, MuscleEngagement] = Field(default_factory=dict)
+
+
 class ExerciseDocument(BaseModel):
     """Shape of a single document in the `exercises` MongoDB collection.
 
@@ -51,6 +71,8 @@ class ExerciseDocument(BaseModel):
     cadence: Cadence | None = None
     progression_goals: ProgressionGoals | None = None
     muscle_engagement_percent: dict[str, int] = Field(default_factory=dict)
+    level_coefficient: float = 0.5
+    height_multiplier: float = 0.5
 
 
 class ExerciseListItem(BaseModel):
@@ -66,3 +88,4 @@ class ExerciseListItem(BaseModel):
 class ExerciseDetailResponse(ExerciseDocument):
     next_exercise_id: str | None = None
     next_exercise_name: str | None = None
+    muscle_load_by_difficulty: MuscleLoadByDifficulty | None = None
