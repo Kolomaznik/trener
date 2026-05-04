@@ -1,19 +1,42 @@
-# backend/Dockerfile
-FROM python:3.12-slim
+# syntax=docker/dockerfile:1.7
+# Trener FRONTEND — Vite React SPA, optimised for Railway.app
 
-# Instalace uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# ─── Stage 1: build the SPA bundle with Node 22 ──────────────────────────────
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Kopírování konfiguračních souborů
-COPY pyproject.toml uv.lock ./
+# Install deps from lockfile (deterministic, fast).  Cached until either
+# package.json or package-lock.json change.
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --no-fund --prefer-offline
 
-# Instalace závislostí (vytvoří se .venv)
-RUN uv sync --frozen --no-cache
-
-# Kopírování zbytku kódu
+# Build the SPA.
 COPY . .
+RUN npm run build
 
-# Spuštění aplikace (Railway očekává port z ENV variable $PORT)
-CMD ["uv", "run", "fastapi", "run", "main.py", "--port", "8080"]
+
+# ─── Stage 2: serve with nginx (unprivileged image, listens as uid 101) ──────
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
+
+# Default values; override via Railway env vars.
+ENV PORT=8080 \
+    BACKEND_URL=http://backend:8080 \
+    NGINX_ENVSUBST_FILTER="^(PORT|BACKEND_URL)$"
+
+# Site config — base image runs envsubst on /etc/nginx/templates/*.template
+# at container start, rendering into /etc/nginx/conf.d/.  The FILTER above
+# limits substitution to PORT/BACKEND_URL so nginx variables ($host etc.)
+# are left intact.
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+
+# Static bundle.  --chown matches the unprivileged 'nginx' user (uid 101).
+COPY --from=builder --chown=nginx:nginx /app/dist /usr/share/nginx/html
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD wget -qO- "http://127.0.0.1:${PORT}/healthz" | grep -q ok || exit 1
+
+# CMD is inherited from the base image (`nginx -g 'daemon off;'`).

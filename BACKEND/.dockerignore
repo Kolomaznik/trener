@@ -1,0 +1,32 @@
+# Build artifacts / venvs — must be rebuilt inside the container
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+
+# VCS & editor / IDE
+.git/
+.gitignore
+.gitattributes
+.vscode/
+.idea/
+
+# Local secrets & configs (never bake into image; Railway sets env at runtime)
+.env
+.env.*
+!.env.example
+
+# Tests are not needed in the production image
+tests/
+
+# Docker meta
+Dockerfile
+.dockerignore
+
+# Docs & misc
+README.md
+*.md
