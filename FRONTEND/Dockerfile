@@ -4,6 +4,20 @@
 # ─── Stage 1: build the SPA bundle with Node 22 ──────────────────────────────
 FROM node:22-alpine AS builder
 
+# Railway (and any CI) passes these as Docker build-args so that Vite can bake
+# them into the bundle at build time.  Set these variables in the Railway
+# service → Variables panel for the frontend service.
+ARG VITE_GOOGLE_CLIENT_ID
+ARG VITE_GOOGLE_REDIRECT_URI
+ARG VITE_GOOGLE_OAUTH_SCOPE="openid email profile"
+ARG VITE_GOOGLE_AUTH_URL="https://accounts.google.com/o/oauth2/v2/auth"
+
+# Expose them as ENV so `npm run build` (Vite) picks them up via import.meta.env.
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID \
+    VITE_GOOGLE_REDIRECT_URI=$VITE_GOOGLE_REDIRECT_URI \
+    VITE_GOOGLE_OAUTH_SCOPE=$VITE_GOOGLE_OAUTH_SCOPE \
+    VITE_GOOGLE_AUTH_URL=$VITE_GOOGLE_AUTH_URL
+
 WORKDIR /app
 
 # Install deps from lockfile (deterministic, fast).  Cached until either
