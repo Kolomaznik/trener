@@ -7,6 +7,7 @@ import {
   Col,
   Descriptions,
   Divider,
+  Image,
   Row,
   Segmented,
   Skeleton,
@@ -161,25 +162,7 @@ function ExerciseDetailBody({ detail, navigate, id }) {
               </Card>
             )}
 
-            {detail.media?.youtube_tutorial && (
-              <Card size="small" title="Video">
-                <a
-                  href={detail.media.youtube_tutorial}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {detail.media.thumbnail_url ? (
-                    <img
-                      src={detail.media.thumbnail_url}
-                      alt={detail.name}
-                      style={{ maxWidth: '100%', borderRadius: 8 }}
-                    />
-                  ) : (
-                    <span>YouTube tutorial</span>
-                  )}
-                </a>
-              </Card>
-            )}
+            <MediaSection media={detail.media} exerciseName={detail.name} />
           </Space>
         </Col>
       </Row>
@@ -205,6 +188,74 @@ function ExerciseDetailBody({ detail, navigate, id }) {
         <Alert type="success" showIcon message="Nejvyšší úroveň této rodiny" />
       )}
     </Space>
+  );
+}
+
+/**
+ * Renders the `media` dict (free-form key → URL / data URL).
+ *
+ *  - **v1 backward compat**: if `media` has `youtube_tutorial` (and optionally
+ *    `thumbnail_url`), renders a single linked thumbnail card.
+ *  - **v2 (or any other shape)**: renders every entry as an image in an
+ *    `Image.PreviewGroup` (click to zoom).  Caption uses the dict key.
+ *
+ * `data:` URIs and HTTP image URLs are both treated as renderable images.
+ * Unrecognised string values are skipped.
+ */
+function MediaSection({ media, exerciseName }) {
+  if (!media || typeof media !== 'object' || Object.keys(media).length === 0) {
+    return null;
+  }
+
+  if (media.youtube_tutorial) {
+    return (
+      <Card size="small" title="Video">
+        <a href={media.youtube_tutorial} target="_blank" rel="noreferrer">
+          {media.thumbnail_url ? (
+            <img
+              src={media.thumbnail_url}
+              alt={exerciseName}
+              style={{ maxWidth: '100%', borderRadius: 8 }}
+            />
+          ) : (
+            <span>YouTube tutorial</span>
+          )}
+        </a>
+      </Card>
+    );
+  }
+
+  const items = Object.entries(media).filter(
+    ([, value]) =>
+      typeof value === 'string' &&
+      (value.startsWith('data:image/') ||
+        /^https?:\/\/.+\.(jpe?g|png|webp|gif|svg)(\?|$)/i.test(value)),
+  );
+  if (items.length === 0) return null;
+
+  return (
+    <Card size="small" title="Obrázky">
+      <Image.PreviewGroup>
+        <Space wrap size={12} align="start">
+          {items.map(([key, url]) => (
+            <div key={key} style={{ textAlign: 'center', maxWidth: 220 }}>
+              <Image
+                src={url}
+                alt={key}
+                width={200}
+                style={{ borderRadius: 8 }}
+              />
+              <Text
+                type="secondary"
+                style={{ fontSize: 12, display: 'block', marginTop: 4 }}
+              >
+                {key}
+              </Text>
+            </div>
+          ))}
+        </Space>
+      </Image.PreviewGroup>
+    </Card>
   );
 }
 
@@ -283,6 +334,13 @@ function ProgressionAndMuscleCard({ detail }) {
         items={tabItems}
         style={{ marginTop: 4 }}
       />
+
+      {detail.progression_goals?.coach_note && (
+        <Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+          {detail.progression_goals.coach_note}
+        </Paragraph>
+      )}
+
       <Divider />
 
       {/* ── Muscle map section ──────────────────────────────────────────── */}
@@ -301,7 +359,7 @@ function ProgressionAndMuscleCard({ detail }) {
         <Segmented
           options={[
             { label: '% Zapojení', value: 'percent' },
-            { label: 'Zátěž (kg)', value: 'load', disabled: !hasLoadData },
+            { label: 'Přemístěná zátěž (kg)', value: 'load', disabled: !hasLoadData },
           ]}
           value={mapMode}
           onChange={setMapMode}
