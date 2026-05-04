@@ -5,8 +5,10 @@ import mongomock
 import pytest
 from pymongo.errors import DuplicateKeyError
 
+# tests/__file__ → BACKEND/ → repo root → MONGO_DB/migrations
 MIGRATION_PATH = (
-    Path(__file__).resolve().parents[1]
+    Path(__file__).resolve().parents[2]
+    / "MONGO_DB"
     / "migrations"
     / "20260502070000_schema_ensure_users_email_unique_index.py"
 )

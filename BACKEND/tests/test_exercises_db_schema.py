@@ -1,12 +1,13 @@
 """Validate every document in the `exercises` collection against the
-canonical Pydantic schema imported from BACKEND.
+canonical Pydantic schema from this BACKEND project.
 
 The test:
-1. Discovers every migration file in `migrations/`, sorts by timestamp prefix.
-2. Applies each migration's `upgrade()` against a fresh mongomock database
-   (same order as `mongodb_migrations.MigrationManager`).
-3. Iterates every document in `db.exercises` and validates it with
-   `ExerciseDocument` from `app.schemas.exercises` (BACKEND).
+1. Discovers every migration file in the sibling ``MONGO_DB/migrations``
+   directory, sorts by timestamp prefix.
+2. Applies each migration's ``upgrade()`` against a fresh mongomock
+   database (same order as ``mongodb_migrations.MigrationManager``).
+3. Iterates every document in ``db.exercises`` and validates it with
+   ``ExerciseDocument`` from ``app.schemas.exercises``.
 
 Failures are aggregated and reported together so you see *all* offending
 documents in a single run rather than only the first.
@@ -15,27 +16,22 @@ documents in a single run rather than only the first.
 from __future__ import annotations
 
 import importlib.util
-import sys
 from pathlib import Path
 
 import mongomock
 import pytest
 from pydantic import ValidationError
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-BACKEND_ROOT = REPO_ROOT / "BACKEND"
-if str(BACKEND_ROOT) not in sys.path:
-    sys.path.insert(0, str(BACKEND_ROOT))
+from app.schemas.exercises import ExerciseDocument
 
-from app.schemas.exercises import ExerciseDocument  # noqa: E402
-
-MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "migrations"
+# tests/__file__ → BACKEND/ → repo root → MONGO_DB/migrations
+MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "MONGO_DB" / "migrations"
 
 
 def _discover_migration_modules() -> list[tuple[str, type]]:
     """Return [(timestamp_prefix, Migration class), ...] sorted by filename.
 
-    `mongodb_migrations` runs migrations in alphabetical order of filename,
+    ``mongodb_migrations`` runs migrations in alphabetical order of filename,
     which is chronological because every name starts with a timestamp.
     """
     found: list[tuple[str, type]] = []
@@ -50,11 +46,11 @@ def _discover_migration_modules() -> list[tuple[str, type]]:
 
 
 def _apply_all_migrations(db) -> None:
-    """Instantiate each Migration class and run upgrade() against `db`.
+    """Instantiate each Migration class and run ``upgrade()`` against ``db``.
 
-    `BaseMigration.__init__` connects to a real MongoDB; bypass it via
-    `__new__` and inject our mongomock database directly (same trick used in
-    `tests/test_users_email_unique_index.py`).
+    ``BaseMigration.__init__`` connects to a real MongoDB; bypass it via
+    ``__new__`` and inject our mongomock database directly (same trick used in
+    ``test_users_email_unique_index.py``).
     """
     for _, migration_cls in _discover_migration_modules():
         instance = migration_cls.__new__(migration_cls)
@@ -77,7 +73,7 @@ def test_migrations_seed_at_least_one_exercise(seeded_db):
 
 def test_every_exercise_document_matches_schema(seeded_db):
     """Each document in `db.exercises` must validate against
-    `app.schemas.exercises.ExerciseDocument`."""
+    ``app.schemas.exercises.ExerciseDocument``."""
     docs = list(seeded_db["exercises"].find({}))
     failures: list[str] = []
 

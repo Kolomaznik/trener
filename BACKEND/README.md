@@ -44,6 +44,69 @@ USER_EMAIL=user@example.com
 
 Frontend tento e-mail používá jako `login_hint` při přesměrování na Google OAuth.
 
+## Workout Sessions API
+
+Nová sada endpointů pro ukládání a analýzu tréninkových sérií.
+
+### `POST /workout-sessions`
+
+Uloží výsledek jedné série do MongoDB kolekce `workout_sessions`.
+Vyžaduje Bearer token (Google OAuth).
+
+Backend automaticky doplní:
+- `user_email` z tokenu
+- `user_weight_kg` / `user_height_cm` z profilu uživatele
+- `muscle_engagement_percent` z dokumentu cviku
+
+**Vstup (`WorkoutSessionCreate`):**
+
+```json
+{
+  "exercise_id": "pushups_level_1",
+  "exercise_name": "Kliky o zeď",
+  "started_at": "2026-05-03T10:00:00Z",
+  "ended_at": "2026-05-03T10:01:00Z",
+  "total_duration_sec": 60.0,
+  "total_reps": 15,
+  "set_number": 1,
+  "events": [
+    { "value": 1, "token": "jedna", "timestamp_ms": 1000, "timestamp_iso": "..." },
+    { "value": 2, "token": "dva",   "timestamp_ms": 2000, "timestamp_iso": "..." }
+  ]
+}
+```
+
+**Odpověď:** `201 Created` – obohacený dokument včetně `id` a `saved_at`.
+
+---
+
+### `GET /workout-sessions/level/{exercise_id}`
+
+Vrátí úroveň uživatele pro daný cvik na základě posledních 5 uložených sérií.
+Vyžaduje Bearer token (Google OAuth).
+
+**Výpočet úrovně** (průměr `total_reps` posledních 5 sérií oproti `progression_goals` cviku):
+
+| Průměr opakování          | Úroveň         | `rest_seconds` |
+|---------------------------|----------------|----------------|
+| žádná historie            | `beginner`     | 90 s           |
+| < `beginner.reps`         | `beginner`     | 90 s           |
+| ≥ `beginner.reps`         | `intermediate` | 60 s           |
+| ≥ `mastery.reps`          | `mastery`      | 45 s           |
+
+**Odpověď (`UserLevelInfo`):**
+
+```json
+{
+  "level": "intermediate",
+  "recent_sets": [{ "total_reps": 20, "started_at": "...", "set_number": 1 }],
+  "target_reps": 25,
+  "target_sets": 2,
+  "last_best_reps": 20,
+  "rest_seconds": 60
+}
+```
+
 ## Lint
 ```bash
 uv run --group dev ruff check .
