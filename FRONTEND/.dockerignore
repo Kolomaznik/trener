@@ -1,0 +1,29 @@
+# Dependencies & build artifacts — produced inside the container
+node_modules/
+dist/
+coverage/
+
+# VCS & editor / IDE
+.git/
+.gitignore
+.gitattributes
+.vscode/
+.idea/
+
+# Local secrets & configs (Vite injects only VITE_* at build time;
+# runtime env in nginx is set by Railway)
+.env
+.env.*
+!.env.example
+
+# Test output
+.vitest_cache/
+
+# Docker meta
+Dockerfile
+.dockerignore
+
+# Docs & misc
+README.md
+THIRD_PARTY_NOTICES.md
+*.md
