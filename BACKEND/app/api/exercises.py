@@ -10,7 +10,6 @@ from app.schemas.exercises import (
     Cadence,
     ExerciseDetailResponse,
     ExerciseListItem,
-    Media,
     MuscleLoadByDifficulty,
     ProgressionGoals,
 )
@@ -117,7 +116,7 @@ def _doc_to_detail(
         level=doc["level"],
         description=doc.get("description", ""),
         instructions=list(doc.get("instructions", [])),
-        media=Media(**media_doc) if media_doc else None,
+        media=dict(media_doc) if media_doc else None,
         cadence=Cadence(**cadence_doc) if cadence_doc else None,
         progression_goals=ProgressionGoals(**progression_doc) if progression_doc else None,
         muscle_engagement_percent=dict(doc.get("muscle_engagement_percent", {})),
@@ -169,9 +168,7 @@ def list_exercises_by_family(
 ) -> list[ExerciseDetailResponse]:
     """Return all exercises in a given family, sorted by level ascending."""
     docs = list(
-        db["exercises"]
-        .find({"family": family, "level": {"$exists": True}})
-        .sort("level", 1)
+        db["exercises"].find({"family": family, "level": {"$exists": True}}).sort("level", 1)
     )
     if not docs:
         raise HTTPException(status_code=404, detail="No exercises found for this family")

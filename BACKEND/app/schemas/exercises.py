@@ -28,11 +28,6 @@ class ProgressionGoals(BaseModel):
     coach_note: str
 
 
-class Media(BaseModel):
-    youtube_tutorial: str | None = None
-    thumbnail_url: str | None = None
-
-
 class MuscleEngagement(BaseModel):
     """Per-muscle engagement with computed volume load in kg."""
 
@@ -67,7 +62,10 @@ class ExerciseDocument(BaseModel):
     level: int
     description: str
     instructions: list[str] = Field(default_factory=list)
-    media: Media | None = None
+    # Free-form: keys are author-chosen labels (e.g. ``"img_1"``,
+    # ``"youtube_tutorial"``), values are URLs or ``data:`` URIs.  The
+    # frontend decides how to render each entry based on the value.
+    media: dict[str, str] | None = None
     cadence: Cadence | None = None
     progression_goals: ProgressionGoals | None = None
     muscle_engagement_percent: dict[str, int] = Field(default_factory=dict)
