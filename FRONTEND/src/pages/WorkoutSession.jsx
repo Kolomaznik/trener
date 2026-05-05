@@ -26,7 +26,7 @@ import {
   shouldAcceptEvent,
   tokenizeTranscript,
 } from '../features/voiceCounting.js';
-import { fetchExerciseDetail, fetchUserLevel, postWorkoutSession } from '../api/client.js';
+import { fetchExerciseDetail, postWorkoutSession } from '../api/client.js';
 import ExerciseMuscleMap from '../components/ExerciseMuscleMap.jsx';
 
 const { Title, Paragraph, Text } = Typography;
@@ -110,7 +110,6 @@ export default function WorkoutSession() {
   const navigate = useNavigate();
 
   const [detail, setDetail] = useState(null);
-  const [levelInfo, setLevelInfo] = useState(null);
   const [detailLoading, setDetailLoading] = useState(true);
   const [detailError, setDetailError] = useState(null);
 
@@ -135,11 +134,11 @@ export default function WorkoutSession() {
     isMicrophoneAvailable,
   } = useSpeechRecognition();
 
-  const restSeconds = levelInfo?.rest_seconds ?? 60;
+  const restSeconds = detail?.user_level?.rest_seconds ?? 60;
   const { elapsed, reset: resetElapsed } = useElapsedTimer(sessionState === 'listening');
   const { remaining: restRemaining, reset: resetRest } = useRestTimer(restSeconds, restActive);
 
-  // Load exercise detail + user level
+  // Load exercise detail (includes user_level)
   useEffect(() => {
     if (!exerciseId) return undefined;
     let active = true;
@@ -147,11 +146,10 @@ export default function WorkoutSession() {
     setDetailLoading(true);
     setDetailError(null);
 
-    Promise.all([fetchExerciseDetail(exerciseId), fetchUserLevel(exerciseId)])
-      .then(([det, lvl]) => {
+    fetchExerciseDetail(exerciseId)
+      .then((det) => {
         if (!active) return;
         setDetail(det);
-        setLevelInfo(lvl);
       })
       .catch((err) => {
         if (!active) return;
@@ -299,9 +297,9 @@ export default function WorkoutSession() {
 
     try {
       await postWorkoutSession(payload);
-      // Refresh level info after saving
-      const lvl = await fetchUserLevel(exerciseId);
-      setLevelInfo(lvl);
+      // Re-fetch detail to get refreshed user_level
+      const freshDetail = await fetchExerciseDetail(exerciseId);
+      setDetail(freshDetail);
     } catch {
       setSaveError('Sérii se nepodařilo uložit. Data jsou zachována lokálně.');
     } finally {
@@ -383,27 +381,27 @@ export default function WorkoutSession() {
       )}
 
       {/* User level and motivation */}
-      {levelInfo && (
+      {detail?.user_level && (
         <Card size="small" title="Tvoje úroveň">
           <Space direction="vertical" size={8} style={{ width: '100%' }}>
             <Space wrap>
-              <Tag color={LEVEL_COLORS[levelInfo.level]}>
-                {LEVEL_LABELS[levelInfo.level] ?? levelInfo.level}
+              <Tag color={LEVEL_COLORS[detail.user_level.level]}>
+                {LEVEL_LABELS[detail.user_level.level] ?? detail.user_level.level}
               </Tag>
-              {levelInfo.target_reps != null && levelInfo.target_sets != null && (
+              {detail.user_level.target_reps != null && detail.user_level.target_sets != null && (
                 <Text type="secondary">
-                  Cíl: {levelInfo.target_sets} × {levelInfo.target_reps} opakování
+                  Cíl: {detail.user_level.target_sets} × {detail.user_level.target_reps} opakování
                 </Text>
               )}
             </Space>
-            {levelInfo.last_best_reps != null && (
+            {detail.user_level.last_best_reps != null && (
               <Text>
-                Naposledy nejlepší výkon: <Text strong>{levelInfo.last_best_reps}</Text> opakování
+                Naposledy nejlepší výkon: <Text strong>{detail.user_level.last_best_reps}</Text> opakování
               </Text>
             )}
-            {levelInfo.target_reps != null && (
+            {detail.user_level.target_reps != null && (
               <Text type="secondary">
-                🎯 Dnes překonej: <Text strong>{levelInfo.target_reps}</Text> opakování
+                🎯 Dnes překonej: <Text strong>{detail.user_level.target_reps}</Text> opakování
               </Text>
             )}
           </Space>

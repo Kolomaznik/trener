@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Avatar, Button, Drawer, Grid, Layout, Menu, Spin, Typography } from 'antd';
-import { MenuOutlined, PlayCircleOutlined, UserOutlined } from '@ant-design/icons';
+import { MenuOutlined, UserOutlined } from '@ant-design/icons';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { apiClient } from './api/client.js';
 import { getUserSettings } from './api/getUserSettings.js';
@@ -96,7 +96,6 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false);
   const [authError, setAuthError] = useState('');
   const [userSettings, setUserSettings] = useState(null);
-  const startButtonLabel = isMobile ? 'Začít' : 'Začít cvičit';
 
   useEffect(() => {
     let cancelled = false;
@@ -235,14 +234,6 @@ export default function App() {
           />
           <span style={{ color: '#fff', fontSize: 18, fontWeight: 500 }}>Trainer</span>
           <div style={{ flex: 1 }} />
-          <Button
-            type="primary"
-            icon={<PlayCircleOutlined />}
-            onClick={() => navigate('/exercises')}
-            size={isMobile ? 'middle' : 'large'}
-          >
-            {startButtonLabel}
-          </Button>
           <Drawer
             placement="left"
             open={drawerOpen}

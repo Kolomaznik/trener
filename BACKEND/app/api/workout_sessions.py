@@ -7,15 +7,11 @@ from pymongo.database import Database
 from app.auth import GoogleUser, get_current_user
 from app.db import get_db
 from app.schemas.workout_sessions import (
-    RecentSet,
-    UserLevelInfo,
     WorkoutSessionCreate,
     WorkoutSessionResponse,
 )
 
 router = APIRouter(prefix="/workout-sessions", tags=["workout-sessions"])
-
-_REST_SECONDS: dict[str, int] = {"beginner": 90, "intermediate": 60, "mastery": 45}
 
 
 def _compute_level(recent_reps: list[int], progression_goals: dict[str, Any] | None) -> str:
@@ -62,51 +58,4 @@ def create_workout_session(
     return WorkoutSessionResponse(
         id=str(result.inserted_id),
         **{k: v for k, v in doc.items() if k != "_id"},
-    )
-
-
-@router.get("/level/{exercise_id}", response_model=UserLevelInfo)
-def get_user_level(
-    exercise_id: str,
-    user: GoogleUser = Depends(get_current_user),
-    db: Database = Depends(get_db),
-) -> UserLevelInfo:
-    recent_docs = list(
-        db["workout_sessions"]
-        .find({"user_email": user.email, "exercise_id": exercise_id})
-        .sort("started_at", -1)
-        .limit(5)
-    )
-
-    exercise_doc = db["exercises"].find_one({"id": exercise_id}) or {}
-    progression_goals = exercise_doc.get("progression_goals")
-
-    recent_reps = [doc["total_reps"] for doc in recent_docs]
-    level = _compute_level(recent_reps, progression_goals)
-
-    recent_sets = [
-        RecentSet(
-            total_reps=doc["total_reps"],
-            started_at=doc["started_at"],
-            set_number=doc["set_number"],
-        )
-        for doc in recent_docs
-    ]
-
-    target_reps: int | None = None
-    target_sets: int | None = None
-    if progression_goals:
-        goal = progression_goals.get(level) or {}
-        target_reps = goal.get("reps")
-        target_sets = goal.get("sets")
-
-    last_best_reps = max(recent_reps) if recent_reps else None
-
-    return UserLevelInfo(
-        level=level,
-        recent_sets=recent_sets,
-        target_reps=target_reps,
-        target_sets=target_sets,
-        last_best_reps=last_best_reps,
-        rest_seconds=_REST_SECONDS.get(level, 60),
     )
