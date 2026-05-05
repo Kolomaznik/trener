@@ -13,12 +13,12 @@ WORKDIR /app
 # Install only deps first — this layer is cached until pyproject.toml or
 # uv.lock change. --no-dev keeps ruff / pytest / mongomock out of the image.
 COPY pyproject.toml uv.lock ./
-RUN --mount=type=cache,target=/root/.cache/uv \
+RUN --mount=type=cache,id=s/ee10e872-1e47-4dfc-a975-ed3f9773f081-/root/.cache/uv,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
 
 # Copy the application source and install the project itself.
 COPY . .
-RUN --mount=type=cache,target=/root/.cache/uv \
+RUN --mount=type=cache,id=s/ee10e872-1e47-4dfc-a975-ed3f9773f081-/root/.cache/uv,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
 
