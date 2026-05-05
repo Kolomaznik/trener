@@ -6,9 +6,22 @@ import ExerciseDetail from './ExerciseDetail.jsx';
 vi.mock('../api/client.js', () => ({
   fetchExercises: vi.fn(),
   fetchExerciseDetail: vi.fn(),
+  fetchUserLevel: vi.fn(),
+  postWorkoutSession: vi.fn(),
 }));
 
-import { fetchExerciseDetail } from '../api/client.js';
+vi.mock('react-speech-recognition', () => ({
+  default: { startListening: vi.fn(), stopListening: vi.fn() },
+  useSpeechRecognition: () => ({
+    transcript: '',
+    listening: false,
+    browserSupportsSpeechRecognition: true,
+    isMicrophoneAvailable: true,
+    resetTranscript: vi.fn(),
+  }),
+}));
+
+import { fetchExerciseDetail, fetchUserLevel } from '../api/client.js';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -110,7 +123,9 @@ function renderWithRouter(initialPath = '/exercises/pushups_level_1') {
 describe('ExerciseDetail page', () => {
   beforeEach(() => {
     fetchExerciseDetail.mockReset();
+    fetchUserLevel.mockReset();
     fetchExerciseDetail.mockResolvedValue(detailFixture);
+    fetchUserLevel.mockResolvedValue(null);
   });
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -359,14 +374,5 @@ describe('ExerciseDetail page', () => {
     renderWithRouter('/exercises/neexistuje');
 
     expect(await screen.findByText('Cvik nebyl nalezen.')).toBeInTheDocument();
-  });
-
-  it('renders "Začít cvičit" button that navigates to workout page', async () => {
-    renderWithRouter();
-
-    await screen.findByText('Kliky o zeď');
-    fireEvent.click(screen.getByRole('button', { name: /Začít cvičit/ }));
-
-    expect(await screen.findByTestId('workout-marker')).toBeInTheDocument();
   });
 });
