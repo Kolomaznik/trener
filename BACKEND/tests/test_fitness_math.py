@@ -102,8 +102,8 @@ class TestCalculateMuscleLoad:
     def test_basic_calculation(self):
         """Verify the formula: total_load = 80 * 10 * 0.64 = 512 kg.
 
-        chest   (40 %) → round(512 * 0.40, 1) = 204.8 kg
-        triceps (30 %) → round(512 * 0.30, 1) = 153.6 kg
+        chest   (40%) → round(512 * 0.40, 1) = 204.8 kg
+        triceps (30%) → round(512 * 0.30, 1) = 153.6 kg
         """
         result = calculate_muscle_load(
             weight_kg=80,
