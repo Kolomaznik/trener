@@ -23,7 +23,7 @@ WORKDIR /app
 # Install deps from lockfile (deterministic, fast).  Cached until either
 # package.json or package-lock.json change.
 COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm \
+RUN --mount=type=cache,id=s/94cd0ef2-8d19-439c-ab49-bc033f586504-/root/.npm,target=/root/.npm \
     npm ci --no-audit --no-fund --prefer-offline
 
 # Build the SPA.
