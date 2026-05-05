@@ -3,9 +3,10 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ExerciseDetail from './ExerciseDetail.jsx';
 
-vi.mock('../api/client.js', () => ({
-  fetchExercises: vi.fn(),
-  fetchExerciseDetail: vi.fn(),
+vi.mock('../api/exercises/get_detail.js', () => ({
+  getExerciseDetail: vi.fn(),
+}));
+vi.mock('../api/workout-sessions/post.js', () => ({
   postWorkoutSession: vi.fn(),
 }));
 
@@ -20,7 +21,7 @@ vi.mock('react-speech-recognition', () => ({
   }),
 }));
 
-import { fetchExerciseDetail } from '../api/client.js';
+import { getExerciseDetail } from '../api/exercises/get_detail.js';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -129,8 +130,8 @@ function renderWithRouter(initialPath = '/exercises/pushups_level_1') {
 
 describe('ExerciseDetail page', () => {
   beforeEach(() => {
-    fetchExerciseDetail.mockReset();
-    fetchExerciseDetail.mockResolvedValue(detailFixture);
+    getExerciseDetail.mockReset();
+    getExerciseDetail.mockResolvedValue(detailFixture);
   });
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -139,7 +140,7 @@ describe('ExerciseDetail page', () => {
     renderWithRouter('/exercises/pushups_level_1');
 
     await waitFor(() =>
-      expect(fetchExerciseDetail).toHaveBeenCalledWith('pushups_level_1'),
+      expect(getExerciseDetail).toHaveBeenCalledWith('pushups_level_1'),
     );
   });
 
@@ -147,7 +148,7 @@ describe('ExerciseDetail page', () => {
     renderWithRouter();
 
     await screen.findByText('Kliky o zeď');
-    expect(fetchExerciseDetail).toHaveBeenCalledTimes(1);
+    expect(getExerciseDetail).toHaveBeenCalledTimes(1);
   });
 
   // ── Header card ────────────────────────────────────────────────────────────
@@ -231,7 +232,7 @@ describe('ExerciseDetail page', () => {
   });
 
   it('Přemístěná zátěž option is disabled when load data is absent', async () => {
-    fetchExerciseDetail.mockResolvedValue(detailFixtureNoLoad);
+    getExerciseDetail.mockResolvedValue(detailFixtureNoLoad);
     renderWithRouter();
 
     await screen.findByText('% Zapojení');
@@ -240,7 +241,7 @@ describe('ExerciseDetail page', () => {
   });
 
   it('shows an info alert when load data is absent', async () => {
-    fetchExerciseDetail.mockResolvedValue(detailFixtureNoLoad);
+    getExerciseDetail.mockResolvedValue(detailFixtureNoLoad);
     renderWithRouter();
 
     expect(await screen.findByText(/Přihlaste se a vyplňte hmotnost/i)).toBeInTheDocument();
@@ -253,14 +254,14 @@ describe('ExerciseDetail page', () => {
     expect(screen.queryByText(/Přihlaste se a vyplňte hmotnost/i)).not.toBeInTheDocument();
   });
 
-  it('switching to Přemístěná zátěž mode does not call fetchExerciseDetail again', async () => {
+  it('switching to Přemístěná zátěž mode does not call getExerciseDetail again', async () => {
     renderWithRouter();
 
     await screen.findByText('% Zapojení');
     fireEvent.click(screen.getByText('Přemístěná zátěž (kg)'));
 
     // Still exactly 1 call — no extra API request
-    expect(fetchExerciseDetail).toHaveBeenCalledTimes(1);
+    expect(getExerciseDetail).toHaveBeenCalledTimes(1);
   });
 
   it('muscle map updates immediately when switching to load mode (no spinner needed)', async () => {
@@ -356,7 +357,7 @@ describe('ExerciseDetail page', () => {
   });
 
   it('navigates to next exercise when "next level" button is clicked', async () => {
-    fetchExerciseDetail.mockImplementation(async (id) =>
+    getExerciseDetail.mockImplementation(async (id) =>
       id === 'pushups_level_2' ? detailFixtureLevel2 : detailFixture,
     );
     renderWithRouter();
@@ -365,7 +366,7 @@ describe('ExerciseDetail page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Kliky v předklonu' }));
 
     await waitFor(() =>
-      expect(fetchExerciseDetail).toHaveBeenCalledWith('pushups_level_2'),
+      expect(getExerciseDetail).toHaveBeenCalledWith('pushups_level_2'),
     );
     expect(
       await screen.findByText('Nejvyšší úroveň této rodiny'),
@@ -375,7 +376,7 @@ describe('ExerciseDetail page', () => {
   // ── Error states ───────────────────────────────────────────────────────────
 
   it('shows 404 message when exercise is not found', async () => {
-    fetchExerciseDetail.mockRejectedValue({ response: { status: 404 } });
+    getExerciseDetail.mockRejectedValue({ response: { status: 404 } });
     renderWithRouter('/exercises/neexistuje');
 
     expect(await screen.findByText('Cvik nebyl nalezen.')).toBeInTheDocument();

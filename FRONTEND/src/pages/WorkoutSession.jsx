@@ -26,7 +26,8 @@ import {
   shouldAcceptEvent,
   tokenizeTranscript,
 } from '../features/voiceCounting.js';
-import { fetchExerciseDetail, postWorkoutSession } from '../api/client.js';
+import { getExerciseDetail } from '../api/exercises/get_detail.js';
+import { postWorkoutSession } from '../api/workout-sessions/post.js';
 import ExerciseMuscleMap from '../components/ExerciseMuscleMap.jsx';
 
 const { Title, Paragraph, Text } = Typography;
@@ -146,7 +147,7 @@ export default function WorkoutSession() {
     setDetailLoading(true);
     setDetailError(null);
 
-    fetchExerciseDetail(exerciseId)
+    getExerciseDetail(exerciseId)
       .then((det) => {
         if (!active) return;
         setDetail(det);
@@ -298,7 +299,7 @@ export default function WorkoutSession() {
     try {
       await postWorkoutSession(payload);
       // Re-fetch detail to get refreshed user_level
-      const freshDetail = await fetchExerciseDetail(exerciseId);
+      const freshDetail = await getExerciseDetail(exerciseId);
       setDetail(freshDetail);
     } catch {
       setSaveError('Sérii se nepodařilo uložit. Data jsou zachována lokálně.');

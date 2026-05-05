@@ -25,7 +25,8 @@ import {
 } from '@ant-design/icons';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import ExerciseMuscleMap from '../components/ExerciseMuscleMap.jsx';
-import { fetchExerciseDetail, postWorkoutSession } from '../api/client.js';
+import { getExerciseDetail } from '../api/exercises/get_detail.js';
+import { postWorkoutSession } from '../api/workout-sessions/post.js';
 import {
   computeSessionStats,
   parseNumberFromTokens,
@@ -128,7 +129,7 @@ export default function ExerciseDetail() {
     let active = true;
     setLoading(true);
     setError(null);
-    fetchExerciseDetail(id)
+    getExerciseDetail(id)
       .then((data) => {
         if (active) setDetail(data);
       })
@@ -334,7 +335,7 @@ function ExerciseDetailBody({ detail, setDetail, navigate, id }) {
 
     try {
       await postWorkoutSession(payload);
-      const freshDetail = await fetchExerciseDetail(id);
+      const freshDetail = await getExerciseDetail(id);
       setDetail(freshDetail);
     } catch {
       setSaveError('Sérii se nepodařilo uložit. Data jsou zachována lokálně.');

@@ -3,12 +3,11 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Exercises from './Exercises.jsx';
 
-vi.mock('../api/client.js', () => ({
-  fetchExercises: vi.fn(),
-  fetchExerciseDetail: vi.fn(),
+vi.mock('../api/exercises/get_list.js', () => ({
+  getExercises: vi.fn(),
 }));
 
-import { fetchExercises } from '../api/client.js';
+import { getExercises } from '../api/exercises/get_list.js';
 
 const listFixture = [
   {
@@ -44,14 +43,14 @@ function renderWithRouter(initialPath = '/exercises') {
 
 describe('Exercises page (tile grid)', () => {
   beforeEach(() => {
-    fetchExercises.mockReset();
-    fetchExercises.mockResolvedValue(listFixture);
+    getExercises.mockReset();
+    getExercises.mockResolvedValue(listFixture);
   });
 
   it('renders tiles for each exercise', async () => {
     renderWithRouter();
 
-    await waitFor(() => expect(fetchExercises).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getExercises).toHaveBeenCalledTimes(1));
     expect(await screen.findByText('Kliky o zeď')).toBeInTheDocument();
     expect(screen.getByText('Kliky v předklonu')).toBeInTheDocument();
     expect(screen.getAllByText('Kliky').length).toBeGreaterThanOrEqual(2);
@@ -79,7 +78,7 @@ describe('Exercises page (tile grid)', () => {
   });
 
   it('shows error alert when list fails to load', async () => {
-    fetchExercises.mockRejectedValue(new Error('boom'));
+    getExercises.mockRejectedValue(new Error('boom'));
     renderWithRouter();
 
     expect(
@@ -88,7 +87,7 @@ describe('Exercises page (tile grid)', () => {
   });
 
   it('shows empty state when no exercises in DB', async () => {
-    fetchExercises.mockResolvedValue([]);
+    getExercises.mockResolvedValue([]);
     renderWithRouter();
 
     expect(

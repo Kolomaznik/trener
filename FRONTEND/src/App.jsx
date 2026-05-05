@@ -3,7 +3,7 @@ import { Avatar, Button, Drawer, Grid, Layout, Menu, Spin, Typography } from 'an
 import { MenuOutlined, UserOutlined } from '@ant-design/icons';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { apiClient } from './api/client.js';
-import { getUserSettings } from './api/getUserSettings.js';
+import { getUserSettings } from './api/user/settings/get.js';
 import {
   UserSettingsContext,
   isProfileComplete,

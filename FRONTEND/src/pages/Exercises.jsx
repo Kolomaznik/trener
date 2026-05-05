@@ -11,7 +11,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import { fetchExercises } from '../api/client.js';
+import { getExercises } from '../api/exercises/get_list.js';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -25,7 +25,7 @@ export default function Exercises() {
     let active = true;
     setLoading(true);
     setError(null);
-    fetchExercises()
+    getExercises()
       .then((data) => {
         if (active) setExercises(data);
       })

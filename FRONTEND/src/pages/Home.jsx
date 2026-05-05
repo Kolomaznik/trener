@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Divider, Flex, Grid, Spin, Typography } from 'antd';
 import BodyHighlighter from '../components/BodyHighlighter.jsx';
-import { getYearlyOverview } from '../api/getYearlyOverview.js';
+import { getDashboard } from '../api/dashboard/get.js';
 import { useUserSettings } from '../context/UserSettingsContext.jsx';
 
 const { Title, Paragraph } = Typography;
@@ -65,10 +65,10 @@ export default function Home() {
   useEffect(() => {
     let cancelled = false;
 
-    getYearlyOverview()
+    getDashboard()
       .then((data) => {
         if (cancelled) return;
-        setOverview(data);
+        setOverview(data.year_summary);
       })
       .catch(() => {
         if (cancelled) return;

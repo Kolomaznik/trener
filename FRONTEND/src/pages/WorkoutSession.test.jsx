@@ -3,9 +3,10 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import WorkoutSession from './WorkoutSession.jsx';
 
-vi.mock('../api/client.js', () => ({
-  fetchExercises: vi.fn(),
-  fetchExerciseDetail: vi.fn(),
+vi.mock('../api/exercises/get_detail.js', () => ({
+  getExerciseDetail: vi.fn(),
+}));
+vi.mock('../api/workout-sessions/post.js', () => ({
   postWorkoutSession: vi.fn(),
 }));
 
@@ -48,7 +49,8 @@ vi.mock('react-speech-recognition', () => {
 });
 
 import * as speechModule from 'react-speech-recognition';
-import { fetchExerciseDetail, postWorkoutSession } from '../api/client.js';
+import { getExerciseDetail } from '../api/exercises/get_detail.js';
+import { postWorkoutSession } from '../api/workout-sessions/post.js';
 
 const levelFixtureBeginner = {
   level: 'beginner',
@@ -110,15 +112,15 @@ function renderWithRouter(path = '/exercises/pushups_level_1/workout') {
 describe('WorkoutSession page', () => {
   beforeEach(() => {
     speechModule.__resetMockState();
-    fetchExerciseDetail.mockReset();
+    getExerciseDetail.mockReset();
     postWorkoutSession.mockReset();
 
-    fetchExerciseDetail.mockResolvedValue(detailFixture);
+    getExerciseDetail.mockResolvedValue(detailFixture);
     postWorkoutSession.mockResolvedValue({ id: 'session-1', total_reps: 5 });
   });
 
   it('shows skeleton while loading', () => {
-    fetchExerciseDetail.mockReturnValue(new Promise(() => {}));
+    getExerciseDetail.mockReturnValue(new Promise(() => {}));
     renderWithRouter();
 
     expect(document.querySelector('.ant-skeleton')).toBeInTheDocument();
@@ -139,7 +141,7 @@ describe('WorkoutSession page', () => {
   });
 
   it('shows intermediate level tag with last best reps', async () => {
-    fetchExerciseDetail.mockResolvedValue({ ...detailFixture, user_level: levelFixtureIntermediate });
+    getExerciseDetail.mockResolvedValue({ ...detailFixture, user_level: levelFixtureIntermediate });
     renderWithRouter();
 
     await screen.findByText('Kliky o zeď');
@@ -267,7 +269,7 @@ describe('WorkoutSession page', () => {
   });
 
   it('shows error message when detail fails to load', async () => {
-    fetchExerciseDetail.mockRejectedValue({ response: { status: 404 } });
+    getExerciseDetail.mockRejectedValue({ response: { status: 404 } });
     renderWithRouter();
 
     expect(await screen.findByText('Cvik nebyl nalezen.')).toBeInTheDocument();
