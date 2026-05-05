@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +16,11 @@ class Settings(BaseSettings):
     muscle_map_json_path: Path = (
         Path(__file__).resolve().parents[1] / "FRONTEND" / "src" / "assets" / "muscle-map.json"
     )
+
+    @field_validator("google_userinfo_url", "mongo_uri", mode="before")
+    @classmethod
+    def strip_url_whitespace(cls, v: str) -> str:
+        return v.strip()
 
 
 settings = Settings()
