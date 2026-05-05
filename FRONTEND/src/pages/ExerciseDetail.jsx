@@ -651,7 +651,7 @@ function MediaSection({ media, exerciseName }) {
             <img
               src={media.thumbnail_url}
               alt={exerciseName}
-              style={{ display: 'block', maxWidth: 'min(360px, 100%)', height: 'auto', borderRadius: 8 }}
+              style={{ display: 'block', width: '100%', height: 'auto', borderRadius: 8 }}
             />
           ) : (
             <span>YouTube tutorial</span>
@@ -672,13 +672,13 @@ function MediaSection({ media, exerciseName }) {
   return (
     <Card size="small" title="Obrázky">
       <Image.PreviewGroup>
-        <Space wrap size={12} align="start">
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
           {items.map(([key, url]) => (
-            <div key={key} style={{ textAlign: 'center', maxWidth: 220 }}>
+            <div key={key} style={{ textAlign: 'center', width: '100%' }}>
               <Image
                 src={url}
                 alt={key}
-                styles={{ root: { width: '100%', maxWidth: 200 } }}
+                styles={{ root: { width: '100%' } }}
                 style={{ borderRadius: 8 }}
               />
               <Text
