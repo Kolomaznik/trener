@@ -14,6 +14,7 @@ from app.schemas.exercises import (
     ProgressionGoals,
 )
 from app.schemas.workout_sessions import RecentSet, UserLevelInfo
+from app.api.workout_sessions import _compute_level
 from app.services.muscle_load import calculate_muscle_load
 from config import settings as app_settings
 
@@ -81,8 +82,6 @@ def _compute_user_level_info(
     exercise_doc: dict[str, Any],
 ) -> UserLevelInfo:
     """Return the authenticated user's level info for a given exercise."""
-    from app.api.workout_sessions import _compute_level  # avoid top-level circular import
-
     recent_docs = list(
         db["workout_sessions"]
         .find({"user_email": user_email, "exercise_id": exercise_id})
