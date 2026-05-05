@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pytest
 
-from app.api.workout_sessions import _compute_level
+from app.services.fitness_math import compute_level
 from tests.conftest import google_payload
 
 AUTH = {"Authorization": "Bearer dummy-token"}
@@ -63,46 +63,48 @@ def authed_client(client, fake_google):
     return client
 
 
-# ── _compute_level unit tests ─────────────────────────────────────────────────
+# ── compute_level unit tests ─────────────────────────────────────────────────
+
 
 class TestComputeLevel:
     def test_no_history_returns_beginner(self):
-        assert _compute_level([], None) == "beginner"
+        assert compute_level([], None) == "beginner"
 
     def test_no_history_with_goals_returns_beginner(self):
         goals = {"beginner": {"reps": 10}, "mastery": {"reps": 50}}
-        assert _compute_level([], goals) == "beginner"
+        assert compute_level([], goals) == "beginner"
 
     def test_below_beginner_threshold_returns_beginner(self):
         goals = {"beginner": {"reps": 10}, "mastery": {"reps": 50}}
-        assert _compute_level([5, 6, 7], goals) == "beginner"
+        assert compute_level([5, 6, 7], goals) == "beginner"
 
     def test_at_beginner_threshold_returns_intermediate(self):
         goals = {"beginner": {"reps": 10}, "mastery": {"reps": 50}}
-        assert _compute_level([10, 10, 10], goals) == "intermediate"
+        assert compute_level([10, 10, 10], goals) == "intermediate"
 
     def test_above_beginner_below_mastery_returns_intermediate(self):
         goals = {"beginner": {"reps": 10}, "mastery": {"reps": 50}}
-        assert _compute_level([20, 25, 30], goals) == "intermediate"
+        assert compute_level([20, 25, 30], goals) == "intermediate"
 
     def test_at_mastery_threshold_returns_mastery(self):
         goals = {"beginner": {"reps": 10}, "mastery": {"reps": 50}}
-        assert _compute_level([50, 50, 50], goals) == "mastery"
+        assert compute_level([50, 50, 50], goals) == "mastery"
 
     def test_above_mastery_threshold_returns_mastery(self):
         goals = {"beginner": {"reps": 10}, "mastery": {"reps": 50}}
-        assert _compute_level([60, 70], goals) == "mastery"
+        assert compute_level([60, 70], goals) == "mastery"
 
     def test_uses_average_not_latest(self):
         goals = {"beginner": {"reps": 10}, "mastery": {"reps": 50}}
         # average = (5 + 15) / 2 = 10 → intermediate
-        assert _compute_level([5, 15], goals) == "intermediate"
+        assert compute_level([5, 15], goals) == "intermediate"
 
     def test_no_goals_returns_beginner(self):
-        assert _compute_level([100], None) == "beginner"
+        assert compute_level([100], None) == "beginner"
 
 
 # ── POST /workout-sessions ────────────────────────────────────────────────────
+
 
 class TestCreateWorkoutSession:
     def test_creates_session_and_returns_201(self, authed_client, seeded_db):
@@ -166,4 +168,3 @@ class TestCreateWorkoutSession:
         assert doc is not None
         assert doc["total_reps"] == 15
         assert isinstance(doc["saved_at"], datetime)
-

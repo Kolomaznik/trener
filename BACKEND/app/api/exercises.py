@@ -14,7 +14,7 @@ from app.schemas.exercises import (
     ProgressionGoals,
 )
 from app.schemas.workout_sessions import RecentSet, UserLevelInfo
-from app.api.workout_sessions import _compute_level
+from app.services.fitness_math import compute_level
 from app.services.muscle_load import calculate_muscle_load
 from config import settings as app_settings
 
@@ -75,6 +75,7 @@ async def _get_optional_user_context(
     weight_kg = float(raw) if raw is not None else None
     return _UserContext(email=email, weight_kg=weight_kg)
 
+
 def _compute_user_level_info(
     db: Database,
     user_email: str,
@@ -91,7 +92,7 @@ def _compute_user_level_info(
 
     progression_goals: dict[str, Any] | None = exercise_doc.get("progression_goals")
     recent_reps = [doc["total_reps"] for doc in recent_docs]
-    level = _compute_level(recent_reps, progression_goals)
+    level = compute_level(recent_reps, progression_goals)
 
     recent_sets = [
         RecentSet(
