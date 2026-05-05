@@ -651,7 +651,7 @@ function MediaSection({ media, exerciseName }) {
             <img
               src={media.thumbnail_url}
               alt={exerciseName}
-              style={{ maxWidth: '100%', borderRadius: 8 }}
+              style={{ display: 'block', maxWidth: 'min(360px, 100%)', height: 'auto', borderRadius: 8 }}
             />
           ) : (
             <span>YouTube tutorial</span>
@@ -678,7 +678,7 @@ function MediaSection({ media, exerciseName }) {
               <Image
                 src={url}
                 alt={key}
-                width={200}
+                styles={{ root: { width: '100%', maxWidth: 200 } }}
                 style={{ borderRadius: 8 }}
               />
               <Text
