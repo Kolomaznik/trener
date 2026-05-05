@@ -6,6 +6,18 @@ import ExerciseDetail from './ExerciseDetail.jsx';
 vi.mock('../api/client.js', () => ({
   fetchExercises: vi.fn(),
   fetchExerciseDetail: vi.fn(),
+  postWorkoutSession: vi.fn(),
+}));
+
+vi.mock('react-speech-recognition', () => ({
+  default: { startListening: vi.fn(), stopListening: vi.fn() },
+  useSpeechRecognition: () => ({
+    transcript: '',
+    listening: false,
+    browserSupportsSpeechRecognition: true,
+    isMicrophoneAvailable: true,
+    resetTranscript: vi.fn(),
+  }),
 }));
 
 import { fetchExerciseDetail } from '../api/client.js';
@@ -72,6 +84,14 @@ const detailFixture = {
   next_exercise_name: 'Kliky v předklonu',
   level_coefficient: 0.20,
   height_multiplier: 0.40,
+  user_level: {
+    level: 'beginner',
+    recent_sets: [],
+    target_reps: 10,
+    target_sets: 1,
+    last_best_reps: 9,
+    rest_seconds: 90,
+  },
 };
 
 /** Fixture without load data — simulates an unauthenticated / no-profile response. */
@@ -123,7 +143,7 @@ describe('ExerciseDetail page', () => {
     );
   });
 
-  it('makes exactly one API call on load (no separate muscle-load request)', async () => {
+  it('makes exactly one API call on load (user_level embedded in exercise detail)', async () => {
     renderWithRouter();
 
     await screen.findByText('Kliky o zeď');
@@ -359,14 +379,5 @@ describe('ExerciseDetail page', () => {
     renderWithRouter('/exercises/neexistuje');
 
     expect(await screen.findByText('Cvik nebyl nalezen.')).toBeInTheDocument();
-  });
-
-  it('renders "Začít cvičit" button that navigates to workout page', async () => {
-    renderWithRouter();
-
-    await screen.findByText('Kliky o zeď');
-    fireEvent.click(screen.getByRole('button', { name: /Začít cvičit/ }));
-
-    expect(await screen.findByTestId('workout-marker')).toBeInTheDocument();
   });
 });

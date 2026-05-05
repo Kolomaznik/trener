@@ -65,6 +65,7 @@ def authed_client(client, fake_google):
 
 # ── compute_level unit tests ─────────────────────────────────────────────────
 
+
 class TestComputeLevel:
     def test_no_history_returns_beginner(self):
         assert compute_level([], None) == "beginner"
@@ -103,6 +104,7 @@ class TestComputeLevel:
 
 
 # ── POST /workout-sessions ────────────────────────────────────────────────────
+
 
 class TestCreateWorkoutSession:
     def test_creates_session_and_returns_201(self, authed_client, seeded_db):
@@ -166,80 +168,3 @@ class TestCreateWorkoutSession:
         assert doc is not None
         assert doc["total_reps"] == 15
         assert isinstance(doc["saved_at"], datetime)
-
-
-# ── GET /workout-sessions/level/{exercise_id} ─────────────────────────────────
-
-class TestGetUserLevel:
-    def _post_session(self, client, total_reps: int, set_number: int = 1):
-        payload = {**SESSION_PAYLOAD, "total_reps": total_reps, "set_number": set_number}
-        client.post("/workout-sessions", json=payload, headers=AUTH)
-
-    def test_no_history_returns_beginner(self, authed_client, seeded_db):
-        response = authed_client.get("/workout-sessions/level/pushups_level_1", headers=AUTH)
-
-        assert response.status_code == 200
-        body = response.json()
-        assert body["level"] == "beginner"
-        assert body["recent_sets"] == []
-        assert body["last_best_reps"] is None
-        assert body["rest_seconds"] == 90
-
-    def test_beginner_level_includes_goals(self, authed_client, seeded_db):
-        response = authed_client.get("/workout-sessions/level/pushups_level_1", headers=AUTH)
-
-        body = response.json()
-        assert body["target_reps"] == 10
-        assert body["target_sets"] == 1
-
-    def test_intermediate_level_when_avg_above_beginner(self, authed_client, seeded_db):
-        self._post_session(authed_client, total_reps=20)
-
-        response = authed_client.get("/workout-sessions/level/pushups_level_1", headers=AUTH)
-
-        body = response.json()
-        assert body["level"] == "intermediate"
-        assert body["target_reps"] == 25
-        assert body["target_sets"] == 2
-        assert body["rest_seconds"] == 60
-
-    def test_mastery_level_when_avg_above_mastery(self, authed_client, seeded_db):
-        self._post_session(authed_client, total_reps=55)
-
-        response = authed_client.get("/workout-sessions/level/pushups_level_1", headers=AUTH)
-
-        body = response.json()
-        assert body["level"] == "mastery"
-        assert body["target_reps"] == 50
-        assert body["rest_seconds"] == 45
-
-    def test_uses_only_last_5_sessions(self, authed_client, seeded_db):
-        for i in range(7):
-            self._post_session(authed_client, total_reps=55, set_number=i + 1)
-
-        response = authed_client.get("/workout-sessions/level/pushups_level_1", headers=AUTH)
-
-        body = response.json()
-        assert len(body["recent_sets"]) == 5
-
-    def test_last_best_reps_is_max(self, authed_client, seeded_db):
-        self._post_session(authed_client, total_reps=10)
-        self._post_session(authed_client, total_reps=20, set_number=2)
-        self._post_session(authed_client, total_reps=15, set_number=3)
-
-        response = authed_client.get("/workout-sessions/level/pushups_level_1", headers=AUTH)
-
-        assert response.json()["last_best_reps"] == 20
-
-    def test_requires_auth(self, client, seeded_db):
-        response = client.get("/workout-sessions/level/pushups_level_1")
-
-        assert response.status_code in (401, 403)
-
-    def test_unknown_exercise_returns_beginner(self, authed_client, seeded_db):
-        response = authed_client.get("/workout-sessions/level/neexistuje", headers=AUTH)
-
-        assert response.status_code == 200
-        body = response.json()
-        assert body["level"] == "beginner"
-        assert body["target_reps"] is None

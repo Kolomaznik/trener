@@ -6,6 +6,8 @@ Lives in `app/schemas/` so it can be imported by other projects in this repo
 
 from pydantic import BaseModel, Field
 
+from app.schemas.workout_sessions import UserLevelInfo
+
 
 class Cadence(BaseModel):
     eccentric_sec: int
@@ -87,3 +89,4 @@ class ExerciseDetailResponse(ExerciseDocument):
     next_exercise_id: str | None = None
     next_exercise_name: str | None = None
     muscle_load_by_difficulty: MuscleLoadByDifficulty | None = None
+    user_level: UserLevelInfo | None = None
