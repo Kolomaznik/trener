@@ -392,18 +392,18 @@ function ExerciseDetailBody({ detail, levelInfo, setLevelInfo, navigate, id }) {
               <Tag color={LEVEL_COLORS[levelInfo.level]}>
                 {LEVEL_LABELS[levelInfo.level] ?? levelInfo.level}
               </Tag>
-              {levelInfo.target_reps != null && levelInfo.target_sets != null && (
+              {levelInfo.target_reps !== null && levelInfo.target_sets !== null && (
                 <Text type="secondary">
                   Cíl: {levelInfo.target_sets} × {levelInfo.target_reps} opakování
                 </Text>
               )}
             </Space>
-            {levelInfo.last_best_reps != null && (
+            {levelInfo.last_best_reps !== null && (
               <Text>
                 Naposledy nejlepší výkon: <Text strong>{levelInfo.last_best_reps}</Text> opakování
               </Text>
             )}
-            {levelInfo.target_reps != null && (
+            {levelInfo.target_reps !== null && (
               <Text type="secondary">
                 🎯 Dnes překonej: <Text strong>{levelInfo.target_reps}</Text> opakování
               </Text>
