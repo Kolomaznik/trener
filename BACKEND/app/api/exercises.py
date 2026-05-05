@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, NamedTuple
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,6 +13,8 @@ from app.schemas.exercises import (
     MuscleLoadByDifficulty,
     ProgressionGoals,
 )
+from app.schemas.workout_sessions import RecentSet, UserLevelInfo
+from app.api.workout_sessions import _compute_level
 from app.services.muscle_load import calculate_muscle_load
 from config import settings as app_settings
 
@@ -25,21 +27,30 @@ SCHEMA_FILTER: dict[str, Any] = {
 
 _optional_bearer = HTTPBearer(auto_error=False)
 
+_REST_SECONDS: dict[str, int] = {"beginner": 90, "intermediate": 60, "mastery": 45}
 
-async def _get_weight_kg(
+
+class _UserContext(NamedTuple):
+    """Optional authentication context resolved for a single request."""
+
+    email: str | None
+    weight_kg: float | None
+
+
+async def _get_optional_user_context(
     credentials: HTTPAuthorizationCredentials | None = Depends(_optional_bearer),
     db: Database = Depends(get_db),
-) -> float | None:
-    """Return the authenticated user's weight_kg from the database, or None.
+) -> _UserContext:
+    """Return the authenticated user's email and weight_kg (both None if unauthenticated).
 
-    Returns None when:
+    Makes at most one outbound HTTP call to Google's userinfo endpoint.
+    Returns ``(None, None)`` when:
     - no Authorization header is present,
-    - the token is invalid / Google rejects it,
-    - the user has no profile yet, or
-    - weight_kg has not been filled in.
+    - the token is invalid / Google rejects it.
+    Returns ``(email, None)`` when the user has no profile or no weight_kg set.
     """
     if credentials is None:
-        return None
+        return _UserContext(email=None, weight_kg=None)
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(
@@ -47,21 +58,67 @@ async def _get_weight_kg(
                 headers={"Authorization": f"Bearer {credentials.credentials}"},
             )
     except httpx.HTTPError:
-        return None
+        return _UserContext(email=None, weight_kg=None)
 
     if resp.status_code != 200:
-        return None
+        return _UserContext(email=None, weight_kg=None)
 
     email = resp.json().get("email")
     if not email:
-        return None
+        return _UserContext(email=None, weight_kg=None)
 
     user_doc = db["users"].find_one({"email": email})
     if user_doc is None:
-        return None
+        return _UserContext(email=email, weight_kg=None)
 
     raw = user_doc.get("weight_kg")
-    return float(raw) if raw is not None else None
+    weight_kg = float(raw) if raw is not None else None
+    return _UserContext(email=email, weight_kg=weight_kg)
+
+def _compute_user_level_info(
+    db: Database,
+    user_email: str,
+    exercise_id: str,
+    exercise_doc: dict[str, Any],
+) -> UserLevelInfo:
+    """Return the authenticated user's level info for a given exercise."""
+    recent_docs = list(
+        db["workout_sessions"]
+        .find({"user_email": user_email, "exercise_id": exercise_id})
+        .sort("started_at", -1)
+        .limit(5)
+    )
+
+    progression_goals: dict[str, Any] | None = exercise_doc.get("progression_goals")
+    recent_reps = [doc["total_reps"] for doc in recent_docs]
+    level = _compute_level(recent_reps, progression_goals)
+
+    recent_sets = [
+        RecentSet(
+            total_reps=doc["total_reps"],
+            started_at=doc["started_at"],
+            set_number=doc["set_number"],
+        )
+        for doc in recent_docs
+    ]
+
+    target_reps: int | None = None
+    target_sets: int | None = None
+    if progression_goals:
+        goal = progression_goals.get(level) or {}
+        target_reps = goal.get("reps")
+        target_sets = goal.get("sets")
+
+    last_best_reps = max(recent_reps) if recent_reps else None
+
+    return UserLevelInfo(
+        level=level,
+        recent_sets=recent_sets,
+        target_reps=target_reps,
+        target_sets=target_sets,
+        last_best_reps=last_best_reps,
+        rest_seconds=_REST_SECONDS.get(level, 60),
+    )
 
 
 def _compute_load_for_all_difficulties(
@@ -102,6 +159,7 @@ def _doc_to_detail(
     doc: dict[str, Any],
     nxt: dict[str, Any] | None,
     muscle_load_by_difficulty: MuscleLoadByDifficulty | None = None,
+    user_level: UserLevelInfo | None = None,
 ) -> ExerciseDetailResponse:
     media_doc = doc.get("media") if isinstance(doc.get("media"), dict) else None
     cadence_doc = doc.get("cadence") if isinstance(doc.get("cadence"), dict) else None
@@ -125,6 +183,7 @@ def _doc_to_detail(
         next_exercise_id=nxt["id"] if nxt else None,
         next_exercise_name=nxt["name"] if nxt else None,
         muscle_load_by_difficulty=muscle_load_by_difficulty,
+        user_level=user_level,
     )
 
 
@@ -185,17 +244,21 @@ def list_exercises_by_family(
 async def get_exercise_detail(
     exercise_id: str,
     db: Database = Depends(get_db),
-    weight_kg: float | None = Depends(_get_weight_kg),
+    user_context: _UserContext = Depends(_get_optional_user_context),
 ) -> ExerciseDetailResponse:
-    """Return full exercise detail, including pre-computed per-difficulty muscle load.
+    """Return full exercise detail, including pre-computed per-difficulty muscle load
+    and the authenticated user's current level info.
 
     The function is ``async`` because the optional authentication dependency
-    ``_get_weight_kg`` makes an outbound HTTP request to Google's userinfo
-    endpoint to identify the caller.
+    ``_get_optional_user_context`` makes an outbound HTTP request to Google's
+    userinfo endpoint to identify the caller.
 
     The ``muscle_load_by_difficulty`` field is populated only when the request
     carries a valid Google access token and the authenticated user has
     ``weight_kg`` set in their profile.  It is ``null`` otherwise.
+
+    The ``user_level`` field is populated whenever the user is authenticated,
+    even if they have no workout history.  It is ``null`` for anonymous requests.
     """
     doc = db["exercises"].find_one({"id": exercise_id, **SCHEMA_FILTER})
     if doc is None:
@@ -204,7 +267,13 @@ async def get_exercise_detail(
     nxt = _next_in_family(db, doc)
 
     muscle_load_by_difficulty: MuscleLoadByDifficulty | None = None
-    if weight_kg is not None:
-        muscle_load_by_difficulty = _compute_load_for_all_difficulties(doc, weight_kg)
+    user_level: UserLevelInfo | None = None
 
-    return _doc_to_detail(doc, nxt, muscle_load_by_difficulty)
+    if user_context.email is not None:
+        if user_context.weight_kg is not None:
+            muscle_load_by_difficulty = _compute_load_for_all_difficulties(
+                doc, user_context.weight_kg
+            )
+        user_level = _compute_user_level_info(db, user_context.email, exercise_id, doc)
+
+    return _doc_to_detail(doc, nxt, muscle_load_by_difficulty, user_level)

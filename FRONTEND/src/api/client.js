@@ -48,8 +48,3 @@ export async function postWorkoutSession(data) {
   const response = await apiClient.post('/workout-sessions', data);
   return response.data;
 }
-
-export async function fetchUserLevel(exerciseId) {
-  const response = await apiClient.get(`/workout-sessions/level/${exerciseId}`);
-  return response.data;
-}
