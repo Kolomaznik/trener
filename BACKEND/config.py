@@ -17,9 +17,9 @@ class Settings(BaseSettings):
         Path(__file__).resolve().parents[1] / "FRONTEND" / "src" / "assets" / "muscle-map.json"
     )
 
-    @field_validator("google_userinfo_url", mode="before")
+    @field_validator("google_userinfo_url", "mongo_uri", mode="before")
     @classmethod
-    def strip_google_userinfo_url(cls, v: str) -> str:
+    def strip_url_whitespace(cls, v: str) -> str:
         return v.strip()
 
 
