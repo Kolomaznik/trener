@@ -203,3 +203,96 @@ def test_detail_scales_with_user_weight(client, seeded_db, fake_google, mock_db)
     load_160 = body_160["muscle_load_by_difficulty"]["beginner"]["chest"]["muscle_load"]
     assert load_160 == pytest.approx(2 * load_80)
 
+
+# ── GET /exercises/{id} — user_level embedding ────────────────────────────────
+
+
+class TestExerciseDetailUserLevel:
+    def test_user_level_is_null_when_unauthenticated(self, client, seeded_db):
+        response = client.get("/exercises/pushups_level_1")
+
+        assert response.status_code == 200
+        assert response.json()["user_level"] is None
+
+    def test_user_level_is_beginner_with_no_history(self, client, seeded_db, fake_google):
+        fake_google.set_user(google_payload())
+
+        response = client.get("/exercises/pushups_level_1", headers=AUTH)
+
+        assert response.status_code == 200
+        user_level = response.json()["user_level"]
+        assert user_level is not None
+        assert user_level["level"] == "beginner"
+        assert user_level["recent_sets"] == []
+        assert user_level["last_best_reps"] is None
+        assert user_level["rest_seconds"] == 90
+
+    def test_user_level_includes_goals_when_no_history(self, client, seeded_db, fake_google):
+        fake_google.set_user(google_payload())
+
+        response = client.get("/exercises/pushups_level_1", headers=AUTH)
+
+        user_level = response.json()["user_level"]
+        assert user_level["target_reps"] == 10
+        assert user_level["target_sets"] == 1
+
+    def test_user_level_updates_with_session_history(self, client, seeded_db, fake_google, mock_db):
+        mock_db["workout_sessions"].insert_one({
+            "user_email": "alice@example.com",
+            "exercise_id": "pushups_level_1",
+            "total_reps": 20,
+            "started_at": "2026-05-03T10:00:00Z",
+            "set_number": 1,
+        })
+        fake_google.set_user(google_payload())
+
+        response = client.get("/exercises/pushups_level_1", headers=AUTH)
+
+        user_level = response.json()["user_level"]
+        assert user_level["level"] == "intermediate"
+        assert user_level["last_best_reps"] == 20
+        assert user_level["rest_seconds"] == 60
+
+    def test_user_level_reflects_mastery_when_high_avg(self, client, seeded_db, fake_google, mock_db):
+        mock_db["workout_sessions"].insert_one({
+            "user_email": "alice@example.com",
+            "exercise_id": "pushups_level_1",
+            "total_reps": 55,
+            "started_at": "2026-05-03T10:00:00Z",
+            "set_number": 1,
+        })
+        fake_google.set_user(google_payload())
+
+        response = client.get("/exercises/pushups_level_1", headers=AUTH)
+
+        user_level = response.json()["user_level"]
+        assert user_level["level"] == "mastery"
+        assert user_level["rest_seconds"] == 45
+
+    def test_user_level_uses_last_5_sessions_only(self, client, seeded_db, fake_google, mock_db):
+        for i in range(7):
+            mock_db["workout_sessions"].insert_one({
+                "user_email": "alice@example.com",
+                "exercise_id": "pushups_level_1",
+                "total_reps": 55,
+                "started_at": f"2026-05-0{i + 1}T10:00:00Z",
+                "set_number": i + 1,
+            })
+        fake_google.set_user(google_payload())
+
+        response = client.get("/exercises/pushups_level_1", headers=AUTH)
+
+        assert len(response.json()["user_level"]["recent_sets"]) == 5
+
+    def test_user_level_present_even_without_weight(self, client, seeded_db, fake_google, mock_db):
+        """User level is embedded even when weight_kg is missing (muscle load stays null)."""
+        _seed_user(mock_db, weight_kg=None)
+        fake_google.set_user(google_payload())
+
+        response = client.get("/exercises/pushups_level_1", headers=AUTH)
+
+        body = response.json()
+        assert body["muscle_load_by_difficulty"] is None
+        assert body["user_level"] is not None
+        assert body["user_level"]["level"] == "beginner"
+

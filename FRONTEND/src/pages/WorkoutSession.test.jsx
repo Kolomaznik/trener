@@ -7,7 +7,6 @@ vi.mock('../api/client.js', () => ({
   fetchExercises: vi.fn(),
   fetchExerciseDetail: vi.fn(),
   postWorkoutSession: vi.fn(),
-  fetchUserLevel: vi.fn(),
 }));
 
 vi.mock('react-speech-recognition', () => {
@@ -49,7 +48,25 @@ vi.mock('react-speech-recognition', () => {
 });
 
 import * as speechModule from 'react-speech-recognition';
-import { fetchExerciseDetail, fetchUserLevel, postWorkoutSession } from '../api/client.js';
+import { fetchExerciseDetail, postWorkoutSession } from '../api/client.js';
+
+const levelFixtureBeginner = {
+  level: 'beginner',
+  recent_sets: [],
+  target_reps: 10,
+  target_sets: 1,
+  last_best_reps: null,
+  rest_seconds: 90,
+};
+
+const levelFixtureIntermediate = {
+  level: 'intermediate',
+  recent_sets: [{ total_reps: 20, started_at: '2026-05-03T10:00:00Z', set_number: 1 }],
+  target_reps: 25,
+  target_sets: 2,
+  last_best_reps: 20,
+  rest_seconds: 60,
+};
 
 const detailFixture = {
   id: 'pushups_level_1',
@@ -76,24 +93,7 @@ const detailFixture = {
   muscle_engagement_percent: { chest: 40, triceps: 30 },
   next_exercise_id: null,
   next_exercise_name: null,
-};
-
-const levelFixtureBeginner = {
-  level: 'beginner',
-  recent_sets: [],
-  target_reps: 10,
-  target_sets: 1,
-  last_best_reps: null,
-  rest_seconds: 90,
-};
-
-const levelFixtureIntermediate = {
-  level: 'intermediate',
-  recent_sets: [{ total_reps: 20, started_at: '2026-05-03T10:00:00Z', set_number: 1 }],
-  target_reps: 25,
-  target_sets: 2,
-  last_best_reps: 20,
-  rest_seconds: 60,
+  user_level: levelFixtureBeginner,
 };
 
 function renderWithRouter(path = '/exercises/pushups_level_1/workout') {
@@ -111,17 +111,14 @@ describe('WorkoutSession page', () => {
   beforeEach(() => {
     speechModule.__resetMockState();
     fetchExerciseDetail.mockReset();
-    fetchUserLevel.mockReset();
     postWorkoutSession.mockReset();
 
     fetchExerciseDetail.mockResolvedValue(detailFixture);
-    fetchUserLevel.mockResolvedValue(levelFixtureBeginner);
     postWorkoutSession.mockResolvedValue({ id: 'session-1', total_reps: 5 });
   });
 
   it('shows skeleton while loading', () => {
     fetchExerciseDetail.mockReturnValue(new Promise(() => {}));
-    fetchUserLevel.mockReturnValue(new Promise(() => {}));
     renderWithRouter();
 
     expect(document.querySelector('.ant-skeleton')).toBeInTheDocument();
@@ -142,7 +139,7 @@ describe('WorkoutSession page', () => {
   });
 
   it('shows intermediate level tag with last best reps', async () => {
-    fetchUserLevel.mockResolvedValue(levelFixtureIntermediate);
+    fetchExerciseDetail.mockResolvedValue({ ...detailFixture, user_level: levelFixtureIntermediate });
     renderWithRouter();
 
     await screen.findByText('Kliky o zeď');

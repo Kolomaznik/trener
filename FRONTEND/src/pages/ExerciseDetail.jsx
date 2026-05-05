@@ -25,7 +25,7 @@ import {
 } from '@ant-design/icons';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import ExerciseMuscleMap from '../components/ExerciseMuscleMap.jsx';
-import { fetchExerciseDetail, fetchUserLevel, postWorkoutSession } from '../api/client.js';
+import { fetchExerciseDetail, postWorkoutSession } from '../api/client.js';
 import {
   computeSessionStats,
   parseNumberFromTokens,
@@ -120,7 +120,6 @@ export default function ExerciseDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [detail, setDetail] = useState(null);
-  const [levelInfo, setLevelInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -129,12 +128,9 @@ export default function ExerciseDetail() {
     let active = true;
     setLoading(true);
     setError(null);
-    Promise.all([fetchExerciseDetail(id), fetchUserLevel(id).catch(() => null)])
-      .then(([data, lvl]) => {
-        if (active) {
-          setDetail(data);
-          setLevelInfo(lvl);
-        }
+    fetchExerciseDetail(id)
+      .then((data) => {
+        if (active) setDetail(data);
       })
       .catch((err) => {
         if (!active) return;
@@ -173,8 +169,7 @@ export default function ExerciseDetail() {
       ) : (
         <ExerciseDetailBody
           detail={detail}
-          levelInfo={levelInfo}
-          setLevelInfo={setLevelInfo}
+          setDetail={setDetail}
           navigate={navigate}
           id={id}
         />
@@ -183,8 +178,9 @@ export default function ExerciseDetail() {
   );
 }
 
-function ExerciseDetailBody({ detail, levelInfo, setLevelInfo, navigate, id }) {
+function ExerciseDetailBody({ detail, setDetail, navigate, id }) {
   // ── Workout session state ─────────────────────────────────────────────────
+  const levelInfo = detail.user_level ?? null;
   const [setNumber, setSetNumber] = useState(1);
   const [sessionState, setSessionState] = useState('idle');
   const [events, setEvents] = useState([]);
@@ -338,8 +334,8 @@ function ExerciseDetailBody({ detail, levelInfo, setLevelInfo, navigate, id }) {
 
     try {
       await postWorkoutSession(payload);
-      const lvl = await fetchUserLevel(id);
-      setLevelInfo(lvl);
+      const freshDetail = await fetchExerciseDetail(id);
+      setDetail(freshDetail);
     } catch {
       setSaveError('Sérii se nepodařilo uložit. Data jsou zachována lokálně.');
     } finally {

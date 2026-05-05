@@ -6,7 +6,6 @@ import ExerciseDetail from './ExerciseDetail.jsx';
 vi.mock('../api/client.js', () => ({
   fetchExercises: vi.fn(),
   fetchExerciseDetail: vi.fn(),
-  fetchUserLevel: vi.fn(),
   postWorkoutSession: vi.fn(),
 }));
 
@@ -21,7 +20,7 @@ vi.mock('react-speech-recognition', () => ({
   }),
 }));
 
-import { fetchExerciseDetail, fetchUserLevel } from '../api/client.js';
+import { fetchExerciseDetail } from '../api/client.js';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -85,6 +84,14 @@ const detailFixture = {
   next_exercise_name: 'Kliky v předklonu',
   level_coefficient: 0.20,
   height_multiplier: 0.40,
+  user_level: {
+    level: 'beginner',
+    recent_sets: [],
+    target_reps: 10,
+    target_sets: 1,
+    last_best_reps: 9,
+    rest_seconds: 90,
+  },
 };
 
 /** Fixture without load data — simulates an unauthenticated / no-profile response. */
@@ -123,9 +130,7 @@ function renderWithRouter(initialPath = '/exercises/pushups_level_1') {
 describe('ExerciseDetail page', () => {
   beforeEach(() => {
     fetchExerciseDetail.mockReset();
-    fetchUserLevel.mockReset();
     fetchExerciseDetail.mockResolvedValue(detailFixture);
-    fetchUserLevel.mockResolvedValue(null);
   });
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -138,7 +143,7 @@ describe('ExerciseDetail page', () => {
     );
   });
 
-  it('makes exactly one API call on load (no separate muscle-load request)', async () => {
+  it('makes exactly one API call on load (user_level embedded in exercise detail)', async () => {
     renderWithRouter();
 
     await screen.findByText('Kliky o zeď');
