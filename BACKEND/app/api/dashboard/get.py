@@ -1,3 +1,4 @@
+import json
 from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -6,8 +7,10 @@ from pymongo.database import Database
 
 from app.auth import GoogleUser, get_current_user
 from app.db import get_db
+from config import settings
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
 DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
 
 
@@ -16,18 +19,28 @@ class DailyExerciseSummary(BaseModel):
     count: int = Field(ge=0)
 
 
-class YearlyOverviewResponse(BaseModel):
+class YearSummary(BaseModel):
     start_date: date
     end_date: date
     days: list[DailyExerciseSummary]
 
 
-@router.get("/yearly-overview", response_model=YearlyOverviewResponse)
-def yearly_overview(
+class MuscleMetrics(BaseModel):
+    strength: int = 0
+    increment_since_last_exercise: int = 0
+
+
+class DashboardResponse(BaseModel):
+    year_summary: YearSummary
+    muscle_map: dict[str, MuscleMetrics]
+
+
+@router.get("", response_model=DashboardResponse)
+def get_dashboard(
     end_date: str | None = Query(default=None, pattern=DATE_PATTERN),
     user: GoogleUser = Depends(get_current_user),
     db: Database = Depends(get_db),
-) -> YearlyOverviewResponse:
+) -> DashboardResponse:
     if end_date is None:
         end = date.today()
     else:
@@ -64,4 +77,27 @@ def yearly_overview(
         days.append(DailyExerciseSummary(date=current, count=counts.get(current, 0)))
         current += timedelta(days=1)
 
-    return YearlyOverviewResponse(start_date=start, end_date=end, days=days)
+    year_summary = YearSummary(start_date=start, end_date=end, days=days)
+
+    try:
+        data = json.loads(settings.muscle_map_json_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Muscle map file not found: {settings.muscle_map_json_path}",
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Invalid JSON in muscle map file: {settings.muscle_map_json_path}",
+        ) from exc
+
+    groups = data.get("highlightableMuscleGroups", [])
+    muscle_map: dict[str, MuscleMetrics] = {}
+    for group in groups:
+        if isinstance(group, dict):
+            muscle_id = group.get("id")
+            if isinstance(muscle_id, str):
+                muscle_map[muscle_id] = MuscleMetrics()
+
+    return DashboardResponse(year_summary=year_summary, muscle_map=muscle_map)

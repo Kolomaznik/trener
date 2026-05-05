@@ -18,7 +18,14 @@ calculate_muscle_load : (...) -> dict[str, MuscleEngagement]
 
 from typing import Any
 
-from app.schemas.exercises import MuscleEngagement
+from pydantic import BaseModel
+
+
+class MuscleEngagement(BaseModel):
+    """Per-muscle engagement with computed volume load in kg."""
+
+    percent: int
+    muscle_load: float = 0.0
 
 # ---------------------------------------------------------------------------
 # Constants

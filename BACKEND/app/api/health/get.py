@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-router = APIRouter()
+router = APIRouter(tags=["health"])
 
 
 class HealthResponse(BaseModel):
@@ -9,5 +9,5 @@ class HealthResponse(BaseModel):
 
 
 @router.get("/health", response_model=HealthResponse)
-def health() -> HealthResponse:
+def get_health() -> HealthResponse:
     return HealthResponse(status="ok")
