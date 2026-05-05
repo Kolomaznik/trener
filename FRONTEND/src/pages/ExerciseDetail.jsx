@@ -559,50 +559,44 @@ function ExerciseDetailBody({ detail, setDetail, navigate, id }) {
       )}
 
       {/* ── Static detail cards ──────────────────────────────────────────── */}
-      <Row gutter={[16, 16]}>
-        <Col xs={24} md={14}>
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
-            {detail.instructions?.length > 0 && (
-              <Card size="small" title="Jak cvičit">
-                <ol style={{ margin: 0, paddingLeft: 20 }}>
-                  {detail.instructions.map((step, idx) => (
-                    <li key={idx} style={{ marginBottom: 4 }}>
-                      {step}
-                    </li>
-                  ))}
-                </ol>
-              </Card>
-            )}
+      {detail.instructions?.length > 0 && (
+        <Card size="small" title="Jak cvičit">
+          <ol style={{ margin: 0, paddingLeft: 20 }}>
+            {detail.instructions.map((step, idx) => (
+              <li key={idx} style={{ marginBottom: 4 }}>
+                {step}
+              </li>
+            ))}
+          </ol>
+        </Card>
+      )}
 
-            {detail.cadence && (
-              <Card size="small" title="Tempo">
-                <Descriptions size="small" column={1}>
-                  <Descriptions.Item label="Spouštění">
-                    {detail.cadence.eccentric_sec} s
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Pauza dole">
-                    {detail.cadence.pause_bottom_sec} s
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Zvedání">
-                    {detail.cadence.concentric_sec} s
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Pauza nahoře">
-                    {detail.cadence.pause_top_sec} s
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Celkem">
-                    {detail.cadence.total_rep_time_sec} s / opakování
-                  </Descriptions.Item>
-                </Descriptions>
-                <Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
-                  {detail.cadence.coach_note}
-                </Paragraph>
-              </Card>
-            )}
+      {detail.cadence && (
+        <Card size="small" title="Tempo">
+          <Descriptions size="small" column={1}>
+            <Descriptions.Item label="Spouštění">
+              {detail.cadence.eccentric_sec} s
+            </Descriptions.Item>
+            <Descriptions.Item label="Pauza dole">
+              {detail.cadence.pause_bottom_sec} s
+            </Descriptions.Item>
+            <Descriptions.Item label="Zvedání">
+              {detail.cadence.concentric_sec} s
+            </Descriptions.Item>
+            <Descriptions.Item label="Pauza nahoře">
+              {detail.cadence.pause_top_sec} s
+            </Descriptions.Item>
+            <Descriptions.Item label="Celkem">
+              {detail.cadence.total_rep_time_sec} s / opakování
+            </Descriptions.Item>
+          </Descriptions>
+          <Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+            {detail.cadence.coach_note}
+          </Paragraph>
+        </Card>
+      )}
 
-            <MediaSection media={detail.media} exerciseName={detail.name} />
-          </Space>
-        </Col>
-      </Row>
+      <MediaSection media={detail.media} exerciseName={detail.name} />
 
       {/* ── Difficulty tabs + muscle map ─────────────────────────────────── */}
       {detail.progression_goals && (
