@@ -24,6 +24,7 @@ import {
   StopOutlined,
 } from '@ant-design/icons';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
+import ReactMarkdown from 'react-markdown';
 import ExerciseMuscleMap from '../components/ExerciseMuscleMap.jsx';
 import { getExerciseDetail } from '../api/exercises/get_detail.js';
 import { postWorkoutSession } from '../api/workout-sessions/post.js';
@@ -118,18 +119,18 @@ function useRestTimer(initialSeconds, active) {
 }
 
 export default function ExerciseDetail() {
-  const { id } = useParams();
+  const { name: exerciseName } = useParams();
   const navigate = useNavigate();
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!id) return undefined;
+    if (!exerciseName) return undefined;
     let active = true;
     setLoading(true);
     setError(null);
-    getExerciseDetail(id)
+    getExerciseDetail(exerciseName)
       .then((data) => {
         if (active) setDetail(data);
       })
@@ -148,7 +149,7 @@ export default function ExerciseDetail() {
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [exerciseName]);
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
@@ -172,14 +173,14 @@ export default function ExerciseDetail() {
           detail={detail}
           setDetail={setDetail}
           navigate={navigate}
-          id={id}
+          exerciseName={exerciseName}
         />
       )}
     </Space>
   );
 }
 
-function ExerciseDetailBody({ detail, setDetail, navigate, id }) {
+function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
   // ── Workout session state ─────────────────────────────────────────────────
   const levelInfo = detail.user_level ?? null;
   const [setNumber, setSetNumber] = useState(1);
@@ -318,8 +319,8 @@ function ExerciseDetailBody({ detail, setDetail, navigate, id }) {
     const currentEvents = events;
     const stats = computeSessionStats(currentEvents);
     const payload = {
-      exercise_id: id,
-      exercise_name: detail?.name ?? id,
+      exercise_id: exerciseName,
+      exercise_name: detail?.title ?? exerciseName,
       started_at: sessionStartedAt,
       ended_at: endedAt,
       total_duration_sec: elapsed,
@@ -335,7 +336,7 @@ function ExerciseDetailBody({ detail, setDetail, navigate, id }) {
 
     try {
       await postWorkoutSession(payload);
-      const freshDetail = await getExerciseDetail(id);
+      const freshDetail = await getExerciseDetail(exerciseName);
       setDetail(freshDetail);
     } catch {
       setSaveError('Sérii se nepodařilo uložit. Data jsou zachována lokálně.');
@@ -369,7 +370,7 @@ function ExerciseDetailBody({ detail, setDetail, navigate, id }) {
       <Card>
         <Space direction="vertical" size={4}>
           <Title level={2} style={{ margin: 0 }}>
-            {detail.name}
+            {detail.title}
           </Title>
           {detail.english_name && (
             <Text type="secondary">{detail.english_name}</Text>
@@ -555,23 +556,11 @@ function ExerciseDetailBody({ detail, setDetail, navigate, id }) {
       {/* ── Description ──────────────────────────────────────────────────── */}
       {detail.description && (
         <Card size="small">
-          <Paragraph style={{ margin: 0 }}>{detail.description}</Paragraph>
+          <ReactMarkdown>{detail.description}</ReactMarkdown>
         </Card>
       )}
 
       {/* ── Static detail cards ──────────────────────────────────────────── */}
-      {detail.instructions?.length > 0 && (
-        <Card size="small" title="Jak cvičit">
-          <ol style={{ margin: 0, paddingLeft: 20 }}>
-            {detail.instructions.map((step, idx) => (
-              <li key={idx} style={{ marginBottom: 4 }}>
-                {step}
-              </li>
-            ))}
-          </ol>
-        </Card>
-      )}
-
       {detail.cadence && (
         <Card size="small" title="Tempo">
           <Descriptions size="small" column={1}>
@@ -597,14 +586,14 @@ function ExerciseDetailBody({ detail, setDetail, navigate, id }) {
         </Card>
       )}
 
-      <MediaSection media={detail.media} exerciseName={detail.name} />
+      <MediaSection media={detail.media} exerciseName={detail.title} />
 
       {/* ── Difficulty tabs + muscle map ─────────────────────────────────── */}
       {detail.progression_goals && (
         <ProgressionAndMuscleCard detail={detail} />
       )}
 
-      {detail.next_exercise_id ? (
+      {detail.next_exercise_name ? (
         <Alert
           type="info"
           showIcon
@@ -613,10 +602,10 @@ function ExerciseDetailBody({ detail, setDetail, navigate, id }) {
               <Text>Další úroveň:</Text>
               <Button
                 type="link"
-                onClick={() => navigate(`/exercises/${detail.next_exercise_id}`)}
+                onClick={() => navigate(`/exercises/${detail.next_exercise_name}`)}
                 style={{ padding: 0 }}
               >
-                {detail.next_exercise_name}
+                {detail.next_exercise_title}
               </Button>
             </Space>
           }

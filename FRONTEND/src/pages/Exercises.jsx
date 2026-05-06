@@ -15,6 +15,14 @@ import { getExercises } from '../api/exercises/get_list.js';
 
 const { Title, Paragraph, Text } = Typography;
 
+function plainTextFromMarkdown(md) {
+  return md
+    .replace(/^#{1,6}\s+.+$/gm, '')
+    .replace(/\*\*?(.+?)\*\*?/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export default function Exercises() {
   const navigate = useNavigate();
   const [exercises, setExercises] = useState([]);
@@ -69,10 +77,10 @@ export default function Exercises() {
       ) : (
         <Row gutter={[16, 16]}>
           {exercises.map((item) => (
-            <Col key={item.id} xs={24} sm={12} lg={8}>
+            <Col key={item.name} xs={24} sm={12} lg={8}>
               <ExerciseTile
                 item={item}
-                onClick={() => navigate(`/exercises/${item.id}`)}
+                onClick={() => navigate(`/exercises/${item.name}`)}
               />
             </Col>
           ))}
@@ -83,12 +91,13 @@ export default function Exercises() {
 }
 
 function ExerciseTile({ item, onClick }) {
+  const previewText = plainTextFromMarkdown(item.description ?? '');
   return (
     <Card
       hoverable
       onClick={onClick}
       role="button"
-      aria-label={`Otevřít cvik ${item.name}`}
+      aria-label={`Otevřít cvik ${item.title}`}
       styles={{ body: { padding: 16 } }}
       style={{ height: '100%' }}
     >
@@ -98,17 +107,17 @@ function ExerciseTile({ item, onClick }) {
           <Tag>Level {item.level}</Tag>
         </Space>
         <Title level={4} style={{ margin: 0 }}>
-          {item.name}
+          {item.title}
         </Title>
         <Paragraph
           style={{ marginBottom: 0 }}
-          ellipsis={{ rows: 3, expandable: false, tooltip: item.description }}
+          ellipsis={{ rows: 3, expandable: false, tooltip: previewText }}
         >
-          {item.description}
+          {previewText}
         </Paragraph>
-        {item.next_exercise_id ? (
+        {item.next_exercise_name ? (
           <Text type="secondary" style={{ fontSize: 12 }}>
-            Další úroveň: {item.next_exercise_name}
+            Další úroveň: {item.next_exercise_title}
           </Text>
         ) : (
           <Text type="secondary" style={{ fontSize: 12 }}>

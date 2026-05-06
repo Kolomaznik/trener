@@ -1,0 +1,112 @@
+# 1. DŘEP VE STOJI NA RAMENOU
+### PRVNÍ STUPEŇ
+
+## Provedení
+S ohnutými koleny se položte na záda. Vykopněte a dostaňte nohy do vzduchu za pomoci rukou. Když dosáhnete této polohy, podepřete si bedra rukama. Ramena stále spočívají na zemi. Ocitnete se ve „stoji na ramenou“, opírat se budete o ramena, horní část zad a o zadní strany paží. Uvědomte si, že se v těchto místech musíte neustále podpírat a že nesmíte zatěžovat krk. Vaše tělo musí být rovné, neohýbejte kyčle. To je počáteční poloha (obr. 21). Udržujte trup rovný, a zároveň se ohněte v kyčlích a kolenou tak, aby se kolena dotkla čela. To je konečná poloha (obr. 22). Natáhněte nohy dozadu tak, aby se trup ocitl v počáteční poloze. Opakujte.
+
+## Cvičení pod drobnohledem
+Dřepy ve stoji na ramenou jsou skvělé přípravné cvičení pro každého, kdo chce s dřepy začít. Vzhledem k obrácené poloze cviku nespočívá na kolenou a bedrech prakticky žádná váha, což z něj dělá ideální rehabilitační cvičení pro lidi s poraněnými zády nebo koleny – pomáhá jim vrátit se zpátky ke sportům, pro které je pohyb nohou důležitý. Technicky vzato jsou dřepy ve stoji na ramenou náročnější pro horní část těla než pro spodní. Ale zároveň uvolňují ztuhlé klouby, zvyšují rozsah pohybu, a především nasměrují začátečníky k dokonalé formě.
+
+## Tréninkové cíle
+* **Začátečník:** 1 série po 10 dřepech
+* **Pokročilý:** 2 série po 25 dřepech
+* **Expert:** 3 série po 50 dřepech
+
+## Zdokonalujte svou techniku
+Na první pokus se každému dotknout se čela koleny nepodaří. Snažte se je ohýbat co nejvíc a vaše klouby se při každém cvičení uvolní. Tato technika je prakticky nemožná pro lidi s nadváhou, protože jim překáží břicho. Než nadbytečná kila shodíte, cvičte raději s prázdným žaludkem.
+
+210 Trénink vězně
+
+# 1. STUPEŇ: KRÁTKÝ MOST
+### PRVNÍ STUPEŇ
+
+## Provedení
+Položte se na záda, nohy mějte natažené a ruce zkřížené na břiše. Natáhněte chodidla a ohněte kolena tak, aby byly vaše holeně téměř rovnoběžné se zemí a chodidla ležela naplocho na zemi. Ta by od sebe měla být vzdálená na šířku ramen, případně méně, podle toho, jakou máte postavu. Paty by měly být asi 15–20 cm od hýždí. To je počáteční poloha (obr. 83). Přitlačte chodidla k zemi a zvedněte kyčle a záda tak, aby váha těla spočívala jen na ramenou a chodidlech. V tomto stadiu jsou stehna a trup v jedné přímce a kyčle se neprohýbají. To je konečná poloha (obr. 84). V poloze nahoře se na chvíli zastavte a provádějte pohyby v opačném pořadí, abyste se vrátili zpět do počáteční polohy. Pak cvičení opakujte. Když jdete nahoru, vydechujte, když jdete dolů, nadechujte se.
+
+## Cvičení pod drobnohledem
+Krátké mosty zahrnují zvedání se za pomoci dolních končetin a patří k těm nejmírnějším způsobům, jak začít s tréninkem zad, protože v běžném životě obvykle aktivujete zádové svaly prostřednictvím nohou, například při chůzi, předklonu atd. Držení trupu zpříma na vrcholu krátkého pohybu v mostu stimuluje páteř a svaly kyčlí, aniž by přímo obratle zatěžoval jakýkoliv tlak. Proto je toto cvičení skvělou terapií pro ty, kteří trpí poraněním plotének.
+
+## Tréninkové cíle
+* **Začátečník:** 1 série po 10 mostech
+* **Pokročilý:** 2 série po 25 mostech
+* **Expert:** 3 série po 50 mostech
+
+## Zdokonalujte svou techniku
+Většina lidí by měla udělat krátký most, aniž by se přitom museli moc namáhat. Pokud se zotavujete po zranění zad a toto cvičení pro vás představuje problém, jednoduše omezte rozsah pohybu tím, že budete pohyb provádět s několika polštáři, umístěnými pod kyčlemi.
+
+
+# 1. STUPEŇ: VERTIKÁLNÍ SHYB
+### PRVNÍ STUPEŇ
+
+## Provedení
+Najděte si nějakou vertikální základnu, na které se dokážete udržet. Měla by být bezpečná a umožnit vám pohodlný úchop, takže navrhuji dveřní rám nebo vysoké zábradlí. Postavte se blízko základny, špičky vašich chodidel by měly být 7 až 15 cm daleko. Uchopte základnu tak, aby vám to bylo pohodlné. Ideálně by vaše ruce měly být na šířku ramen od sebe, ale stačí, když budete stát tak, aby to bylo symetrické. Toto je počáteční poloha (obr. 41). Díky blízkosti základny budou vaše paže ohnuté. Teď nechte váhu vašeho těla, aby se za pomoci mírného „opření“ posunula dozadu. Přitom roztahujte paže tak, aby na konci byly téměř rovné a vaše tělo směřovalo úhlopříčně dozadu. Toto je konečná poloha (obr. 42). V tomto bodě budete cítit mírný tah v horní části zad a možná i v pažích. Udělejte krátkou pauzu, než se přitáhnete zpět do počáteční polohy. To provedete stažením lopatek, paže nechte lehce ohnuté. Na chvíli si odpočiňte a cvik opakujte.
+
+## Cvičení pod drobnohledem
+Vertikální shyb je velmi jemný cvik, ideální pro sportovce, kteří se pokoušejí obnovit sílu svých zad a paží po nějakém zranění, například ramene, bicepsu nebo lokte. Zvyšuje průtok krve a obnovuje dřívější úroveň protažení. Je to také skvělé cvičení pro jakéhokoliv začátečníka. Malá intenzita umožňuje sportovcům, kteří začínají se shyby, aby přišli na to, že v ramenou a horní části zad opravdu mají svaly.
+
+## Tréninkové cíle
+* **Začátečník:** 1 série po 10 shybech
+* **Pokročilý:** 2 série po 20 shybech
+* **Expert:** 3 série po 40 shybech
+
+## Zdokonalujte svou techniku
+Toto by mělo být snadné cvičení, které by měl zvládnout doslova každý. Pokud se rehabilitujete po nějakém zranění a pohyb v dané oblasti (kde máte možná ještě stehy) se vám zdá příliš prudký, jednoduše omezte rozsah pohybu, zpevněte ramena a nenatahujte paže tak daleko.
+
+
+# 1. STUPEŇ: PŘITAHOVÁNÍ KOLEN
+### PRVNÍ STUPEŇ
+
+## Provedení
+Sedněte si na kraj židle nebo postele. Mírně se zakloňte, uchopte rukama okraj sedadla a narovnejte nohy. Chodidla jsou spolu s patami několik centimetrů od podlahy. To je počáteční poloha (obr. 61). Pomalu zvedejte kolena nahoru a k sobě, až budou asi 15–25 cm od vašeho hrudníku. Vydechněte a souběžně přitahujte kolena. Pohyb ukončíte úplným výdechem, vaše břišní svaly by v té chvíli měly být pevně stažené. To je konečná poloha (obr. 62). Udělejte vteřinovou pauzu a pak se vraťte do počáteční polohy. Nadechněte se, když natahujete nohy. Vaše chodidla by měla opsat přímku a neměla by se dotknout podlahy, dokud cvik neukončíte. Celou dobu mějte zaťažené břicho. Odolejte nutkání rychle cvik zopakovat, mezi opakováním se musíte pořádně nadechnout.
+
+## Cvičení pod drobnohledem
+Přitahování kolen je ideálním cvičením pro začátečníky. Vede ke správnému postavení páteře, trénuje břišní svaly a posiluje přitahovače kyčlí. Většině lidí také připadá lehké, a tedy představuje skvělou příležitost, jak obecně zlepšit svou techniku. Důležitý je plynulý pohyb, správný dechový rytmus a pevně zaťažené břicho.
+
+## Tréninkové cíle
+* **Začátečník:** 1 série po 10 přitazích kolen
+* **Pokročilý:** 2 série po 25 přitazích kolen
+* **Expert:** 3 série po 40 přitazích kolen
+
+## Zdokonalujte svou techniku
+Toto cvičení má v počáteční (natažené nohy) i konečné poloze (kolena přitažená k hrudi) stejnou obtížnost. Aby bylo cvičení trochu snazší, soustřeďte se na kratší rozsah pohybu. Až váš pas zesílí, postupně rozsah pohybu zvětšujte, dokud nebude provedení dokonalé.
+
+
+# 1. STUPEŇ: STOJ NA HLAVĚ U ZDI
+### PRVNÍ STUPEŇ
+
+## Provedení
+Najděte si nějakou pevnou zeď. K jejímu úpatí položte polštář nebo smotaný ručník, tam si budete opírat hlavu. Klekněte si, položte dlaně na zem a hlavu na polštář. Měli byste být asi 15–20 cm od zdi a dlaně by od hlavy měly být na šířku ramen. Koleno své silnější nohy přitáhněte k příslušnému lokti a druhou nohu narovnejte tak, aby se koleno zvedlo ze země (obr. 107). Silnější nohou zatlačte do země a druhou nohou vykopněte do vzduchu tak, aby se obě nohy zvedly ke zdi. Až se dotknete zdi, nohy pomalu narovnejte, tělo by mělo být v jedné přímce (obr. 108). Ústa jsou zavřená, dýchejte nosem. Chvíli setrvejte nahoře, pak ohněte nohy a pomalu a plynule je spusťte dolů.
+
+## Cvičení pod drobnohledem
+Každý, kdo se chce naučit klik ve stojce, musí nejdřív zvládnout obrácenou polohu. Stoj na hlavě u zdi je pro začátek nejlepší. Stačí trocha praxe, aby se cévy a orgány trupu a hlavy náhlé změně gravitace snadno přizpůsobily. Také je to dobré cvičení pro rovnováhu a posílení ramenních svalů, protože celé tělo je vlastně nad hlavou, kde ho udržují primárně ramena.
+
+## Tréninkové cíle
+* **Začátečník:** 30 vteřin
+* **Pokročilý:** 1 minuta
+* **Expert:** 2 minuty
+
+## Zdokonalujte svou techniku
+Většina lidí dokáže vydržet ve stoji na hlavě u zdi jen několik vteřin, a největší problém pro ně je se do ní vůbec dostat. Je potřeba se naučit, kolik síly je potřeba, aby se člověk dokázal vyhoupnout nahoru. Pokud je to pro vás obtížné, požádejte nějakého kamaráda, aby vám pomáhal nohy zvedat, dokud to nedokážete sami.
+
+60 Trénink vězně
+
+# 1. STUPEŇ: KLIK O ZEĎ
+### PRVNÍ STUPEŇ
+
+## Provedení
+Postavte se proti zdi, chodidla mějte u sebe. Položte dlaně naplocho na zeď. To je počáteční poloha (obr. 1). Ruce jsou rovné a roztažené na šířku ramen, dlaně jsou ve výšce prsou.
+
+Ohněte ramena a lokty, dokud se čelo jemně nedotkne zdi. To je konečná poloha (obr. 2). Dostaňte se zpět do počáteční polohy a opakujte.
+
+## Cvičení pod drobnohledem
+Kliky o zeď jsou první ze série deseti cviků, potřebných k dokonalému zvládnutí kliků. Je to první stupeň, a proto je nejjednodušší.
+
+Každý zdravý člověk by měl dokázat provést tento cvik bez jakýchkoli problémů. Kliky o zeď také patří do terapeutické série kliků, užitečných pro každého, kdo se zotavuje po úraze nebo po operaci a snaží se uzdravit a pomalu obnovit svou sílu. K chronickým a akutním úrazům jsou náchylné především lokty, zápěstí a ramena, zejména citlivé rotátorové manžety v rameni. Toto cvičení dané oblasti jemně aktivuje, stimuluje, zlepšuje jejich prokrvení a svalový tonus. Začátečníci musí vždy začínat velmi citlivě, aby dali svým schopnostem možnost se rozvíjet co nejpřirozeněji. Proto by měli začít s tímto cvičením.
+
+## Tréninkové cíle
+* **Začátečník:** 1 série po 10 klicích
+* **Pokročilý:** 2 série po 25 klicích
+* **Expert:** 3 série po 50 klicích
+
+## Zdokonalujte svou techniku
+Každý, kdo čte tuto knihu, by měl být schopný provést toto cvičení, pokud není tělesně postižený, těžce zraněný nebo nemocný. Pokud se zotavujeme po úraze nebo operaci, tento pohyb je dobrým testem možných slabin, které mohou během rehabilitace způsobit problémy.

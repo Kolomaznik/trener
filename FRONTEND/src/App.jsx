@@ -271,8 +271,8 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/exercises" element={<Exercises />} />
-            <Route path="/exercises/:id" element={<ExerciseDetail />} />
-            <Route path="/exercises/:id/workout" element={<WorkoutSession />} />
+            <Route path="/exercises/:name" element={<ExerciseDetail />} />
+            <Route path="/exercises/:name/workout" element={<WorkoutSession />} />
             <Route path="/voice-counting" element={<VoiceCounting />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

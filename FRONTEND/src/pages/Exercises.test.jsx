@@ -11,22 +11,22 @@ import { getExercises } from '../api/exercises/get_list.js';
 
 const listFixture = [
   {
-    id: 'pushups_level_1',
-    name: 'Kliky o zeď',
+    name: 'pushups_level_1',
+    title: 'Kliky o zeď',
     family: 'Kliky',
     level: 1,
     description: 'Rehabilitační a přípravný cvik.',
-    next_exercise_id: 'pushups_level_2',
-    next_exercise_name: 'Kliky v předklonu',
+    next_exercise_name: 'pushups_level_2',
+    next_exercise_title: 'Kliky v předklonu',
   },
   {
-    id: 'pushups_level_2',
-    name: 'Kliky v předklonu',
+    name: 'pushups_level_2',
+    title: 'Kliky v předklonu',
     family: 'Kliky',
     level: 2,
     description: 'Náročnější varianta.',
-    next_exercise_id: null,
     next_exercise_name: null,
+    next_exercise_title: null,
   },
 ];
 
@@ -35,7 +35,7 @@ function renderWithRouter(initialPath = '/exercises') {
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route path="/exercises" element={<Exercises />} />
-        <Route path="/exercises/:id" element={<div data-testid="detail-marker" />} />
+        <Route path="/exercises/:name" element={<div data-testid="detail-marker" />} />
       </Routes>
     </MemoryRouter>,
   );

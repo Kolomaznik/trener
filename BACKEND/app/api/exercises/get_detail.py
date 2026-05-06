@@ -69,21 +69,20 @@ class UserLevelInfo(BaseModel):
 
 
 class ExerciseDetailResponse(BaseModel):
-    id: str
     name: str
+    title: str
     english_name: str | None = None
     family: str
     level: int
     description: str
-    instructions: list[str] = Field(default_factory=list)
     media: dict[str, str] | None = None
     cadence: Cadence | None = None
     progression_goals: ProgressionGoals | None = None
     muscle_engagement_percent: dict[str, int] = Field(default_factory=dict)
     level_coefficient: float = 0.5
     height_multiplier: float = 0.5
-    next_exercise_id: str | None = None
     next_exercise_name: str | None = None
+    next_exercise_title: str | None = None
     muscle_load_by_difficulty: MuscleLoadByDifficulty | None = None
     user_level: UserLevelInfo | None = None
 
@@ -124,13 +123,13 @@ async def _get_optional_user_context(
     return _UserContext(email=email, weight_kg=weight_kg)
 
 
-@router.get("/{exercise_id}", response_model=ExerciseDetailResponse)
+@router.get("/{exercise_name}", response_model=ExerciseDetailResponse)
 async def get_exercise_detail(
-    exercise_id: str,
+    exercise_name: str,
     db: Database = Depends(get_db),
     user_context: _UserContext = Depends(_get_optional_user_context),
 ) -> ExerciseDetailResponse:
-    doc = db["exercises"].find_one({"id": exercise_id, **SCHEMA_FILTER})
+    doc = db["exercises"].find_one({"name": exercise_name, **SCHEMA_FILTER})
     if doc is None:
         raise HTTPException(status_code=404, detail="Exercise not found")
 
@@ -165,7 +164,7 @@ async def get_exercise_detail(
 
         recent_docs = list(
             db["workout_sessions"]
-            .find({"user_email": user_context.email, "exercise_id": exercise_id})
+            .find({"user_email": user_context.email, "exercise_id": exercise_name})
             .sort("started_at", -1)
             .limit(5)
         )
@@ -206,21 +205,20 @@ async def get_exercise_detail(
     )
 
     return ExerciseDetailResponse(
-        id=doc["id"],
         name=doc["name"],
+        title=doc["title"],
         english_name=doc.get("english_name"),
         family=doc["family"],
         level=doc["level"],
         description=doc.get("description", ""),
-        instructions=list(doc.get("instructions", [])),
         media=dict(media_doc) if media_doc else None,
         cadence=Cadence(**cadence_doc) if cadence_doc else None,
         progression_goals=ProgressionGoals(**progression_doc) if progression_doc else None,
         muscle_engagement_percent=dict(doc.get("muscle_engagement_percent", {})),
         level_coefficient=doc.get("level_coefficient", 0.5),
         height_multiplier=doc.get("height_multiplier", 0.5),
-        next_exercise_id=nxt["id"] if nxt else None,
         next_exercise_name=nxt["name"] if nxt else None,
+        next_exercise_title=nxt["title"] if nxt else None,
         muscle_load_by_difficulty=muscle_load_by_difficulty,
         user_level=user_level,
     )

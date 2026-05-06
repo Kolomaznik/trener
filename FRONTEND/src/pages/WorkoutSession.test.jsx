@@ -71,13 +71,12 @@ const levelFixtureIntermediate = {
 };
 
 const detailFixture = {
-  id: 'pushups_level_1',
-  name: 'Kliky o zeď',
+  name: 'pushups_level_1',
+  title: 'Kliky o zeď',
   english_name: 'Wall Push-ups',
   family: 'Kliky',
   level: 1,
   description: 'Rehabilitační cvik.',
-  instructions: ['Postav se ke zdi.'],
   cadence: {
     eccentric_sec: 2,
     pause_bottom_sec: 1,
@@ -93,8 +92,8 @@ const detailFixture = {
     coach_note: 'Pokračuj na level 2.',
   },
   muscle_engagement_percent: { chest: 40, triceps: 30 },
-  next_exercise_id: null,
   next_exercise_name: null,
+  next_exercise_title: null,
   user_level: levelFixtureBeginner,
 };
 
@@ -102,8 +101,8 @@ function renderWithRouter(path = '/exercises/pushups_level_1/workout') {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/exercises/:id" element={<div data-testid="detail-marker" />} />
-        <Route path="/exercises/:id/workout" element={<WorkoutSession />} />
+        <Route path="/exercises/:name" element={<div data-testid="detail-marker" />} />
+        <Route path="/exercises/:name/workout" element={<WorkoutSession />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -176,8 +175,8 @@ describe('WorkoutSession page', () => {
     rerender(
       <MemoryRouter initialEntries={['/exercises/pushups_level_1/workout']}>
         <Routes>
-          <Route path="/exercises/:id" element={<div data-testid="detail-marker" />} />
-          <Route path="/exercises/:id/workout" element={<WorkoutSession />} />
+          <Route path="/exercises/:name" element={<div data-testid="detail-marker" />} />
+          <Route path="/exercises/:name/workout" element={<WorkoutSession />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -247,8 +246,8 @@ describe('WorkoutSession page', () => {
     rerender(
       <MemoryRouter initialEntries={['/exercises/pushups_level_1/workout']}>
         <Routes>
-          <Route path="/exercises/:id" element={<div data-testid="detail-marker" />} />
-          <Route path="/exercises/:id/workout" element={<WorkoutSession />} />
+          <Route path="/exercises/:name" element={<div data-testid="detail-marker" />} />
+          <Route path="/exercises/:name/workout" element={<WorkoutSession />} />
         </Routes>
       </MemoryRouter>,
     );

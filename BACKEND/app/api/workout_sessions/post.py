@@ -40,7 +40,7 @@ def create_workout_session(
     db: Database = Depends(get_db),
 ) -> WorkoutSessionCreated:
     user_doc = db["users"].find_one({"email": user.email}) or {}
-    exercise_doc = db["exercises"].find_one({"id": payload.exercise_id}) or {}
+    exercise_doc = db["exercises"].find_one({"name": payload.exercise_id}) or {}
 
     now = datetime.now(UTC)
     doc: dict[str, Any] = {

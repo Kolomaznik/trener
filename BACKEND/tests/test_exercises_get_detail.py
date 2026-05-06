@@ -2,12 +2,11 @@ import pytest
 
 EXERCISE_DOC = {
     "_id": "pushups_level_1",
-    "id": "pushups_level_1",
-    "name": "Kliky o zeď",
+    "name": "pushups_level_1",
+    "title": "Kliky o zeď",
     "family": "Kliky",
     "level": 1,
     "description": "Rehabilitační a přípravný cvik.",
-    "instructions": [],
 }
 
 

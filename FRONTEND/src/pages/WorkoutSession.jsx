@@ -20,6 +20,7 @@ import {
   StopOutlined,
 } from '@ant-design/icons';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
+import ReactMarkdown from 'react-markdown';
 import {
   computeSessionStats,
   parseNumberFromTokens,
@@ -107,7 +108,7 @@ function useRestTimer(initialSeconds, active) {
 }
 
 export default function WorkoutSession() {
-  const { id: exerciseId } = useParams();
+  const { name: exerciseName } = useParams();
   const navigate = useNavigate();
 
   const [detail, setDetail] = useState(null);
@@ -141,13 +142,13 @@ export default function WorkoutSession() {
 
   // Load exercise detail (includes user_level)
   useEffect(() => {
-    if (!exerciseId) return undefined;
+    if (!exerciseName) return undefined;
     let active = true;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setDetailLoading(true);
     setDetailError(null);
 
-    getExerciseDetail(exerciseId)
+    getExerciseDetail(exerciseName)
       .then((det) => {
         if (!active) return;
         setDetail(det);
@@ -167,7 +168,7 @@ export default function WorkoutSession() {
     return () => {
       active = false;
     };
-  }, [exerciseId]);
+  }, [exerciseName]);
 
   // Voice transcript processing
   useEffect(() => {
@@ -281,8 +282,8 @@ export default function WorkoutSession() {
     const currentEvents = events;
     const stats = computeSessionStats(currentEvents);
     const payload = {
-      exercise_id: exerciseId,
-      exercise_name: detail?.name ?? exerciseId,
+      exercise_id: exerciseName,
+      exercise_name: detail?.title ?? exerciseName,
       started_at: sessionStartedAt,
       ended_at: endedAt,
       total_duration_sec: elapsed,
@@ -299,7 +300,7 @@ export default function WorkoutSession() {
     try {
       await postWorkoutSession(payload);
       // Re-fetch detail to get refreshed user_level
-      const freshDetail = await getExerciseDetail(exerciseId);
+      const freshDetail = await getExerciseDetail(exerciseName);
       setDetail(freshDetail);
     } catch {
       setSaveError('Sérii se nepodařilo uložit. Data jsou zachována lokálně.');
@@ -343,7 +344,7 @@ export default function WorkoutSession() {
         <Button
           type="link"
           icon={<ArrowLeftOutlined />}
-          onClick={() => navigate(`/exercises/${exerciseId}`)}
+          onClick={() => navigate(`/exercises/${exerciseName}`)}
           style={{ padding: 0 }}
         >
           Zpět na cvik
@@ -358,7 +359,7 @@ export default function WorkoutSession() {
       <Button
         type="link"
         icon={<ArrowLeftOutlined />}
-        onClick={() => navigate(`/exercises/${exerciseId}`)}
+        onClick={() => navigate(`/exercises/${exerciseName}`)}
         style={{ padding: 0 }}
       >
         Zpět na cvik
@@ -369,7 +370,7 @@ export default function WorkoutSession() {
         <Card>
           <Space direction="vertical" size={4}>
             <Title level={3} style={{ margin: 0 }}>
-              {detail.name}
+              {detail.title}
             </Title>
             {detail.english_name && <Text type="secondary">{detail.english_name}</Text>}
             <Space size={4} wrap>
@@ -377,7 +378,9 @@ export default function WorkoutSession() {
               <Tag>Level {detail.level}</Tag>
             </Space>
           </Space>
-          <Paragraph style={{ marginTop: 8, marginBottom: 0 }}>{detail.description}</Paragraph>
+          <div style={{ marginTop: 8 }}>
+            <ReactMarkdown>{detail.description}</ReactMarkdown>
+          </div>
         </Card>
       )}
 
@@ -592,7 +595,7 @@ export default function WorkoutSession() {
       {/* End workout */}
       <Button
         type="default"
-        onClick={() => navigate(`/exercises/${exerciseId}`)}
+        onClick={() => navigate(`/exercises/${exerciseName}`)}
         style={{ width: '100%' }}
       >
         Ukončit trénink

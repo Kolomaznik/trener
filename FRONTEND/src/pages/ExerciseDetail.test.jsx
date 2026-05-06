@@ -51,16 +51,12 @@ const muscleLoadByDifficulty = {
 };
 
 const detailFixture = {
-  id: 'pushups_level_1',
-  name: 'Kliky o zeď',
+  name: 'pushups_level_1',
+  title: 'Kliky o zeď',
   english_name: 'Wall Push-ups',
   family: 'Kliky',
   level: 1,
   description: 'Rehabilitační a přípravný cvik.',
-  instructions: [
-    'Postav se čelem ke zdi.',
-    'Polož dlaně na zeď ve výšce hrudníku.',
-  ],
   media: {
     youtube_tutorial: 'https://www.youtube.com/watch?v=xxx',
     thumbnail_url: 'https://img.youtube.com/vi/xxx/hqdefault.jpg',
@@ -81,8 +77,8 @@ const detailFixture = {
   },
   muscle_engagement_percent: { chest: 40, triceps: 30, lower_back: 5 },
   muscle_load_by_difficulty: muscleLoadByDifficulty,
-  next_exercise_id: 'pushups_level_2',
-  next_exercise_name: 'Kliky v předklonu',
+  next_exercise_name: 'pushups_level_2',
+  next_exercise_title: 'Kliky v předklonu',
   level_coefficient: 0.20,
   height_multiplier: 0.40,
   user_level: {
@@ -103,12 +99,12 @@ const detailFixtureNoLoad = {
 
 const detailFixtureLevel2 = {
   ...detailFixture,
-  id: 'pushups_level_2',
-  name: 'Kliky v předklonu',
+  name: 'pushups_level_2',
+  title: 'Kliky v předklonu',
   english_name: null,
   level: 2,
-  next_exercise_id: null,
   next_exercise_name: null,
+  next_exercise_title: null,
   level_coefficient: 0.35,
 };
 
@@ -119,8 +115,8 @@ function renderWithRouter(initialPath = '/exercises/pushups_level_1') {
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route path="/exercises" element={<div data-testid="list-marker" />} />
-        <Route path="/exercises/:id" element={<ExerciseDetail />} />
-        <Route path="/exercises/:id/workout" element={<div data-testid="workout-marker" />} />
+        <Route path="/exercises/:name" element={<ExerciseDetail />} />
+        <Route path="/exercises/:name/workout" element={<div data-testid="workout-marker" />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -136,7 +132,7 @@ describe('ExerciseDetail page', () => {
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
-  it('fetches detail using id from URL', async () => {
+  it('fetches detail using name from URL', async () => {
     renderWithRouter('/exercises/pushups_level_1');
 
     await waitFor(() =>
@@ -335,12 +331,10 @@ describe('ExerciseDetail page', () => {
 
   // ── Static detail cards ────────────────────────────────────────────────────
 
-  it('renders instructions, cadence, video cards', async () => {
+  it('renders cadence and video cards', async () => {
     renderWithRouter();
 
-    expect(await screen.findByText('Jak cvičit')).toBeInTheDocument();
-    expect(screen.getByText(/Postav se čelem ke zdi/)).toBeInTheDocument();
-    expect(screen.getByText('Tempo')).toBeInTheDocument();
+    expect(await screen.findByText('Tempo')).toBeInTheDocument();
     expect(screen.getByText('6 s / opakování')).toBeInTheDocument();
     expect(screen.getByText('Video')).toBeInTheDocument();
   });
