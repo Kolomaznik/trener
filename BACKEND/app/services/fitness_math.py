@@ -143,9 +143,9 @@ def _median(values: list[float]) -> float:
 
 
 # Tuning constants for interpolation and evaluation
-_DEDUP_WINDOW_MS: int = 1500  # same-value events within this window are collapsed
+_DEDUP_WINDOW_MS: int = 1500  # same-value events within this window are deduplicated, keeping the last occurrence
 _DEFAULT_INTERVAL_MS: float = 3000.0  # assumed rep interval when there is no history
-_GAP_THRESHOLD_FACTOR: float = 0.5  # generous: gaps >= 50 % of expected trigger fill
+_GAP_THRESHOLD_FACTOR: float = 0.5  # gaps >= 50 % of the expected duration for missing reps trigger interpolation
 _PACE_TOO_FAST: float = 0.8  # avg < cadence × this → too fast (±20 % band)
 _PACE_TOO_SLOW: float = 1.2  # avg > cadence × this → too slow
 _TREND_SLOWING: float = 1.15  # second-half avg > first-half × this → slowing down
