@@ -1,0 +1,25 @@
+# =============================================================================
+# GlitchTip — Celery worker + beat scheduler service
+# =============================================================================
+# Same image as the web service but starts the background task worker instead
+# of gunicorn. The --beat flag runs the periodic task scheduler in the same
+# process (sufficient for low-traffic deployments).
+#
+# Railway deployment:
+#   Service type    : Worker (no public port needed)
+#   Root Dir        : SENTRY/
+#   Dockerfile path : Dockerfile.worker    ← set in Railway service settings
+#   Start command   : (leave empty — CMD below is used)
+#
+# Required environment variables are identical to the web service —
+# share them via a Railway "Shared Variables" config group or duplicate them.
+# See .env.example for the full list.
+# =============================================================================
+
+FROM glitchtip/glitchtip:latest
+
+CMD celery \
+  -A glitchtip worker \
+  --beat \
+  --loglevel=info \
+  --concurrency=${CELERY_WORKER_CONCURRENCY:-2}
