@@ -7,6 +7,12 @@ from pymongo.database import Database
 
 from app.auth import GoogleUser, get_current_user
 from app.db import get_db
+from app.services.fitness_math import (
+    SetEvaluation,
+    compute_level,
+    evaluate_set_performance,
+    interpolate_missing_reps,
+)
 
 router = APIRouter(prefix="/workout-sessions", tags=["workout-sessions"])
 
@@ -16,6 +22,7 @@ class WorkoutEvent(BaseModel):
     token: str
     timestamp_ms: int
     timestamp_iso: str
+    interpolated: bool = False
 
 
 class WorkoutSessionCreate(BaseModel):
@@ -31,6 +38,8 @@ class WorkoutSessionCreate(BaseModel):
 
 class WorkoutSessionCreated(BaseModel):
     id: str
+    total_reps: int
+    evaluation: SetEvaluation | None = None
 
 
 @router.post("", response_model=WorkoutSessionCreated, status_code=status.HTTP_201_CREATED)
@@ -42,6 +51,34 @@ def create_workout_session(
     user_doc = db["users"].find_one({"email": user.email}) or {}
     exercise_doc = db["exercises"].find_one({"name": payload.exercise_id}) or {}
 
+    # Correct rep count by interpolating over speech-recognition gaps
+    session_start_ms = int(payload.started_at.timestamp() * 1000)
+    raw_events = [e.model_dump() for e in payload.events]
+    corrected_events, corrected_total_reps = interpolate_missing_reps(raw_events, session_start_ms)
+
+    # Evaluate set performance (pace + trend) when cadence data is available.
+    # The user's target rep count for this exercise — derived from their level
+    # against the exercise's progression goals — is needed so the evaluation
+    # can decide whether the set was successfully completed.
+    cadence = exercise_doc.get("cadence") or {}
+    cadence_total_rep_time_sec: float | None = cadence.get("total_rep_time_sec")
+    progression_goals: dict[str, Any] = exercise_doc.get("progression_goals") or {}
+    recent_docs = list(
+        db["workout_sessions"]
+        .find({"user_email": user.email, "exercise_id": payload.exercise_id})
+        .sort("started_at", -1)
+        .limit(5)
+    )
+    recent_reps = [d["total_reps"] for d in recent_docs]
+    level = compute_level(recent_reps, progression_goals)
+    target_reps: int | None = (progression_goals.get(level) or {}).get("reps")
+    evaluation = evaluate_set_performance(
+        corrected_events,
+        cadence_total_rep_time_sec,
+        target_reps=target_reps,
+        total_reps=corrected_total_reps,
+    )
+
     now = datetime.now(UTC)
     doc: dict[str, Any] = {
         "user_email": user.email,
@@ -50,8 +87,8 @@ def create_workout_session(
         "started_at": payload.started_at,
         "ended_at": payload.ended_at,
         "total_duration_sec": payload.total_duration_sec,
-        "total_reps": payload.total_reps,
-        "events": [e.model_dump() for e in payload.events],
+        "total_reps": corrected_total_reps,
+        "events": corrected_events,
         "set_number": payload.set_number,
         "user_weight_kg": user_doc.get("weight_kg"),
         "user_height_cm": user_doc.get("height_cm"),
@@ -60,4 +97,8 @@ def create_workout_session(
     }
 
     result = db["workout_sessions"].insert_one(doc)
-    return WorkoutSessionCreated(id=str(result.inserted_id))
+    return WorkoutSessionCreated(
+        id=str(result.inserted_id),
+        total_reps=corrected_total_reps,
+        evaluation=evaluation,
+    )

@@ -115,7 +115,7 @@ describe('WorkoutSession page', () => {
     postWorkoutSession.mockReset();
 
     getExerciseDetail.mockResolvedValue(detailFixture);
-    postWorkoutSession.mockResolvedValue({ id: 'session-1', total_reps: 5 });
+    postWorkoutSession.mockResolvedValue({ id: 'session-1', total_reps: 0, evaluation: null });
   });
 
   it('shows skeleton while loading', () => {
@@ -211,7 +211,8 @@ describe('WorkoutSession page', () => {
     expect(call.set_number).toBe(1);
   });
 
-  it('shows rest timer after set completes', async () => {
+  it('shows rest timer after set completes when target_sets > 1', async () => {
+    getExerciseDetail.mockResolvedValue({ ...detailFixture, user_level: levelFixtureIntermediate });
     renderWithRouter();
     await screen.findByText('Kliky o zeď');
 
@@ -223,6 +224,7 @@ describe('WorkoutSession page', () => {
   });
 
   it('increments set number after skipping rest', async () => {
+    getExerciseDetail.mockResolvedValue({ ...detailFixture, user_level: levelFixtureIntermediate });
     renderWithRouter();
     await screen.findByText('Kliky o zeď');
 
@@ -319,5 +321,78 @@ describe('WorkoutSession page', () => {
     await waitFor(() =>
       expect(screen.getByText(/Sérii se nepodařilo uložit/i)).toBeInTheDocument(),
     );
+  });
+
+  it('hides live stats (Opakování counter) after set is stopped', async () => {
+    renderWithRouter();
+    await screen.findByText('Kliky o zeď');
+
+    // While idle the live counter row should be visible
+    expect(screen.getByTestId('live-stats')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Start série/ }));
+    await waitFor(() => screen.getByRole('button', { name: /Konec série/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Konec série/ }));
+
+    await waitFor(() => expect(postWorkoutSession).toHaveBeenCalledTimes(1));
+    // After stopping the live counter row should be gone
+    expect(screen.queryByTestId('live-stats')).not.toBeInTheDocument();
+  });
+
+  it('hides rest timer when target_sets is 1', async () => {
+    renderWithRouter(); // default fixture has target_sets: 1
+    await screen.findByText('Kliky o zeď');
+
+    fireEvent.click(screen.getByRole('button', { name: /Start série/ }));
+    await waitFor(() => screen.getByRole('button', { name: /Konec série/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Konec série/ }));
+
+    // Give time for async save to complete
+    await waitFor(() => expect(postWorkoutSession).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId('rest-timer')).not.toBeInTheDocument();
+  });
+
+  it('shows evaluation card after set when backend returns evaluation', async () => {
+    postWorkoutSession.mockResolvedValue({
+      id: 'session-1',
+      total_reps: 10,
+      evaluation: {
+        pace_label: 'on_track',
+        trend_label: 'steady',
+        avg_interval_sec: 6.1,
+        recommendation: 'Skvělé a rovnoměrné tempo! Příště zkus 12 opakování.',
+      },
+    });
+    renderWithRouter();
+    await screen.findByText('Kliky o zeď');
+
+    fireEvent.click(screen.getByRole('button', { name: /Start série/ }));
+    await waitFor(() => screen.getByRole('button', { name: /Konec série/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Konec série/ }));
+
+    await waitFor(() => expect(screen.getByTestId('evaluation-card')).toBeInTheDocument());
+    expect(screen.getByText('V tempu')).toBeInTheDocument();
+    expect(screen.getByText('Stabilní')).toBeInTheDocument();
+    expect(screen.getByText(/Skvělé a rovnoměrné tempo/)).toBeInTheDocument();
+  });
+
+  it('shows rep correction notice when corrected count differs from recognised count', async () => {
+    postWorkoutSession.mockResolvedValue({
+      id: 'session-1',
+      total_reps: 10,
+      evaluation: null,
+    });
+    renderWithRouter();
+    await screen.findByText('Kliky o zeď');
+
+    fireEvent.click(screen.getByRole('button', { name: /Start série/ }));
+    await waitFor(() => screen.getByRole('button', { name: /Konec série/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Konec série/ }));
+
+    // events.length === 0, correctedTotalReps === 10 → notice should appear
+    await waitFor(() =>
+      expect(screen.getByTestId('rep-correction-notice')).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/odhadnutý počet/)).toBeInTheDocument();
   });
 });
