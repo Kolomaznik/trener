@@ -3,8 +3,8 @@ from typing import Any, NamedTuple
 import httpx
 from fastapi import APIRouter, Depends, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
-from pymongo.database import Database
 
 from app.db import get_db
 from app.services.fitness_math import compute_level
@@ -57,10 +57,12 @@ async def _get_optional_user_email(
 async def get_exercises(
     limit: int = Query(default=100, ge=1),
     skip: int = Query(default=0, ge=0),
-    db: Database = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     user_email: _UserEmail = Depends(_get_optional_user_email),
 ) -> list[ExerciseListItem]:
-    all_docs = list(db["exercises"].find(SCHEMA_FILTER).sort([("family", 1), ("level", 1)]))
+    all_docs = await (
+        db["exercises"].find(SCHEMA_FILTER).sort([("family", 1), ("level", 1)]).to_list(None)
+    )
 
     by_family: dict[str, list[dict[str, Any]]] = {}
     for doc in all_docs:
@@ -76,11 +78,12 @@ async def get_exercises(
 
     user_levels: dict[str, str] = {}
     if user_email.email:
-        recent_sessions = list(
+        recent_sessions = await (
             db["workout_sessions"]
             .find({"user_email": user_email.email})
             .sort("started_at", -1)
             .limit(len(all_docs) * 5)
+            .to_list(None)
         )
         sessions_by_exercise: dict[str, list[int]] = {}
         for session in recent_sessions:

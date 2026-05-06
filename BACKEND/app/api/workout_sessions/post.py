@@ -2,8 +2,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, status
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field
-from pymongo.database import Database
 
 from app.auth import GoogleUser, get_current_user
 from app.db import get_db
@@ -43,13 +43,13 @@ class WorkoutSessionCreated(BaseModel):
 
 
 @router.post("", response_model=WorkoutSessionCreated, status_code=status.HTTP_201_CREATED)
-def create_workout_session(
+async def create_workout_session(
     payload: WorkoutSessionCreate = Body(...),
     user: GoogleUser = Depends(get_current_user),
-    db: Database = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> WorkoutSessionCreated:
-    user_doc = db["users"].find_one({"email": user.email}) or {}
-    exercise_doc = db["exercises"].find_one({"name": payload.exercise_id}) or {}
+    user_doc = (await db["users"].find_one({"email": user.email})) or {}
+    exercise_doc = (await db["exercises"].find_one({"name": payload.exercise_id})) or {}
 
     # Correct rep count by interpolating over speech-recognition gaps
     session_start_ms = int(payload.started_at.timestamp() * 1000)
@@ -63,11 +63,12 @@ def create_workout_session(
     cadence = exercise_doc.get("cadence") or {}
     cadence_total_rep_time_sec: float | None = cadence.get("total_rep_time_sec")
     progression_goals: dict[str, Any] = exercise_doc.get("progression_goals") or {}
-    recent_docs = list(
+    recent_docs = await (
         db["workout_sessions"]
         .find({"user_email": user.email, "exercise_id": payload.exercise_id})
         .sort("started_at", -1)
         .limit(5)
+        .to_list(None)
     )
     recent_reps = [d["total_reps"] for d in recent_docs]
     level = compute_level(recent_reps, progression_goals)
@@ -96,7 +97,7 @@ def create_workout_session(
         "saved_at": now,
     }
 
-    result = db["workout_sessions"].insert_one(doc)
+    result = await db["workout_sessions"].insert_one(doc)
     return WorkoutSessionCreated(
         id=str(result.inserted_id),
         total_reps=corrected_total_reps,
