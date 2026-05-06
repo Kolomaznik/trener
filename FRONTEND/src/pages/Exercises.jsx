@@ -109,8 +109,8 @@ function ExerciseTile({ item, onClick }) {
           <Tag color="blue">{item.family}</Tag>
           <Tag>Level {item.level}</Tag>
           {item.user_level && (
-            <Tag color={LEVEL_COLORS[item.user_level]}>
-              {LEVEL_LABELS[item.user_level] ?? item.user_level}
+            <Tag color={LEVEL_COLORS[item.user_level] ?? 'default'}>
+              {LEVEL_LABELS[item.user_level] ?? 'Neznámá úroveň'}
             </Tag>
           )}
         </Space>

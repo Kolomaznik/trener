@@ -80,6 +80,7 @@ async def get_exercises(
             db["workout_sessions"]
             .find({"user_email": user_email.email})
             .sort("started_at", -1)
+            .limit(len(all_docs) * 5)
         )
         sessions_by_exercise: dict[str, list[int]] = {}
         for session in recent_sessions:
