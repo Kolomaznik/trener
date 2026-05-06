@@ -142,6 +142,17 @@ def _median(values: list[float]) -> float:
     return s[n // 2]
 
 
+# Tuning constants for interpolation and evaluation
+_DEDUP_WINDOW_MS: int = 1500  # same-value events within this window are collapsed
+_DEFAULT_INTERVAL_MS: float = 3000.0  # assumed rep interval when there is no history
+_GAP_THRESHOLD_FACTOR: float = 0.5  # generous: gaps >= 50 % of expected trigger fill
+_PACE_TOO_FAST: float = 0.8  # avg < cadence × this → too fast (±20 % band)
+_PACE_TOO_SLOW: float = 1.2  # avg > cadence × this → too slow
+_TREND_SLOWING: float = 1.15  # second-half avg > first-half × this → slowing down
+_TREND_SPEEDING: float = 0.85  # second-half avg < first-half × this → speeding up
+_TARGET_INCREMENT: int = 2  # reps added to target when recommending more volume
+
+
 def interpolate_missing_reps(
     events: list[dict],
     session_start_ms: int | None = None,
@@ -187,7 +198,7 @@ def interpolate_missing_reps(
         if (
             deduped
             and deduped[-1]["value"] == ev["value"]
-            and ev["timestamp_ms"] - deduped[-1]["timestamp_ms"] <= 1500
+            and ev["timestamp_ms"] - deduped[-1]["timestamp_ms"] <= _DEDUP_WINDOW_MS
         ):
             deduped[-1] = ev  # keep the later occurrence
         else:
@@ -201,7 +212,7 @@ def interpolate_missing_reps(
         deduped[i + 1]["timestamp_ms"] - deduped[i]["timestamp_ms"]
         for i in range(len(deduped) - 1)
     ]
-    median_ms: float = _median(intervals_ms) if intervals_ms else 3000.0
+    median_ms: float = _median(intervals_ms) if intervals_ms else _DEFAULT_INTERVAL_MS
 
     def _make_synthetic(value: int, timestamp_ms: int) -> dict:
         return {
@@ -219,7 +230,7 @@ def interpolate_missing_reps(
     missing_before = first["value"] - 1
     if missing_before > 0 and session_start_ms is not None:
         available_ms = first["timestamp_ms"] - session_start_ms
-        if available_ms >= missing_before * median_ms * 0.5:
+        if available_ms >= missing_before * median_ms * _GAP_THRESHOLD_FACTOR:
             step = available_ms / (missing_before + 1)
             for i, num in enumerate(range(1, first["value"]), start=1):
                 result.append(_make_synthetic(num, session_start_ms + int(step * i)))
@@ -235,7 +246,7 @@ def interpolate_missing_reps(
             missing = nxt["value"] - ev["value"] - 1
             if missing > 0:
                 gap_ms = nxt["timestamp_ms"] - ev["timestamp_ms"]
-                if gap_ms >= missing * median_ms * 0.5:
+                if gap_ms >= missing * median_ms * _GAP_THRESHOLD_FACTOR:
                     step = gap_ms / (missing + 1)
                     for j, num in enumerate(range(ev["value"] + 1, nxt["value"]), start=1):
                         result.append(_make_synthetic(num, ev["timestamp_ms"] + int(step * j)))
@@ -290,9 +301,9 @@ def evaluate_set_performance(
     expected = cadence_total_rep_time_sec
 
     # Pace classification (±20 % tolerance)
-    if avg_interval_sec < expected * 0.8:
+    if avg_interval_sec < expected * _PACE_TOO_FAST:
         pace_label = "too_fast"
-    elif avg_interval_sec > expected * 1.2:
+    elif avg_interval_sec > expected * _PACE_TOO_SLOW:
         pace_label = "too_slow"
     else:
         pace_label = "on_track"
@@ -302,9 +313,9 @@ def evaluate_set_performance(
         mid = len(intervals_ms) // 2
         first_avg = sum(intervals_ms[:mid]) / mid
         second_avg = sum(intervals_ms[mid:]) / (len(intervals_ms) - mid)
-        if second_avg > first_avg * 1.15:
+        if second_avg > first_avg * _TREND_SLOWING:
             trend_label = "slowing_down"
-        elif second_avg < first_avg * 0.85:
+        elif second_avg < first_avg * _TREND_SPEEDING:
             trend_label = "speeding_up"
         else:
             trend_label = "steady"
@@ -331,7 +342,7 @@ def evaluate_set_performance(
     elif trend_label == "speeding_up":
         recommendation = "Výborně! Zrychlení v průběhu série je skvělý znak síly."
     else:
-        next_target = (target_reps + 2) if target_reps else None
+        next_target = (target_reps + _TARGET_INCREMENT) if target_reps else None
         if next_target:
             recommendation = (
                 f"Skvělé a rovnoměrné tempo! Příště zkus {next_target} opakování."
