@@ -76,16 +76,22 @@ function IntervalSparkline({ intervalsMs, cadenceMs }) {
   const innerW = VW - PAD.left - PAD.right;
   const innerH = VH - PAD.top - PAD.bottom;
 
+  // Rep 1 has no preceding interval. Prepend the median so the first rep
+  // shows on the X axis instead of being missing from the chart.
+  const sortedIntervals = [...intervalsMs].sort((a, b) => a - b);
+  const medianMs = sortedIntervals[Math.floor(sortedIntervals.length / 2)];
+  const displayValues = [medianMs, ...intervalsMs];
+
   const maxVal = cadenceMs != null
-    ? Math.max(...intervalsMs, cadenceMs * 1.3)
-    : Math.max(...intervalsMs);
+    ? Math.max(...displayValues, cadenceMs * 1.3)
+    : Math.max(...displayValues);
   const minVal = 0;
   const span = maxVal - minVal || 1;
 
-  const toX = (i) => PAD.left + (i / Math.max(intervalsMs.length - 1, 1)) * innerW;
+  const toX = (i) => PAD.left + (i / Math.max(displayValues.length - 1, 1)) * innerW;
   const toY = (v) => PAD.top + innerH - ((v - minVal) / span) * innerH;
 
-  const pts = intervalsMs.map((v, i) => `${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
+  const pts = displayValues.map((v, i) => `${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
   const cadenceY = cadenceMs != null ? toY(cadenceMs) : null;
 
   return (
@@ -106,18 +112,99 @@ function IntervalSparkline({ intervalsMs, cadenceMs }) {
           </text>
         </>
       )}
-      {intervalsMs.length > 1 && (
+      {displayValues.length > 1 && (
         <polyline points={pts} fill="none" stroke="#1677ff" strokeWidth="2.5" strokeLinejoin="round" />
       )}
-      {intervalsMs.map((v, i) => (
+      {displayValues.map((v, i) => (
         <g key={i}>
           <circle cx={toX(i)} cy={toY(v)} r="4" fill="#1677ff" />
-          <text x={toX(i)} y={VH - 6} textAnchor="middle" fontSize="11" fill="#888">{i + 2}</text>
+          <text x={toX(i)} y={VH - 6} textAnchor="middle" fontSize="11" fill="#888">{i + 1}</text>
         </g>
       ))}
       <text x={0} y={PAD.top + innerH / 2} fontSize="11" fill="#888"
         transform={`rotate(-90,8,${PAD.top + innerH / 2})`} textAnchor="middle">s</text>
     </svg>
+  );
+}
+
+function CompletedSetCard({ set, levelInfo, cadenceMs }) {
+  const { setNumber, rawEventCount, correctedTotalReps, durationSec, intervalsMs, evaluation } = set;
+  const totalReps = correctedTotalReps ?? rawEventCount;
+  const targetReps = levelInfo?.target_reps ?? null;
+  const isCompleted = evaluation?.is_completed === true;
+  const notEnough = !isCompleted && targetReps != null && totalReps < targetReps;
+  const avgIntervalSec = evaluation?.avg_interval_sec != null
+    ? evaluation.avg_interval_sec
+    : intervalsMs.length > 0
+      ? intervalsMs.reduce((a, b) => a + b, 0) / intervalsMs.length / 1000
+      : null;
+
+  return (
+    <Card
+      size="small"
+      data-testid="evaluation-card"
+      title={
+        <Space wrap>
+          <Text strong>Série {setNumber}:</Text>
+          {isCompleted ? (
+            <Tag color="green" data-testid="done-badge">Hotovo</Tag>
+          ) : (
+            <>
+              {notEnough && (
+                <Tag color="orange" data-testid="not-enough-badge">
+                  Málo opakování
+                </Tag>
+              )}
+              {evaluation?.pace_label && evaluation.pace_label !== 'on_track' && (
+                <Tag color={PACE_LABELS[evaluation.pace_label]?.color}>
+                  {PACE_LABELS[evaluation.pace_label]?.text ?? evaluation.pace_label}
+                </Tag>
+              )}
+              {evaluation?.trend_label && evaluation.trend_label !== 'steady' && (
+                <Tag color={TREND_LABELS[evaluation.trend_label]?.color}>
+                  {TREND_LABELS[evaluation.trend_label]?.text ?? evaluation.trend_label}
+                </Tag>
+              )}
+            </>
+          )}
+        </Space>
+      }
+    >
+      <Space direction="vertical" size={12} style={{ width: '100%' }}>
+        <Row gutter={16} justify="space-between" style={{ width: '100%' }}>
+          <Col>
+            <Statistic
+              title="Čas"
+              value={`${Math.floor(durationSec / 60)}:${String(durationSec % 60).padStart(2, '0')}`}
+            />
+          </Col>
+          <Col>
+            <Statistic title="Opakování" value={totalReps} />
+          </Col>
+          {avgIntervalSec != null && (
+            <Col>
+              <Statistic
+                title="Prům. interval"
+                value={`${avgIntervalSec.toFixed(1)} s`}
+              />
+            </Col>
+          )}
+        </Row>
+
+        {correctedTotalReps != null && correctedTotalReps !== rawEventCount && (
+          <Text data-testid="rep-correction-notice">
+            Rozpoznáno {rawEventCount} čísel, odhadnutý počet:{' '}
+            <Text strong>{correctedTotalReps}</Text>
+          </Text>
+        )}
+
+        {evaluation?.recommendation && <Text>{evaluation.recommendation}</Text>}
+
+        {evaluation && (
+          <IntervalSparkline intervalsMs={intervalsMs} cadenceMs={cadenceMs} />
+        )}
+      </Space>
+    </Card>
   );
 }
 
@@ -256,8 +343,10 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
   const [saveError, setSaveError] = useState(null);
   const [restActive, setRestActive] = useState(false);
   const [micError, setMicError] = useState('');
-  const [evaluation, setEvaluation] = useState(null);
-  const [correctedTotalReps, setCorrectedTotalReps] = useState(null);
+  // Each entry: { setNumber, rawEventCount, correctedTotalReps, durationSec,
+  // intervalsMs, evaluation }. Appended in stopSet, never cleared during the
+  // session so the user can scroll back through every series they finished.
+  const [completedSets, setCompletedSets] = useState([]);
 
   const processedTokenCountRef = useRef(0);
   const previousEventRef = useRef(null);
@@ -354,8 +443,6 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
     setMicError('');
     setSaveError(null);
     setEvents([]);
-    setEvaluation(null);
-    setCorrectedTotalReps(null);
     processedTokenCountRef.current = 0;
     previousEventRef.current = null;
     resetElapsed();
@@ -403,10 +490,12 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
       set_number: setNumber,
     };
 
+    let evaluation = null;
+    let correctedTotalReps = null;
     try {
       const result = await postWorkoutSession(payload);
-      if (result?.evaluation != null) setEvaluation(result.evaluation);
-      if (result?.total_reps != null) setCorrectedTotalReps(result.total_reps);
+      if (result?.evaluation != null) evaluation = result.evaluation;
+      if (result?.total_reps != null) correctedTotalReps = result.total_reps;
       const freshDetail = await getExerciseDetail(exerciseName);
       setDetail(freshDetail);
     } catch {
@@ -414,6 +503,18 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
     } finally {
       setSaving(false);
     }
+
+    setCompletedSets((prev) => [
+      ...prev,
+      {
+        setNumber,
+        rawEventCount: currentEvents.length,
+        correctedTotalReps,
+        durationSec: elapsed,
+        intervalsMs: stats.intervalsMs,
+        evaluation,
+      },
+    ]);
 
     resetRest(restSeconds);
     if ((levelInfo?.target_sets ?? 1) > 1) {
@@ -435,7 +536,6 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
 
   const liveCount = events.length;
   const currentNumber = events.length > 0 ? events[events.length - 1].value : null;
-  const summary = useMemo(() => computeSessionStats(events), [events]);
 
   const microphoneError =
     sessionState === 'listening' && isMicrophoneAvailable === false
@@ -494,15 +594,10 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
         size="small"
         title={
           <Space>
-            <Text strong>Série {setNumber}</Text>
+            <Text strong>Voice counting</Text>
             {sessionState === 'listening' && (
               <Tag color="green" data-testid="listening-badge">
                 Naslouchám
-              </Tag>
-            )}
-            {sessionState === 'stopped' && (
-              <Tag color="blue" data-testid="done-badge">
-                Hotovo
               </Tag>
             )}
           </Space>
@@ -521,7 +616,7 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
           {saveError && <Alert type="warning" showIcon message={saveError} />}
 
           {/* Live stats – only shown while the set is running */}
-          {sessionState !== 'stopped' && (
+          {sessionState === 'listening' && (
             <Row gutter={16} data-testid="live-stats">
               <Col>
                 <Statistic title="Opakování" value={liveCount} />
@@ -577,86 +672,20 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
             )}
           </Space>
 
-          {/* Unified set result card */}
-          {sessionState === 'stopped' && (() => {
-            const totalReps = correctedTotalReps ?? summary.count;
-            const targetReps = levelInfo?.target_reps ?? null;
-            const done = targetReps != null && totalReps >= targetReps;
-            const avgIntervalSec = evaluation?.avg_interval_sec != null
-              ? evaluation.avg_interval_sec
-              : summary.intervalsMs.length > 0
-                ? summary.intervalsMs.reduce((a, b) => a + b, 0) / summary.intervalsMs.length / 1000
-                : null;
-
-            return (
-              <Card
-                size="small"
-                data-testid="evaluation-card"
-                title={
-                  <Space wrap>
-                    <Text strong>Série {setNumber}:</Text>
-                    {done && <Tag color="green">Hotovo</Tag>}
-                    {evaluation?.pace_label && evaluation.pace_label !== 'on_track' && (
-                      <Tag color={PACE_LABELS[evaluation.pace_label]?.color}>
-                        {PACE_LABELS[evaluation.pace_label]?.text ?? evaluation.pace_label}
-                      </Tag>
-                    )}
-                    {evaluation?.trend_label && evaluation.trend_label !== 'steady' && (
-                      <Tag color={TREND_LABELS[evaluation.trend_label]?.color}>
-                        {TREND_LABELS[evaluation.trend_label]?.text ?? evaluation.trend_label}
-                      </Tag>
-                    )}
-                  </Space>
-                }
-              >
-                <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                  {/* Stats row */}
-                  <Row gutter={16}>
-                    <Col>
-                      <Statistic
-                        title="Čas"
-                        value={`${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`}
-                      />
-                    </Col>
-                    <Col>
-                      <Statistic title="Opakování" value={totalReps} />
-                    </Col>
-                    {avgIntervalSec != null && (
-                      <Col>
-                        <Statistic
-                          title="Prům. interval"
-                          value={`${avgIntervalSec.toFixed(1)} s`}
-                        />
-                      </Col>
-                    )}
-                  </Row>
-
-                  {/* Rep correction notice */}
-                  {correctedTotalReps != null && correctedTotalReps !== events.length && (
-                    <Text data-testid="rep-correction-notice">
-                      Rozpoznáno {events.length} čísel, odhadnutý počet:{' '}
-                      <Text strong>{correctedTotalReps}</Text>
-                    </Text>
-                  )}
-
-                  {/* Recommendation */}
-                  {evaluation?.recommendation && (
-                    <Text>{evaluation.recommendation}</Text>
-                  )}
-
-                  {/* Sparkline */}
-                  {evaluation && (
-                    <IntervalSparkline
-                      intervalsMs={summary.intervalsMs}
-                      cadenceMs={detail?.cadence?.total_rep_time_sec != null
-                        ? detail.cadence.total_rep_time_sec * 1000
-                        : null}
-                    />
-                  )}
-                </Space>
-              </Card>
-            );
-          })()}
+          {/* All completed sets, newest first (e.g. 3, 2, 1) */}
+          {completedSets
+            .slice()
+            .reverse()
+            .map((set) => (
+              <CompletedSetCard
+                key={set.setNumber}
+                set={set}
+                levelInfo={levelInfo}
+                cadenceMs={detail?.cadence?.total_rep_time_sec != null
+                  ? detail.cadence.total_rep_time_sec * 1000
+                  : null}
+              />
+            ))}
 
           {/* Rest timer – only when target_sets > 1 */}
           {levelInfo?.target_sets > 1 && restActive && restRemaining > 0 && (

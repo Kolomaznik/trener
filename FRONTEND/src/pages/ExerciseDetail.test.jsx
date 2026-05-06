@@ -396,12 +396,15 @@ describe('ExerciseDetail page', () => {
 
   // ── Workout counting frame ─────────────────────────────────────────────────
 
-  it('shows Start série button and live stats initially', async () => {
+  it('shows only Start série button initially; live stats appear after start', async () => {
     renderWithRouter();
     await screen.findByText('Kliky o zeď');
 
     expect(screen.getByRole('button', { name: /Start série/ })).toBeInTheDocument();
-    expect(screen.getByTestId('live-stats')).toBeInTheDocument();
+    expect(screen.queryByTestId('live-stats')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Start série/ }));
+    await waitFor(() => expect(screen.getByTestId('live-stats')).toBeInTheDocument());
   });
 
   it('hides live stats after set is stopped', async () => {
