@@ -15,13 +15,17 @@ import { getExercises } from '../api/exercises/get_list.js';
 
 const { Title, Paragraph, Text } = Typography;
 
-function plainTextFromMarkdown(md) {
-  return md
-    .replace(/^#{1,6}\s+.+$/gm, '')
-    .replace(/\*\*?(.+?)\*\*?/g, '$1')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+const LEVEL_LABELS = {
+  beginner: 'Začátečník',
+  intermediate: 'Středně pokročilý',
+  mastery: 'Mistr',
+};
+
+const LEVEL_COLORS = {
+  beginner: 'default',
+  intermediate: 'blue',
+  mastery: 'gold',
+};
 
 export default function Exercises() {
   const navigate = useNavigate();
@@ -91,7 +95,6 @@ export default function Exercises() {
 }
 
 function ExerciseTile({ item, onClick }) {
-  const previewText = plainTextFromMarkdown(item.description ?? '');
   return (
     <Card
       hoverable
@@ -105,16 +108,15 @@ function ExerciseTile({ item, onClick }) {
         <Space size={4} wrap>
           <Tag color="blue">{item.family}</Tag>
           <Tag>Level {item.level}</Tag>
+          {item.user_level && (
+            <Tag color={LEVEL_COLORS[item.user_level] ?? 'default'}>
+              {LEVEL_LABELS[item.user_level] ?? 'Neznámá úroveň'}
+            </Tag>
+          )}
         </Space>
         <Title level={4} style={{ margin: 0 }}>
           {item.title}
         </Title>
-        <Paragraph
-          style={{ marginBottom: 0 }}
-          ellipsis={{ rows: 3, expandable: false, tooltip: previewText }}
-        >
-          {previewText}
-        </Paragraph>
         {item.next_exercise_name ? (
           <Text type="secondary" style={{ fontSize: 12 }}>
             Další úroveň: {item.next_exercise_title}

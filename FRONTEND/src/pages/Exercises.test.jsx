@@ -15,7 +15,7 @@ const listFixture = [
     title: 'Kliky o zeď',
     family: 'Kliky',
     level: 1,
-    description: 'Rehabilitační a přípravný cvik.',
+    user_level: 'intermediate',
     next_exercise_name: 'pushups_level_2',
     next_exercise_title: 'Kliky v předklonu',
   },
@@ -24,7 +24,7 @@ const listFixture = [
     title: 'Kliky v předklonu',
     family: 'Kliky',
     level: 2,
-    description: 'Náročnější varianta.',
+    user_level: null,
     next_exercise_name: null,
     next_exercise_title: null,
   },
@@ -55,6 +55,12 @@ describe('Exercises page (tile grid)', () => {
     expect(screen.getByText('Kliky v předklonu')).toBeInTheDocument();
     expect(screen.getAllByText('Kliky').length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText(/Level \d/).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('shows user level tag when user_level is set', async () => {
+    renderWithRouter();
+
+    expect(await screen.findByText('Středně pokročilý')).toBeInTheDocument();
   });
 
   it('shows "next level" hint on tiles that have one, "highest" otherwise', async () => {
