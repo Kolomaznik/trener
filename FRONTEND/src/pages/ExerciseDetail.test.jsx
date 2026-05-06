@@ -10,18 +10,34 @@ vi.mock('../api/workout-sessions/post.js', () => ({
   postWorkoutSession: vi.fn(),
 }));
 
-vi.mock('react-speech-recognition', () => ({
-  default: { startListening: vi.fn(), stopListening: vi.fn() },
-  useSpeechRecognition: () => ({
+vi.mock('react-speech-recognition', () => {
+  const initialState = {
     transcript: '',
     listening: false,
     browserSupportsSpeechRecognition: true,
     isMicrophoneAvailable: true,
-    resetTranscript: vi.fn(),
-  }),
-}));
+  };
+  let state = { ...initialState };
+  const startListening = vi.fn(async () => { state = { ...state, listening: true }; });
+  const stopListening = vi.fn(async () => { state = { ...state, listening: false }; });
+  const resetTranscript = vi.fn(() => { state = { ...state, transcript: '' }; });
+  const resetMock = () => {
+    state = { ...initialState };
+    startListening.mockClear();
+    stopListening.mockClear();
+    resetTranscript.mockClear();
+  };
+  return {
+    default: { startListening, stopListening },
+    useSpeechRecognition: () => ({ ...state, resetTranscript }),
+    __resetMockState: resetMock,
+    __mocks: { startListening, stopListening },
+  };
+});
 
 import { getExerciseDetail } from '../api/exercises/get_detail.js';
+import { postWorkoutSession } from '../api/workout-sessions/post.js';
+import * as speechModule from 'react-speech-recognition';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -116,7 +132,6 @@ function renderWithRouter(initialPath = '/exercises/pushups_level_1') {
       <Routes>
         <Route path="/exercises" element={<div data-testid="list-marker" />} />
         <Route path="/exercises/:name" element={<ExerciseDetail />} />
-        <Route path="/exercises/:name/workout" element={<div data-testid="workout-marker" />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -126,8 +141,11 @@ function renderWithRouter(initialPath = '/exercises/pushups_level_1') {
 
 describe('ExerciseDetail page', () => {
   beforeEach(() => {
+    speechModule.__resetMockState();
     getExerciseDetail.mockReset();
+    postWorkoutSession.mockReset();
     getExerciseDetail.mockResolvedValue(detailFixture);
+    postWorkoutSession.mockResolvedValue({ id: 'sess-1', total_reps: 0, evaluation: null });
   });
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -374,5 +392,63 @@ describe('ExerciseDetail page', () => {
     renderWithRouter('/exercises/neexistuje');
 
     expect(await screen.findByText('Cvik nebyl nalezen.')).toBeInTheDocument();
+  });
+
+  // ── Workout counting frame ─────────────────────────────────────────────────
+
+  it('shows Start série button and live stats initially', async () => {
+    renderWithRouter();
+    await screen.findByText('Kliky o zeď');
+
+    expect(screen.getByRole('button', { name: /Start série/ })).toBeInTheDocument();
+    expect(screen.getByTestId('live-stats')).toBeInTheDocument();
+  });
+
+  it('hides live stats after set is stopped', async () => {
+    renderWithRouter();
+    await screen.findByText('Kliky o zeď');
+
+    fireEvent.click(screen.getByRole('button', { name: /Start série/ }));
+    await waitFor(() => screen.getByRole('button', { name: /Konec série/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Konec série/ }));
+
+    await waitFor(() => expect(postWorkoutSession).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId('live-stats')).not.toBeInTheDocument();
+  });
+
+  it('shows evaluation card when backend returns evaluation', async () => {
+    postWorkoutSession.mockResolvedValue({
+      id: 'sess-1',
+      total_reps: 10,
+      evaluation: {
+        pace_label: 'on_track',
+        trend_label: 'steady',
+        avg_interval_sec: 5.9,
+        recommendation: 'Výborné tempo! Pokračuj.',
+      },
+    });
+    renderWithRouter();
+    await screen.findByText('Kliky o zeď');
+
+    fireEvent.click(screen.getByRole('button', { name: /Start série/ }));
+    await waitFor(() => screen.getByRole('button', { name: /Konec série/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Konec série/ }));
+
+    await waitFor(() => expect(screen.getByTestId('evaluation-card')).toBeInTheDocument());
+    expect(screen.getByText('V tempu')).toBeInTheDocument();
+    expect(screen.getByText('Stabilní')).toBeInTheDocument();
+    expect(screen.getByText('Výborné tempo! Pokračuj.')).toBeInTheDocument();
+  });
+
+  it('does not show rest timer when target_sets is 1', async () => {
+    renderWithRouter(); // detailFixture has target_sets: 1
+
+    await screen.findByText('Kliky o zeď');
+    fireEvent.click(screen.getByRole('button', { name: /Start série/ }));
+    await waitFor(() => screen.getByRole('button', { name: /Konec série/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Konec série/ }));
+
+    await waitFor(() => expect(postWorkoutSession).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId('rest-timer')).not.toBeInTheDocument();
   });
 });
