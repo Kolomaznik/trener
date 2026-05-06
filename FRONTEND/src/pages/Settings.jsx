@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Avatar,
+  Card,
+  Col,
   Descriptions,
   Form,
   InputNumber,
   Radio,
+  Row,
   Space,
   Spin,
   Typography,
@@ -16,6 +19,18 @@ import { updateUserSettings } from '../api/updateUserSettings.js';
 
 const { Title, Text } = Typography;
 const DEBOUNCE_MS = 500;
+
+const unitLabelStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '0 11px',
+  background: 'rgba(0,0,0,0.02)',
+  border: '1px solid #d9d9d9',
+  borderLeft: 0,
+  borderRadius: '0 6px 6px 0',
+  color: 'rgba(0,0,0,0.45)',
+  whiteSpace: 'nowrap',
+};
 
 function SaveStatus({ status }) {
   if (status === 'saving') {
@@ -99,7 +114,7 @@ export default function Settings() {
     userSettings.birth_year != null ? currentYear - userSettings.birth_year : null;
 
   return (
-    <Typography>
+    <Typography style={{ maxWidth: 680 }}>
       <Title level={2}>Nastavení profilu</Title>
 
       {incomplete && (
@@ -133,80 +148,101 @@ export default function Settings() {
         ]}
       />
 
-      <Form layout="vertical">
-        <Form.Item
-          label={
-            <Space>
-              <span>Pohlaví</span>
-              <SaveStatus status={statuses.gender} />
-            </Space>
-          }
-          required
-        >
-          <Radio.Group
-            value={userSettings.gender ?? undefined}
-            onChange={(event) => patchImmediate('gender', event.target.value)}
+      <Card title="Fyzické údaje">
+        <Form layout="vertical">
+          <Form.Item
+            label={
+              <Space>
+                <span>Pohlaví</span>
+                <SaveStatus status={statuses.gender} />
+              </Space>
+            }
+            extra="Využíváme pro výpočet svalové zátěže při cvičení."
+            required
           >
-            <Radio.Button value="male">Muž</Radio.Button>
-            <Radio.Button value="female">Žena</Radio.Button>
-          </Radio.Group>
-        </Form.Item>
+            <Radio.Group
+              value={userSettings.gender ?? undefined}
+              onChange={(event) => patchImmediate('gender', event.target.value)}
+              buttonStyle="solid"
+              size="large"
+            >
+              <Radio.Button value="male">Muž</Radio.Button>
+              <Radio.Button value="female">Žena</Radio.Button>
+            </Radio.Group>
+          </Form.Item>
 
-        <Form.Item
-          label={
-            <Space>
-              <span>Výška</span>
-              <SaveStatus status={statuses.height_cm} />
-            </Space>
-          }
-          required
-        >
-          <InputNumber
-            value={userSettings.height_cm ?? null}
-            min={50}
-            max={250}
-            addonAfter="cm"
-            onChange={(value) => patchDebounced('height_cm', value)}
-          />
-        </Form.Item>
+          <Row gutter={24}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label={
+                  <Space>
+                    <span>Výška</span>
+                    <SaveStatus status={statuses.height_cm} />
+                  </Space>
+                }
+                required
+              >
+                <Space.Compact style={{ width: '100%' }}>
+                  <InputNumber
+                    value={userSettings.height_cm ?? null}
+                    min={50}
+                    max={250}
+                    style={{ width: '100%' }}
+                    onChange={(value) => patchDebounced('height_cm', value)}
+                  />
+                  <span style={unitLabelStyle}>
+                    cm
+                  </span>
+                </Space.Compact>
+              </Form.Item>
+            </Col>
 
-        <Form.Item
-          label={
-            <Space>
-              <span>Hmotnost</span>
-              <SaveStatus status={statuses.weight_kg} />
-            </Space>
-          }
-          required
-        >
-          <InputNumber
-            value={userSettings.weight_kg ?? null}
-            min={20}
-            max={300}
-            step={0.1}
-            addonAfter="kg"
-            onChange={(value) => patchDebounced('weight_kg', value)}
-          />
-        </Form.Item>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label={
+                  <Space>
+                    <span>Hmotnost</span>
+                    <SaveStatus status={statuses.weight_kg} />
+                  </Space>
+                }
+                required
+              >
+                <Space.Compact style={{ width: '100%' }}>
+                  <InputNumber
+                    value={userSettings.weight_kg ?? null}
+                    min={20}
+                    max={300}
+                    step={0.1}
+                    style={{ width: '100%' }}
+                    onChange={(value) => patchDebounced('weight_kg', value)}
+                  />
+                  <span style={unitLabelStyle}>
+                    kg
+                  </span>
+                </Space.Compact>
+              </Form.Item>
+            </Col>
+          </Row>
 
-        <Form.Item
-          label={
-            <Space>
-              <span>Rok narození</span>
-              <SaveStatus status={statuses.birth_year} />
-            </Space>
-          }
-          required
-          extra={computedAge != null ? `Aktuální věk: ${computedAge} let` : null}
-        >
-          <InputNumber
-            value={userSettings.birth_year ?? null}
-            min={1900}
-            max={currentYear}
-            onChange={(value) => patchDebounced('birth_year', value)}
-          />
-        </Form.Item>
-      </Form>
+          <Form.Item
+            label={
+              <Space>
+                <span>Rok narození</span>
+                <SaveStatus status={statuses.birth_year} />
+              </Space>
+            }
+            required
+            extra={computedAge != null ? `Aktuální věk: ${computedAge} let` : null}
+          >
+            <InputNumber
+              value={userSettings.birth_year ?? null}
+              min={1900}
+              max={currentYear}
+              onChange={(value) => patchDebounced('birth_year', value)}
+            />
+          </Form.Item>
+        </Form>
+      </Card>
     </Typography>
   );
 }
