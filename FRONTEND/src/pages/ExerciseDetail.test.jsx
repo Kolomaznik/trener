@@ -440,15 +440,17 @@ describe('ExerciseDetail page', () => {
     expect(screen.getByText('Výborné tempo! Pokračuj.')).toBeInTheDocument();
   });
 
-  it('does not show rest timer when target_sets is 1', async () => {
-    renderWithRouter(); // detailFixture has target_sets: 1
-
+  it('shows Start série button again after counting stops', async () => {
+    renderWithRouter();
     await screen.findByText('Kliky o zeď');
+
     fireEvent.click(screen.getByRole('button', { name: /Start série/ }));
     await waitFor(() => screen.getByRole('button', { name: /Konec série/ }));
     fireEvent.click(screen.getByRole('button', { name: /Konec série/ }));
 
     await waitFor(() => expect(postWorkoutSession).toHaveBeenCalledTimes(1));
-    expect(screen.queryByTestId('rest-timer')).not.toBeInTheDocument();
+    // Start série button should be visible again
+    expect(screen.getByRole('button', { name: /Start série/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Konec série/ })).not.toBeInTheDocument();
   });
 });

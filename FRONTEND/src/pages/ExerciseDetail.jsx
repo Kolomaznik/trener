@@ -417,13 +417,21 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
     }
 
     resetRest(restSeconds);
-    setRestActive(true);
+    if ((levelInfo?.target_sets ?? 1) > 1) {
+      setRestActive(true);
+    }
   };
 
   const startNextSet = () => {
     setSetNumber((prev) => prev + 1);
     setRestActive(false);
     setSessionState('idle');
+  };
+
+  const startNextSerieNow = async () => {
+    setSetNumber((prev) => prev + 1);
+    setRestActive(false);
+    await startSet();
   };
 
   const liveCount = events.length;
@@ -560,11 +568,12 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
               <Button
                 type="primary"
                 icon={<PlayCircleOutlined />}
-                onClick={startNextSet}
+                onClick={startNextSerieNow}
                 loading={saving}
+                disabled={!browserSupportsSpeechRecognition}
                 size="large"
               >
-                Další série
+                Start série
               </Button>
             )}
           </Space>
@@ -646,7 +655,7 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
                   title="Zbývá odpočinku"
                   value={`${Math.floor(restRemaining / 60)}:${String(restRemaining % 60).padStart(2, '0')}`}
                 />
-                <Button onClick={startNextSet}>Přeskočit odpočinek → Další série</Button>
+                <Button onClick={startNextSerieNow}>Přeskočit odpočinek → Start série</Button>
               </Space>
             </Card>
           )}
@@ -657,8 +666,8 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
               showIcon
               message="Odpočinek skončil!"
               action={
-                <Button size="small" type="primary" onClick={startNextSet}>
-                  Další série
+                <Button size="small" type="primary" onClick={startNextSerieNow}>
+                  Start série
                 </Button>
               }
             />
