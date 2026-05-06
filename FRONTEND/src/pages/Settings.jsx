@@ -4,7 +4,6 @@ import {
   Avatar,
   Card,
   Col,
-  Descriptions,
   Form,
   InputNumber,
   Radio,
@@ -13,7 +12,12 @@ import {
   Spin,
   Typography,
 } from 'antd';
-import { CheckCircleTwoTone, CloseCircleTwoTone, LoadingOutlined } from '@ant-design/icons';
+import {
+  CheckCircleTwoTone,
+  CloseCircleTwoTone,
+  LoadingOutlined,
+  LockOutlined,
+} from '@ant-design/icons';
 import { isProfileComplete, useUserSettings } from '../context/UserSettingsContext.jsx';
 import { patchUserSettings } from '../api/user/settings/patch.js';
 
@@ -126,27 +130,32 @@ export default function Settings() {
         />
       )}
 
-      <Descriptions
-        bordered
-        column={1}
-        size="small"
+      <Card
+        title={
+          <Space>
+            <LockOutlined />
+            <span>Účet Google</span>
+          </Space>
+        }
         style={{ marginBottom: 24 }}
-        items={[
-          {
-            key: 'avatar',
-            label: 'Avatar',
-            children: (
-              <Avatar
-                size={64}
-                src={userSettings.picture}
-                alt={userSettings.name ?? userSettings.email}
-              />
-            ),
-          },
-          { key: 'name', label: 'Jméno', children: userSettings.name ?? '—' },
-          { key: 'email', label: 'E-mail', children: userSettings.email },
-        ]}
-      />
+      >
+        <Space align="center" style={{ marginBottom: 12 }}>
+          <Avatar
+            size={64}
+            src={userSettings.picture}
+            alt={userSettings.name ?? userSettings.email}
+          />
+          <div>
+            <div style={{ fontWeight: 500 }}>{userSettings.name ?? '—'}</div>
+            <div style={{ color: 'rgba(0,0,0,0.45)' }}>{userSettings.email}</div>
+          </div>
+        </Space>
+        <div>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Tyto údaje jsou spravovány přes váš Google účet a nelze je zde změnit.
+          </Text>
+        </div>
+      </Card>
 
       <Card title="Fyzické údaje">
         <Form layout="vertical">
