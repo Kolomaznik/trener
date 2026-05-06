@@ -1,13 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.exercises import router as exercises_router
-from app.api.health import router as health_router
-from app.api.muscle_map import router as muscle_map_router
-from app.api.root import router as root_router
-from app.api.user_settings import router as user_settings_router
-from app.api.workout_sessions import router as workout_sessions_router
-from app.api.yearly_overview import router as yearly_overview_router
+from app.api.dashboard.get import router as dashboard_router
+from app.api.exercises.get_detail import router as exercises_detail_router
+from app.api.exercises.get_list import router as exercises_list_router
+from app.api.health.get import router as health_router
+from app.api.user.settings.get import router as user_settings_get_router
+from app.api.user.settings.patch import router as user_settings_patch_router
+from app.api.workout_sessions.post import router as workout_sessions_router
 from config import settings
 
 app = FastAPI(title=settings.app_name)
@@ -21,13 +21,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(root_router)
 app.include_router(health_router)
-app.include_router(user_settings_router)
-app.include_router(yearly_overview_router)
-app.include_router(muscle_map_router)
-app.include_router(exercises_router)
+app.include_router(dashboard_router)
+app.include_router(exercises_list_router)
+app.include_router(exercises_detail_router)
 app.include_router(workout_sessions_router)
+app.include_router(user_settings_get_router)
+app.include_router(user_settings_patch_router)
 
 
 def main() -> None:

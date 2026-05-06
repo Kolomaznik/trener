@@ -2,17 +2,17 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('./api/getUserSettings.js', () => ({
+vi.mock('./api/user/settings/get.js', () => ({
   getUserSettings: vi.fn(),
 }));
-vi.mock('./api/updateUserSettings.js', () => ({
-  updateUserSettings: vi.fn(),
+vi.mock('./api/user/settings/patch.js', () => ({
+  patchUserSettings: vi.fn(),
 }));
 vi.mock('./pages/Home.jsx', () => ({ default: () => <div>HOME PAGE</div> }));
 vi.mock('./pages/Exercises.jsx', () => ({ default: () => <div>EXERCISES PAGE</div> }));
 
 import App from './App.jsx';
-import { getUserSettings } from './api/getUserSettings.js';
+import { getUserSettings } from './api/user/settings/get.js';
 
 const STORAGE_KEY = 'trainer_google_auth_token';
 

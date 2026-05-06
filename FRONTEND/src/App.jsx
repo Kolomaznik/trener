@@ -3,7 +3,7 @@ import { Avatar, Button, Drawer, Grid, Layout, Menu, Spin, Typography } from 'an
 import { MenuOutlined, UserOutlined } from '@ant-design/icons';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { apiClient } from './api/client.js';
-import { getUserSettings } from './api/getUserSettings.js';
+import { getUserSettings } from './api/user/settings/get.js';
 import {
   UserSettingsContext,
   isProfileComplete,
@@ -271,8 +271,8 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/exercises" element={<Exercises />} />
-            <Route path="/exercises/:id" element={<ExerciseDetail />} />
-            <Route path="/exercises/:id/workout" element={<WorkoutSession />} />
+            <Route path="/exercises/:name" element={<ExerciseDetail />} />
+            <Route path="/exercises/:name/workout" element={<WorkoutSession />} />
             <Route path="/voice-counting" element={<VoiceCounting />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

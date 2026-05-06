@@ -25,6 +25,8 @@ for _stream in (sys.stdout, sys.stderr):
 
 ROOT = Path(__file__).resolve().parent
 MIGRATIONS_DIR = ROOT / "migrations"
+IMAGES_DIR = ROOT / "images"
+IMAGE_TARGET_WIDTH = 1024
 
 
 def _load_env() -> tuple[str, str]:
@@ -88,6 +90,30 @@ def cmd_new(args: argparse.Namespace) -> None:
     MigrationManager(config).create_migration()
 
 
+def cmd_convert_images(_args: argparse.Namespace) -> None:
+    from PIL import Image
+
+    if not IMAGES_DIR.is_dir():
+        sys.exit(f"Adresář {IMAGES_DIR} neexistuje.")
+
+    converted = 0
+    skipped = 0
+    for src in sorted(IMAGES_DIR.glob("*.png")):
+        dst = src.with_suffix(".webp")
+        if dst.exists():
+            skipped += 1
+            continue
+        with Image.open(src) as img:
+            width, height = img.size
+            if width > IMAGE_TARGET_WIDTH:
+                new_height = int(height * IMAGE_TARGET_WIDTH / width)
+                img = img.resize((IMAGE_TARGET_WIDTH, new_height), Image.LANCZOS)
+            img.save(dst, format="WEBP", quality=85, method=6)
+        print(f"  {src.name} ({src.stat().st_size:,} B) -> {dst.name} ({dst.stat().st_size:,} B)")
+        converted += 1
+    print(f"Konvertováno: {converted}, přeskočeno: {skipped}")
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="manage", description="Trener MongoDB migrations")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -111,6 +137,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_new.add_argument("category", choices=["schema", "seed", "transform"])
     p_new.add_argument("description", help="snake_case popis, pouze [_a-z]")
     p_new.set_defaults(func=cmd_new)
+
+    p_conv = sub.add_parser(
+        "convert-images",
+        help=f"převede PNG -> {IMAGE_TARGET_WIDTH}px WebP v images/ (přeskakuje již převedené)",
+    )
+    p_conv.set_defaults(func=cmd_convert_images)
 
     return parser
 

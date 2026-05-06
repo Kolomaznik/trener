@@ -12,7 +12,7 @@ import {
 } from 'antd';
 import { CheckCircleTwoTone, CloseCircleTwoTone, LoadingOutlined } from '@ant-design/icons';
 import { isProfileComplete, useUserSettings } from '../context/UserSettingsContext.jsx';
-import { updateUserSettings } from '../api/updateUserSettings.js';
+import { patchUserSettings } from '../api/user/settings/patch.js';
 
 const { Title, Text } = Typography;
 const DEBOUNCE_MS = 500;
@@ -68,8 +68,8 @@ export default function Settings() {
   const sendPatch = async (field, value) => {
     setFieldStatus(field, 'saving');
     try {
-      const updated = await updateUserSettings({ [field]: value });
-      setUserSettings(updated);
+      await patchUserSettings({ [field]: value });
+      setUserSettings((prev) => ({ ...prev, [field]: value }));
       setFieldStatus(field, 'saved');
     } catch {
       setFieldStatus(field, 'error');
