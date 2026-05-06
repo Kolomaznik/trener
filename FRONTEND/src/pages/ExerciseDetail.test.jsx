@@ -421,8 +421,8 @@ describe('ExerciseDetail page', () => {
       id: 'sess-1',
       total_reps: 10,
       evaluation: {
-        pace_label: 'on_track',
-        trend_label: 'steady',
+        pace_label: 'too_fast',
+        trend_label: 'slowing_down',
         avg_interval_sec: 5.9,
         recommendation: 'Výborné tempo! Pokračuj.',
       },
@@ -435,8 +435,8 @@ describe('ExerciseDetail page', () => {
     fireEvent.click(screen.getByRole('button', { name: /Konec série/ }));
 
     await waitFor(() => expect(screen.getByTestId('evaluation-card')).toBeInTheDocument());
-    expect(screen.getByText('V tempu')).toBeInTheDocument();
-    expect(screen.getByText('Stabilní')).toBeInTheDocument();
+    expect(screen.getByText('Příliš rychle')).toBeInTheDocument();
+    expect(screen.getByText('Zpomalující')).toBeInTheDocument();
     expect(screen.getByText('Výborné tempo! Pokračuj.')).toBeInTheDocument();
   });
 

@@ -70,11 +70,11 @@ const TREND_LABELS = {
 
 function IntervalSparkline({ intervalsMs, cadenceMs }) {
   if (!intervalsMs || intervalsMs.length < 1) return null;
-  const W = 300;
-  const H = 80;
-  const PAD = { top: 8, right: 12, bottom: 24, left: 36 };
-  const innerW = W - PAD.left - PAD.right;
-  const innerH = H - PAD.top - PAD.bottom;
+  const VW = 400;
+  const VH = 110;
+  const PAD = { top: 10, right: 16, bottom: 28, left: 40 };
+  const innerW = VW - PAD.left - PAD.right;
+  const innerH = VH - PAD.top - PAD.bottom;
 
   const maxVal = cadenceMs != null
     ? Math.max(...intervalsMs, cadenceMs * 1.3)
@@ -90,10 +90,9 @@ function IntervalSparkline({ intervalsMs, cadenceMs }) {
 
   return (
     <svg
-      width={W}
-      height={H}
+      viewBox={`0 0 ${VW} ${VH}`}
       aria-label="Průběh tempa"
-      style={{ display: 'block', marginTop: 8, overflow: 'visible' }}
+      style={{ display: 'block', width: '100%', marginTop: 8, overflow: 'visible' }}
     >
       {cadenceY != null && (
         <>
@@ -102,22 +101,22 @@ function IntervalSparkline({ intervalsMs, cadenceMs }) {
             x2={PAD.left + innerW} y2={cadenceY}
             stroke="#f5222d" strokeWidth="1.5" strokeDasharray="4 3"
           />
-          <text x={PAD.left + innerW + 2} y={cadenceY + 4} fontSize="9" fill="#f5222d">
+          <text x={PAD.left + innerW + 2} y={cadenceY + 4} fontSize="11" fill="#f5222d">
             {(cadenceMs / 1000).toFixed(0)}s
           </text>
         </>
       )}
       {intervalsMs.length > 1 && (
-        <polyline points={pts} fill="none" stroke="#1677ff" strokeWidth="2" strokeLinejoin="round" />
+        <polyline points={pts} fill="none" stroke="#1677ff" strokeWidth="2.5" strokeLinejoin="round" />
       )}
       {intervalsMs.map((v, i) => (
         <g key={i}>
-          <circle cx={toX(i)} cy={toY(v)} r="3" fill="#1677ff" />
-          <text x={toX(i)} y={H - 4} textAnchor="middle" fontSize="9" fill="#888">{i + 2}</text>
+          <circle cx={toX(i)} cy={toY(v)} r="4" fill="#1677ff" />
+          <text x={toX(i)} y={VH - 6} textAnchor="middle" fontSize="11" fill="#888">{i + 2}</text>
         </g>
       ))}
-      <text x={0} y={PAD.top + innerH / 2} fontSize="9" fill="#888"
-        transform={`rotate(-90,6,${PAD.top + innerH / 2})`} textAnchor="middle">s</text>
+      <text x={0} y={PAD.top + innerH / 2} fontSize="11" fill="#888"
+        transform={`rotate(-90,8,${PAD.top + innerH / 2})`} textAnchor="middle">s</text>
     </svg>
   );
 }
@@ -578,64 +577,86 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
             )}
           </Space>
 
-          {/* Set result summary */}
-          {sessionState === 'stopped' && (
-            <Descriptions size="small" bordered column={1}>
-              <Descriptions.Item label="Opakování">
-                {correctedTotalReps ?? summary.count}
-              </Descriptions.Item>
-              <Descriptions.Item label="Čas">
-                {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')}
-              </Descriptions.Item>
-              <Descriptions.Item label="Prům. interval">
-                {evaluation?.avg_interval_sec != null
-                  ? `${evaluation.avg_interval_sec.toFixed(1)} s`
-                  : summary.intervalsMs.length > 0
-                    ? `${(
-                        summary.intervalsMs.reduce((a, b) => a + b, 0) /
-                        summary.intervalsMs.length /
-                        1000
-                      ).toFixed(1)} s`
-                    : '—'}
-              </Descriptions.Item>
-            </Descriptions>
-          )}
+          {/* Unified set result card */}
+          {sessionState === 'stopped' && (() => {
+            const totalReps = correctedTotalReps ?? summary.count;
+            const targetReps = levelInfo?.target_reps ?? null;
+            const done = targetReps != null && totalReps >= targetReps;
+            const avgIntervalSec = evaluation?.avg_interval_sec != null
+              ? evaluation.avg_interval_sec
+              : summary.intervalsMs.length > 0
+                ? summary.intervalsMs.reduce((a, b) => a + b, 0) / summary.intervalsMs.length / 1000
+                : null;
 
-          {/* Evaluation card */}
-          {sessionState === 'stopped' &&
-            (evaluation != null ||
-              (correctedTotalReps != null && correctedTotalReps !== events.length)) && (
-              <Card size="small" title="Vyhodnocení série" data-testid="evaluation-card">
-                <Space direction="vertical" size={8} style={{ width: '100%' }}>
+            return (
+              <Card
+                size="small"
+                data-testid="evaluation-card"
+                title={
+                  <Space wrap>
+                    <Text strong>Série {setNumber}:</Text>
+                    {done && <Tag color="green">Hotovo</Tag>}
+                    {evaluation?.pace_label && evaluation.pace_label !== 'on_track' && (
+                      <Tag color={PACE_LABELS[evaluation.pace_label]?.color}>
+                        {PACE_LABELS[evaluation.pace_label]?.text ?? evaluation.pace_label}
+                      </Tag>
+                    )}
+                    {evaluation?.trend_label && evaluation.trend_label !== 'steady' && (
+                      <Tag color={TREND_LABELS[evaluation.trend_label]?.color}>
+                        {TREND_LABELS[evaluation.trend_label]?.text ?? evaluation.trend_label}
+                      </Tag>
+                    )}
+                  </Space>
+                }
+              >
+                <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                  {/* Stats row */}
+                  <Row gutter={16}>
+                    <Col>
+                      <Statistic
+                        title="Čas"
+                        value={`${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`}
+                      />
+                    </Col>
+                    <Col>
+                      <Statistic title="Opakování" value={totalReps} />
+                    </Col>
+                    {avgIntervalSec != null && (
+                      <Col>
+                        <Statistic
+                          title="Prům. interval"
+                          value={`${avgIntervalSec.toFixed(1)} s`}
+                        />
+                      </Col>
+                    )}
+                  </Row>
+
+                  {/* Rep correction notice */}
                   {correctedTotalReps != null && correctedTotalReps !== events.length && (
                     <Text data-testid="rep-correction-notice">
                       Rozpoznáno {events.length} čísel, odhadnutý počet:{' '}
                       <Text strong>{correctedTotalReps}</Text>
                     </Text>
                   )}
+
+                  {/* Recommendation */}
+                  {evaluation?.recommendation && (
+                    <Text>{evaluation.recommendation}</Text>
+                  )}
+
+                  {/* Sparkline */}
                   {evaluation && (
-                    <>
-                      <Space wrap>
-                        <Tag color={PACE_LABELS[evaluation.pace_label]?.color}>
-                          {PACE_LABELS[evaluation.pace_label]?.text ?? evaluation.pace_label}
-                        </Tag>
-                        <Tag color={TREND_LABELS[evaluation.trend_label]?.color}>
-                          {TREND_LABELS[evaluation.trend_label]?.text ?? evaluation.trend_label}
-                        </Tag>
-                        <Text type="secondary">{evaluation.avg_interval_sec}s/rep</Text>
-                      </Space>
-                      <Text>{evaluation.recommendation}</Text>
-                      <IntervalSparkline
-                        intervalsMs={summary.intervalsMs}
-                        cadenceMs={detail?.cadence?.total_rep_time_sec != null
-                          ? detail.cadence.total_rep_time_sec * 1000
-                          : null}
-                      />
-                    </>
+                    <IntervalSparkline
+                      intervalsMs={summary.intervalsMs}
+                      cadenceMs={detail?.cadence?.total_rep_time_sec != null
+                        ? detail.cadence.total_rep_time_sec * 1000
+                        : null}
+                    />
                   )}
                 </Space>
               </Card>
-            )}
+            );
+          })()}
 
           {/* Rest timer – only when target_sets > 1 */}
           {levelInfo?.target_sets > 1 && restActive && restRemaining > 0 && (
