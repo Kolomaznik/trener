@@ -14,6 +14,7 @@ import ExerciseDetail from './pages/ExerciseDetail.jsx';
 import VoiceCounting from './pages/VoiceCounting.jsx';
 import WorkoutSession from './pages/WorkoutSession.jsx';
 import Settings from './pages/Settings.jsx';
+import TreningVezne from './pages/TreningVezne.jsx';
 
 const { Header, Content } = Layout;
 const { useBreakpoint } = Grid;
@@ -175,6 +176,7 @@ export default function App() {
   const drawerTopItems = [
     { key: '/', label: 'Overview' },
     { key: '/exercises', label: 'Exercises' },
+    { key: '/trening-vezne', label: 'Trénink vězně' },
     { key: '/voice-counting', label: 'Voice counting' },
   ];
 
@@ -273,6 +275,7 @@ export default function App() {
             <Route path="/exercises" element={<Exercises />} />
             <Route path="/exercises/:name" element={<ExerciseDetail />} />
             <Route path="/exercises/:name/workout" element={<WorkoutSession />} />
+            <Route path="/trening-vezne" element={<TreningVezne />} />
             <Route path="/voice-counting" element={<VoiceCounting />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

@@ -5,6 +5,7 @@ from app.api.dashboard.get import router as dashboard_router
 from app.api.exercises.get_detail import router as exercises_detail_router
 from app.api.exercises.get_list import router as exercises_list_router
 from app.api.health.get import router as health_router
+from app.api.trening_vezne.get import router as trening_vezne_router
 from app.api.user.settings.get import router as user_settings_get_router
 from app.api.user.settings.patch import router as user_settings_patch_router
 from app.api.workout_sessions.post import router as workout_sessions_router
@@ -28,6 +29,7 @@ app.include_router(exercises_detail_router)
 app.include_router(workout_sessions_router)
 app.include_router(user_settings_get_router)
 app.include_router(user_settings_patch_router)
+app.include_router(trening_vezne_router)
 
 
 def main() -> None:
