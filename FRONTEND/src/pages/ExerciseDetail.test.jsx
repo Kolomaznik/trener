@@ -3,9 +3,10 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ExerciseDetail from './ExerciseDetail.jsx';
 
-vi.mock('../api/client.js', () => ({
-  fetchExercises: vi.fn(),
-  fetchExerciseDetail: vi.fn(),
+vi.mock('../api/exercises/get_detail.js', () => ({
+  getExerciseDetail: vi.fn(),
+}));
+vi.mock('../api/workout-sessions/post.js', () => ({
   postWorkoutSession: vi.fn(),
 }));
 
@@ -20,7 +21,7 @@ vi.mock('react-speech-recognition', () => ({
   }),
 }));
 
-import { fetchExerciseDetail } from '../api/client.js';
+import { getExerciseDetail } from '../api/exercises/get_detail.js';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -50,16 +51,12 @@ const muscleLoadByDifficulty = {
 };
 
 const detailFixture = {
-  id: 'pushups_level_1',
-  name: 'Kliky o zeď',
+  name: 'pushups_level_1',
+  title: 'Kliky o zeď',
   english_name: 'Wall Push-ups',
   family: 'Kliky',
   level: 1,
   description: 'Rehabilitační a přípravný cvik.',
-  instructions: [
-    'Postav se čelem ke zdi.',
-    'Polož dlaně na zeď ve výšce hrudníku.',
-  ],
   media: {
     youtube_tutorial: 'https://www.youtube.com/watch?v=xxx',
     thumbnail_url: 'https://img.youtube.com/vi/xxx/hqdefault.jpg',
@@ -80,8 +77,8 @@ const detailFixture = {
   },
   muscle_engagement_percent: { chest: 40, triceps: 30, lower_back: 5 },
   muscle_load_by_difficulty: muscleLoadByDifficulty,
-  next_exercise_id: 'pushups_level_2',
-  next_exercise_name: 'Kliky v předklonu',
+  next_exercise_name: 'pushups_level_2',
+  next_exercise_title: 'Kliky v předklonu',
   level_coefficient: 0.20,
   height_multiplier: 0.40,
   user_level: {
@@ -102,12 +99,12 @@ const detailFixtureNoLoad = {
 
 const detailFixtureLevel2 = {
   ...detailFixture,
-  id: 'pushups_level_2',
-  name: 'Kliky v předklonu',
+  name: 'pushups_level_2',
+  title: 'Kliky v předklonu',
   english_name: null,
   level: 2,
-  next_exercise_id: null,
   next_exercise_name: null,
+  next_exercise_title: null,
   level_coefficient: 0.35,
 };
 
@@ -118,8 +115,8 @@ function renderWithRouter(initialPath = '/exercises/pushups_level_1') {
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route path="/exercises" element={<div data-testid="list-marker" />} />
-        <Route path="/exercises/:id" element={<ExerciseDetail />} />
-        <Route path="/exercises/:id/workout" element={<div data-testid="workout-marker" />} />
+        <Route path="/exercises/:name" element={<ExerciseDetail />} />
+        <Route path="/exercises/:name/workout" element={<div data-testid="workout-marker" />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -129,17 +126,17 @@ function renderWithRouter(initialPath = '/exercises/pushups_level_1') {
 
 describe('ExerciseDetail page', () => {
   beforeEach(() => {
-    fetchExerciseDetail.mockReset();
-    fetchExerciseDetail.mockResolvedValue(detailFixture);
+    getExerciseDetail.mockReset();
+    getExerciseDetail.mockResolvedValue(detailFixture);
   });
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
-  it('fetches detail using id from URL', async () => {
+  it('fetches detail using name from URL', async () => {
     renderWithRouter('/exercises/pushups_level_1');
 
     await waitFor(() =>
-      expect(fetchExerciseDetail).toHaveBeenCalledWith('pushups_level_1'),
+      expect(getExerciseDetail).toHaveBeenCalledWith('pushups_level_1'),
     );
   });
 
@@ -147,7 +144,7 @@ describe('ExerciseDetail page', () => {
     renderWithRouter();
 
     await screen.findByText('Kliky o zeď');
-    expect(fetchExerciseDetail).toHaveBeenCalledTimes(1);
+    expect(getExerciseDetail).toHaveBeenCalledTimes(1);
   });
 
   // ── Header card ────────────────────────────────────────────────────────────
@@ -231,7 +228,7 @@ describe('ExerciseDetail page', () => {
   });
 
   it('Přemístěná zátěž option is disabled when load data is absent', async () => {
-    fetchExerciseDetail.mockResolvedValue(detailFixtureNoLoad);
+    getExerciseDetail.mockResolvedValue(detailFixtureNoLoad);
     renderWithRouter();
 
     await screen.findByText('% Zapojení');
@@ -240,7 +237,7 @@ describe('ExerciseDetail page', () => {
   });
 
   it('shows an info alert when load data is absent', async () => {
-    fetchExerciseDetail.mockResolvedValue(detailFixtureNoLoad);
+    getExerciseDetail.mockResolvedValue(detailFixtureNoLoad);
     renderWithRouter();
 
     expect(await screen.findByText(/Přihlaste se a vyplňte hmotnost/i)).toBeInTheDocument();
@@ -253,14 +250,14 @@ describe('ExerciseDetail page', () => {
     expect(screen.queryByText(/Přihlaste se a vyplňte hmotnost/i)).not.toBeInTheDocument();
   });
 
-  it('switching to Přemístěná zátěž mode does not call fetchExerciseDetail again', async () => {
+  it('switching to Přemístěná zátěž mode does not call getExerciseDetail again', async () => {
     renderWithRouter();
 
     await screen.findByText('% Zapojení');
     fireEvent.click(screen.getByText('Přemístěná zátěž (kg)'));
 
     // Still exactly 1 call — no extra API request
-    expect(fetchExerciseDetail).toHaveBeenCalledTimes(1);
+    expect(getExerciseDetail).toHaveBeenCalledTimes(1);
   });
 
   it('muscle map updates immediately when switching to load mode (no spinner needed)', async () => {
@@ -334,12 +331,10 @@ describe('ExerciseDetail page', () => {
 
   // ── Static detail cards ────────────────────────────────────────────────────
 
-  it('renders instructions, cadence, video cards', async () => {
+  it('renders cadence and video cards', async () => {
     renderWithRouter();
 
-    expect(await screen.findByText('Jak cvičit')).toBeInTheDocument();
-    expect(screen.getByText(/Postav se čelem ke zdi/)).toBeInTheDocument();
-    expect(screen.getByText('Tempo')).toBeInTheDocument();
+    expect(await screen.findByText('Tempo')).toBeInTheDocument();
     expect(screen.getByText('6 s / opakování')).toBeInTheDocument();
     expect(screen.getByText('Video')).toBeInTheDocument();
   });
@@ -356,7 +351,7 @@ describe('ExerciseDetail page', () => {
   });
 
   it('navigates to next exercise when "next level" button is clicked', async () => {
-    fetchExerciseDetail.mockImplementation(async (id) =>
+    getExerciseDetail.mockImplementation(async (id) =>
       id === 'pushups_level_2' ? detailFixtureLevel2 : detailFixture,
     );
     renderWithRouter();
@@ -365,7 +360,7 @@ describe('ExerciseDetail page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Kliky v předklonu' }));
 
     await waitFor(() =>
-      expect(fetchExerciseDetail).toHaveBeenCalledWith('pushups_level_2'),
+      expect(getExerciseDetail).toHaveBeenCalledWith('pushups_level_2'),
     );
     expect(
       await screen.findByText('Nejvyšší úroveň této rodiny'),
@@ -375,7 +370,7 @@ describe('ExerciseDetail page', () => {
   // ── Error states ───────────────────────────────────────────────────────────
 
   it('shows 404 message when exercise is not found', async () => {
-    fetchExerciseDetail.mockRejectedValue({ response: { status: 404 } });
+    getExerciseDetail.mockRejectedValue({ response: { status: 404 } });
     renderWithRouter('/exercises/neexistuje');
 
     expect(await screen.findByText('Cvik nebyl nalezen.')).toBeInTheDocument();

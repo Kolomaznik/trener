@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { UserSettingsContext } from '../context/UserSettingsContext.jsx';
 import Settings from './Settings.jsx';
 
-vi.mock('../api/updateUserSettings.js', () => ({
-  updateUserSettings: vi.fn(),
+vi.mock('../api/user/settings/patch.js', () => ({
+  patchUserSettings: vi.fn(),
 }));
 
-import { updateUserSettings } from '../api/updateUserSettings.js';
+import { patchUserSettings } from '../api/user/settings/patch.js';
 
 const baseSettings = {
   email: 'alice@example.com',
@@ -30,8 +30,8 @@ function renderWith(settings, setUserSettings = vi.fn()) {
 
 describe('Settings page', () => {
   beforeEach(() => {
-    updateUserSettings.mockReset();
-    updateUserSettings.mockResolvedValue({ ...baseSettings, gender: 'male' });
+    patchUserSettings.mockReset();
+    patchUserSettings.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -74,21 +74,21 @@ describe('Settings page', () => {
     fireEvent.click(muz);
 
     await waitFor(() => {
-      expect(updateUserSettings).toHaveBeenCalledWith({ gender: 'male' });
+      expect(patchUserSettings).toHaveBeenCalledWith({ gender: 'male' });
     });
   });
 
-  it('updates context with the response from PATCH', async () => {
+  it('updates context with the patched field value', async () => {
     const setUserSettings = vi.fn();
-    updateUserSettings.mockResolvedValue({ ...baseSettings, gender: 'female' });
     renderWith(baseSettings, setUserSettings);
 
     fireEvent.click(screen.getByText('Žena'));
 
     await waitFor(() => {
-      expect(setUserSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ gender: 'female' }),
-      );
+      expect(setUserSettings).toHaveBeenCalled();
+      const updater = setUserSettings.mock.calls[0][0];
+      const result = typeof updater === 'function' ? updater(baseSettings) : updater;
+      expect(result).toMatchObject({ gender: 'female' });
     });
   });
 
@@ -100,10 +100,10 @@ describe('Settings page', () => {
     fireEvent.change(heightInput, { target: { value: '180' } });
 
     vi.advanceTimersByTime(100);
-    expect(updateUserSettings).not.toHaveBeenCalled();
+    expect(patchUserSettings).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(500);
-    expect(updateUserSettings).toHaveBeenCalledWith({ height_cm: 180 });
+    expect(patchUserSettings).toHaveBeenCalledWith({ height_cm: 180 });
   });
 
   it('shows "Uloženo" status after successful PATCH', async () => {
@@ -116,7 +116,7 @@ describe('Settings page', () => {
   });
 
   it('shows error status when PATCH fails', async () => {
-    updateUserSettings.mockRejectedValue(new Error('500'));
+    patchUserSettings.mockRejectedValue(new Error('500'));
     renderWith(baseSettings);
     fireEvent.click(screen.getByText('Muž'));
 
@@ -139,3 +139,4 @@ describe('Settings page', () => {
     ).toBeInTheDocument();
   });
 });
+
