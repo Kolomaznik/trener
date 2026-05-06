@@ -7,6 +7,11 @@ from pymongo.database import Database
 
 from app.auth import GoogleUser, get_current_user
 from app.db import get_db
+from app.services.fitness_math import (
+    SetEvaluation,
+    evaluate_set_performance,
+    interpolate_missing_reps,
+)
 
 router = APIRouter(prefix="/workout-sessions", tags=["workout-sessions"])
 
@@ -16,6 +21,7 @@ class WorkoutEvent(BaseModel):
     token: str
     timestamp_ms: int
     timestamp_iso: str
+    interpolated: bool = False
 
 
 class WorkoutSessionCreate(BaseModel):
@@ -31,6 +37,8 @@ class WorkoutSessionCreate(BaseModel):
 
 class WorkoutSessionCreated(BaseModel):
     id: str
+    total_reps: int
+    evaluation: SetEvaluation | None = None
 
 
 @router.post("", response_model=WorkoutSessionCreated, status_code=status.HTTP_201_CREATED)
@@ -42,6 +50,16 @@ def create_workout_session(
     user_doc = db["users"].find_one({"email": user.email}) or {}
     exercise_doc = db["exercises"].find_one({"name": payload.exercise_id}) or {}
 
+    # Correct rep count by interpolating over speech-recognition gaps
+    session_start_ms = int(payload.started_at.timestamp() * 1000)
+    raw_events = [e.model_dump() for e in payload.events]
+    corrected_events, corrected_total_reps = interpolate_missing_reps(raw_events, session_start_ms)
+
+    # Evaluate set performance (pace + trend) when cadence data is available
+    cadence = exercise_doc.get("cadence") or {}
+    cadence_total_rep_time_sec: float | None = cadence.get("total_rep_time_sec")
+    evaluation = evaluate_set_performance(corrected_events, cadence_total_rep_time_sec)
+
     now = datetime.now(UTC)
     doc: dict[str, Any] = {
         "user_email": user.email,
@@ -50,8 +68,8 @@ def create_workout_session(
         "started_at": payload.started_at,
         "ended_at": payload.ended_at,
         "total_duration_sec": payload.total_duration_sec,
-        "total_reps": payload.total_reps,
-        "events": [e.model_dump() for e in payload.events],
+        "total_reps": corrected_total_reps,
+        "events": corrected_events,
         "set_number": payload.set_number,
         "user_weight_kg": user_doc.get("weight_kg"),
         "user_height_cm": user_doc.get("height_cm"),
@@ -60,4 +78,8 @@ def create_workout_session(
     }
 
     result = db["workout_sessions"].insert_one(doc)
-    return WorkoutSessionCreated(id=str(result.inserted_id))
+    return WorkoutSessionCreated(
+        id=str(result.inserted_id),
+        total_reps=corrected_total_reps,
+        evaluation=evaluation,
+    )

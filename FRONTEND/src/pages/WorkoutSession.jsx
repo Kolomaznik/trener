@@ -45,6 +45,44 @@ const LEVEL_COLORS = {
   mastery: 'gold',
 };
 
+const PACE_LABELS = {
+  too_fast: { text: 'Příliš rychle', color: 'orange' },
+  on_track: { text: 'V tempu', color: 'green' },
+  too_slow: { text: 'Příliš pomalu', color: 'blue' },
+};
+
+const TREND_LABELS = {
+  speeding_up: { text: 'Zrychlující', color: 'green' },
+  steady: { text: 'Stabilní', color: 'default' },
+  slowing_down: { text: 'Zpomalující', color: 'orange' },
+};
+
+function IntervalSparkline({ intervalsMs }) {
+  if (!intervalsMs || intervalsMs.length < 2) return null;
+  const W = 200;
+  const H = 48;
+  const max = Math.max(...intervalsMs);
+  const min = Math.min(...intervalsMs);
+  const span = max - min || 1;
+  const pts = intervalsMs
+    .map((v, i) => {
+      const x = (i / (intervalsMs.length - 1)) * (W - 4) + 2;
+      const y = H - 2 - ((v - min) / span) * (H - 4);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(' ');
+  return (
+    <svg
+      width={W}
+      height={H}
+      aria-label="Průběh tempa"
+      style={{ display: 'block', marginTop: 8 }}
+    >
+      <polyline points={pts} fill="none" stroke="#1677ff" strokeWidth="2" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function createEvent({ value, token, timestampMs, fallbackId }) {
   return {
     id: globalThis.crypto?.randomUUID?.() ?? `${timestampMs}-${fallbackId}`,
@@ -123,6 +161,8 @@ export default function WorkoutSession() {
   const [saveError, setSaveError] = useState(null);
   const [restActive, setRestActive] = useState(false);
   const [micError, setMicError] = useState('');
+  const [evaluation, setEvaluation] = useState(null);
+  const [correctedTotalReps, setCorrectedTotalReps] = useState(null);
 
   const processedTokenCountRef = useRef(0);
   const previousEventRef = useRef(null);
@@ -249,6 +289,8 @@ export default function WorkoutSession() {
     setMicError('');
     setSaveError(null);
     setEvents([]);
+    setEvaluation(null);
+    setCorrectedTotalReps(null);
     processedTokenCountRef.current = 0;
     previousEventRef.current = null;
     resetElapsed();
@@ -298,7 +340,9 @@ export default function WorkoutSession() {
     };
 
     try {
-      await postWorkoutSession(payload);
+      const result = await postWorkoutSession(payload);
+      if (result?.evaluation != null) setEvaluation(result.evaluation);
+      if (result?.total_reps != null) setCorrectedTotalReps(result.total_reps);
       // Re-fetch detail to get refreshed user_level
       const freshDetail = await getExerciseDetail(exerciseName);
       setDetail(freshDetail);
@@ -500,7 +544,9 @@ export default function WorkoutSession() {
           {/* Set result summary */}
           {sessionState === 'stopped' && (
             <Descriptions size="small" bordered column={1}>
-              <Descriptions.Item label="Opakování">{summary.count}</Descriptions.Item>
+              <Descriptions.Item label="Opakování">
+                {correctedTotalReps ?? summary.count}
+              </Descriptions.Item>
               <Descriptions.Item label="Čas">
                 {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')}
               </Descriptions.Item>
@@ -517,41 +563,82 @@ export default function WorkoutSession() {
             </Descriptions>
           )}
 
-          {/* Rest timer */}
-          {restActive && restRemaining > 0 && (
-            <Card
-              size="small"
-              style={{ background: '#f6ffed', borderColor: '#b7eb8f' }}
-              data-testid="rest-timer"
-            >
-              <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                <Space>
-                  <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                  <Text strong style={{ color: '#389e0d' }}>
-                    Výborně! Odpočinek před další sérií
-                  </Text>
+          {/* Evaluation card */}
+          {sessionState === 'stopped' &&
+            (evaluation != null ||
+              (correctedTotalReps != null && correctedTotalReps !== events.length)) && (
+              <Card
+                size="small"
+                title="Vyhodnocení série"
+                data-testid="evaluation-card"
+              >
+                <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                  {correctedTotalReps != null && correctedTotalReps !== events.length && (
+                    <Text data-testid="rep-correction-notice">
+                      Rozpoznáno {events.length} čísel, odhadnutý počet:{' '}
+                      <Text strong>{correctedTotalReps}</Text>
+                    </Text>
+                  )}
+                  {evaluation && (
+                    <>
+                      <Space wrap>
+                        <Tag color={PACE_LABELS[evaluation.pace_label]?.color}>
+                          {PACE_LABELS[evaluation.pace_label]?.text ?? evaluation.pace_label}
+                        </Tag>
+                        <Tag color={TREND_LABELS[evaluation.trend_label]?.color}>
+                          {TREND_LABELS[evaluation.trend_label]?.text ?? evaluation.trend_label}
+                        </Tag>
+                        <Text type="secondary">
+                          {evaluation.avg_interval_sec}s/rep
+                        </Text>
+                      </Space>
+                      <Text>{evaluation.recommendation}</Text>
+                      <IntervalSparkline intervalsMs={summary.intervalsMs} />
+                    </>
+                  )}
                 </Space>
-                <Statistic
-                  title="Zbývá odpočinku"
-                  value={`${Math.floor(restRemaining / 60)}:${String(restRemaining % 60).padStart(2, '0')}`}
-                />
-                <Button onClick={startNextSet}>Přeskočit odpočinek → Další série</Button>
-              </Space>
-            </Card>
-          )}
+              </Card>
+            )}
 
-          {restActive && restRemaining <= 0 && (
-            <Alert
-              type="success"
-              showIcon
-              message="Odpočinek skončil!"
-              action={
-                <Button size="small" type="primary" onClick={startNextSet}>
-                  Další série
-                </Button>
-              }
-            />
-          )}
+          {/* Rest timer – shown only when there is more than one target set */}
+          {(!detail?.user_level || detail.user_level.target_sets > 1) &&
+            restActive &&
+            restRemaining > 0 && (
+              <Card
+                size="small"
+                style={{ background: '#f6ffed', borderColor: '#b7eb8f' }}
+                data-testid="rest-timer"
+              >
+                <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                  <Space>
+                    <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                    <Text strong style={{ color: '#389e0d' }}>
+                      Výborně! Odpočinek před další sérií
+                    </Text>
+                  </Space>
+                  <Statistic
+                    title="Zbývá odpočinku"
+                    value={`${Math.floor(restRemaining / 60)}:${String(restRemaining % 60).padStart(2, '0')}`}
+                  />
+                  <Button onClick={startNextSet}>Přeskočit odpočinek → Další série</Button>
+                </Space>
+              </Card>
+            )}
+
+          {(!detail?.user_level || detail.user_level.target_sets > 1) &&
+            restActive &&
+            restRemaining <= 0 && (
+              <Alert
+                type="success"
+                showIcon
+                message="Odpočinek skončil!"
+                action={
+                  <Button size="small" type="primary" onClick={startNextSet}>
+                    Další série
+                  </Button>
+                }
+              />
+            )}
         </Space>
       </Card>
 
