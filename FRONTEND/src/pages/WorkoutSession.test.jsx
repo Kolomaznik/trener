@@ -323,6 +323,22 @@ describe('WorkoutSession page', () => {
     );
   });
 
+  it('hides live stats (Opakování counter) after set is stopped', async () => {
+    renderWithRouter();
+    await screen.findByText('Kliky o zeď');
+
+    // While idle the live counter row should be visible
+    expect(screen.getByTestId('live-stats')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Start série/ }));
+    await waitFor(() => screen.getByRole('button', { name: /Konec série/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Konec série/ }));
+
+    await waitFor(() => expect(postWorkoutSession).toHaveBeenCalledTimes(1));
+    // After stopping the live counter row should be gone
+    expect(screen.queryByTestId('live-stats')).not.toBeInTheDocument();
+  });
+
   it('hides rest timer when target_sets is 1', async () => {
     renderWithRouter(); // default fixture has target_sets: 1
     await screen.findByText('Kliky o zeď');

@@ -57,28 +57,88 @@ const TREND_LABELS = {
   slowing_down: { text: 'Zpomalující', color: 'orange' },
 };
 
-function IntervalSparkline({ intervalsMs }) {
-  if (!intervalsMs || intervalsMs.length < 2) return null;
-  const W = 200;
-  const H = 48;
-  const max = Math.max(...intervalsMs);
-  const min = Math.min(...intervalsMs);
-  const span = max - min || 1;
-  const pts = intervalsMs
-    .map((v, i) => {
-      const x = (i / (intervalsMs.length - 1)) * (W - 4) + 2;
-      const y = H - 2 - ((v - min) / span) * (H - 4);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
+function IntervalSparkline({ intervalsMs, cadenceMs }) {
+  if (!intervalsMs || intervalsMs.length < 1) return null;
+  const W = 300;
+  const H = 80;
+  const PAD = { top: 8, right: 12, bottom: 24, left: 36 };
+  const innerW = W - PAD.left - PAD.right;
+  const innerH = H - PAD.top - PAD.bottom;
+
+  const maxVal = cadenceMs != null
+    ? Math.max(...intervalsMs, cadenceMs * 1.3)
+    : Math.max(...intervalsMs);
+  const minVal = 0;
+  const span = maxVal - minVal || 1;
+
+  const toX = (i) => PAD.left + (i / Math.max(intervalsMs.length - 1, 1)) * innerW;
+  const toY = (v) => PAD.top + innerH - ((v - minVal) / span) * innerH;
+
+  const pts = intervalsMs.map((v, i) => `${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
+
+  const cadenceY = cadenceMs != null ? toY(cadenceMs) : null;
+
   return (
     <svg
       width={W}
       height={H}
       aria-label="Průběh tempa"
-      style={{ display: 'block', marginTop: 8 }}
+      style={{ display: 'block', marginTop: 8, overflow: 'visible' }}
     >
-      <polyline points={pts} fill="none" stroke="#1677ff" strokeWidth="2" strokeLinejoin="round" />
+      {/* Cadence reference line */}
+      {cadenceY != null && (
+        <>
+          <line
+            x1={PAD.left}
+            y1={cadenceY}
+            x2={PAD.left + innerW}
+            y2={cadenceY}
+            stroke="#f5222d"
+            strokeWidth="1.5"
+            strokeDasharray="4 3"
+          />
+          <text
+            x={PAD.left + innerW + 2}
+            y={cadenceY + 4}
+            fontSize="9"
+            fill="#f5222d"
+          >
+            {(cadenceMs / 1000).toFixed(0)}s
+          </text>
+        </>
+      )}
+
+      {/* Data line */}
+      {intervalsMs.length > 1 && (
+        <polyline
+          points={pts}
+          fill="none"
+          stroke="#1677ff"
+          strokeWidth="2"
+          strokeLinejoin="round"
+        />
+      )}
+
+      {/* Dots with rep-number labels */}
+      {intervalsMs.map((v, i) => (
+        <g key={i}>
+          <circle cx={toX(i)} cy={toY(v)} r="3" fill="#1677ff" />
+          <text
+            x={toX(i)}
+            y={H - 4}
+            textAnchor="middle"
+            fontSize="9"
+            fill="#888"
+          >
+            {i + 2}
+          </text>
+        </g>
+      ))}
+
+      {/* Y-axis label */}
+      <text x={0} y={PAD.top + innerH / 2} fontSize="9" fill="#888" transform={`rotate(-90,6,${PAD.top + innerH / 2})`} textAnchor="middle">
+        s
+      </text>
     </svg>
   );
 }
@@ -487,21 +547,23 @@ export default function WorkoutSession() {
           {displayError && <Alert type="error" showIcon message={displayError} />}
           {saveError && <Alert type="warning" showIcon message={saveError} />}
 
-          {/* Live stats */}
-          <Row gutter={16}>
-            <Col>
-              <Statistic title="Opakování" value={liveCount} />
-            </Col>
-            <Col>
-              <Statistic title="Aktuální číslo" value={currentNumber ?? '---'} />
-            </Col>
-            <Col>
-              <Statistic
-                title="Čas"
-                value={`${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`}
-              />
-            </Col>
-          </Row>
+          {/* Live stats – only shown while the set is running */}
+          {sessionState !== 'stopped' && (
+            <Row gutter={16} data-testid="live-stats">
+              <Col>
+                <Statistic title="Opakování" value={liveCount} />
+              </Col>
+              <Col>
+                <Statistic title="Aktuální číslo" value={currentNumber ?? '---'} />
+              </Col>
+              <Col>
+                <Statistic
+                  title="Čas"
+                  value={`${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`}
+                />
+              </Col>
+            </Row>
+          )}
 
           {/* Controls */}
           <Space wrap>
@@ -550,16 +612,17 @@ export default function WorkoutSession() {
               <Descriptions.Item label="Čas">
                 {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')}
               </Descriptions.Item>
-              {summary.intervalsMs.length > 0 && (
-                <Descriptions.Item label="Prům. interval">
-                  {(
-                    summary.intervalsMs.reduce((a, b) => a + b, 0) /
-                    summary.intervalsMs.length /
-                    1000
-                  ).toFixed(1)}{' '}
-                  s
-                </Descriptions.Item>
-              )}
+              <Descriptions.Item label="Prům. interval">
+                {evaluation?.avg_interval_sec != null
+                  ? `${evaluation.avg_interval_sec.toFixed(1)} s`
+                  : summary.intervalsMs.length > 0
+                    ? `${(
+                        summary.intervalsMs.reduce((a, b) => a + b, 0) /
+                        summary.intervalsMs.length /
+                        1000
+                      ).toFixed(1)} s`
+                    : '—'}
+              </Descriptions.Item>
             </Descriptions>
           )}
 
@@ -593,7 +656,12 @@ export default function WorkoutSession() {
                         </Text>
                       </Space>
                       <Text>{evaluation.recommendation}</Text>
-                      <IntervalSparkline intervalsMs={summary.intervalsMs} />
+                      <IntervalSparkline
+                        intervalsMs={summary.intervalsMs}
+                        cadenceMs={detail?.cadence?.total_rep_time_sec != null
+                          ? detail.cadence.total_rep_time_sec * 1000
+                          : null}
+                      />
                     </>
                   )}
                 </Space>
