@@ -159,26 +159,53 @@ export default function Settings() {
 
       <Card title="Fyzické údaje">
         <Form layout="vertical">
-          <Form.Item
-            label={
-              <Space>
-                <span>Pohlaví</span>
-                <SaveStatus status={statuses.gender} />
-              </Space>
-            }
-            extra="Využíváme pro výpočet svalové zátěže při cvičení."
-            required
-          >
-            <Radio.Group
-              value={userSettings.gender ?? undefined}
-              onChange={(event) => patchImmediate('gender', event.target.value)}
-              buttonStyle="solid"
-              size="large"
-            >
-              <Radio.Button value="male">Muž</Radio.Button>
-              <Radio.Button value="female">Žena</Radio.Button>
-            </Radio.Group>
-          </Form.Item>
+          <p style={{ marginTop: 0, color: 'rgba(0,0,0,0.45)', fontSize: 13 }}>
+            Využíváme pro výpočet svalové zátěže při cvičení.
+          </p>
+
+          <Row gutter={24}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label={
+                  <Space>
+                    <span>Pohlaví</span>
+                    <SaveStatus status={statuses.gender} />
+                  </Space>
+                }
+                required
+              >
+                <Radio.Group
+                  value={userSettings.gender ?? undefined}
+                  onChange={(event) => patchImmediate('gender', event.target.value)}
+                  buttonStyle="solid"
+                  size="large"
+                >
+                  <Radio.Button value="male">Muž</Radio.Button>
+                  <Radio.Button value="female">Žena</Radio.Button>
+                </Radio.Group>
+              </Form.Item>
+            </Col>
+
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label={
+                  <Space>
+                    <span>Rok narození</span>
+                    <SaveStatus status={statuses.birth_year} />
+                  </Space>
+                }
+                required
+                extra={computedAge != null ? `Aktuální věk: ${computedAge} let` : null}
+              >
+                <InputNumber
+                  value={userSettings.birth_year ?? null}
+                  min={1900}
+                  max={currentYear}
+                  onChange={(value) => patchDebounced('birth_year', value)}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
 
           <Row gutter={24}>
             <Col xs={24} sm={12}>
@@ -193,6 +220,7 @@ export default function Settings() {
               >
                 <Space.Compact style={{ width: '100%' }}>
                   <InputNumber
+                    aria-label="Výška"
                     value={userSettings.height_cm ?? null}
                     min={50}
                     max={250}
@@ -232,24 +260,6 @@ export default function Settings() {
               </Form.Item>
             </Col>
           </Row>
-
-          <Form.Item
-            label={
-              <Space>
-                <span>Rok narození</span>
-                <SaveStatus status={statuses.birth_year} />
-              </Space>
-            }
-            required
-            extra={computedAge != null ? `Aktuální věk: ${computedAge} let` : null}
-          >
-            <InputNumber
-              value={userSettings.birth_year ?? null}
-              min={1900}
-              max={currentYear}
-              onChange={(value) => patchDebounced('birth_year', value)}
-            />
-          </Form.Item>
         </Form>
       </Card>
     </Typography>

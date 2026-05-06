@@ -95,7 +95,7 @@ describe('Settings page', () => {
   it('debounces PATCH for height_cm — does not fire immediately', async () => {
     vi.useFakeTimers();
     renderWith(baseSettings);
-    const heightInput = document.querySelector('input[role="spinbutton"]');
+    const heightInput = screen.getByRole('spinbutton', { name: /výška/i });
     expect(heightInput).toBeTruthy();
     fireEvent.change(heightInput, { target: { value: '180' } });
 
