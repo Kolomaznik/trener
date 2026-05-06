@@ -6,6 +6,7 @@ Requires-Python: >=3.12
 Description-Content-Type: text/markdown
 Requires-Dist: fastapi[standard]>=0.115
 Requires-Dist: pydantic-settings>=2.6
+Requires-Dist: motor>=3.6
 Requires-Dist: pymongo>=4.10
 
 # Trener Backend
