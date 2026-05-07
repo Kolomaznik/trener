@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -15,10 +13,6 @@ class Settings(BaseSettings):
     google_userinfo_url: str = "https://www.googleapis.com/oauth2/v3/userinfo"
     sentry_dsn: str | None = None
     sentry_traces_sample_rate: float = 0.1
-    muscle_map_json_path: Path = (
-        Path(__file__).resolve().parents[1] / "FRONTEND" / "src" / "assets" / "muscle-map.json"
-    )
-
     @field_validator("google_userinfo_url", "mongo_uri", mode="before")
     @classmethod
     def strip_url_whitespace(cls, v: str) -> str:
