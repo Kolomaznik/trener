@@ -106,14 +106,17 @@ async def _upsert_user_exercise(
     recent_reps = [d["total_reps"] for d in recent_docs]
     level = compute_level(recent_reps, progression_goals)
     goal = progression_goals.get(level) or {}
-    best_doc = await (
+    best_rows = await (
         db["workout_sessions"]
-        .find({"user_email": user_email, "exercise_id": exercise_name}, {"total_reps": 1})
-        .sort("total_reps", -1)
-        .limit(1)
+        .aggregate(
+            [
+                {"$match": {"user_email": user_email, "exercise_id": exercise_name}},
+                {"$group": {"_id": None, "best_result": {"$max": "$total_reps"}}},
+            ]
+        )
         .to_list(1)
     )
-    best_result = best_doc[0]["total_reps"] if best_doc else 0
+    best_result = best_rows[0]["best_result"] if best_rows else 0
 
     payload: dict[str, Any] = {
         "user_email": user_email,
