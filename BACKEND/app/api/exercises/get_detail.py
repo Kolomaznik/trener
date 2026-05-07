@@ -8,12 +8,8 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field
 
 from app.db import get_db
-from app.services.fitness_math import (
-    REST_SECONDS,
-    MuscleEngagement,
-    calculate_muscle_load,
-    compute_level,
-)
+from app.services.fitness_math import REST_SECONDS, MuscleEngagement
+from app.services.user_exercises import get_or_seed_user_exercises, refresh_user_exercise
 from config import settings as app_settings
 
 router = APIRouter(prefix="/exercises", tags=["exercises"])
@@ -129,84 +125,64 @@ async def get_exercise_detail(
     db: AsyncIOMotorDatabase = Depends(get_db),
     user_context: _UserContext = Depends(_get_optional_user_context),
 ) -> ExerciseDetailResponse:
-    doc = await db["exercises"].find_one({"name": exercise_name, **SCHEMA_FILTER})
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Exercise not found")
-
-    nxt = await db["exercises"].find_one({"family": doc["family"], "level": doc["level"] + 1})
-
-    muscle_load_by_difficulty: MuscleLoadByDifficulty | None = None
     user_level: UserLevelInfo | None = None
-
     if user_context.email is not None:
-        if user_context.weight_kg is not None:
-            level_coefficient: float = doc.get("level_coefficient", 0.5)
-            muscle_engagement: dict[str, int] = dict(doc.get("muscle_engagement_percent", {}))
-            progression: dict[str, Any] = doc.get("progression_goals") or {}
-            tiers: dict[str, dict] = {}
-            for tier in ("beginner", "intermediate", "mastery"):
-                goal = progression.get(tier)
-                if goal and muscle_engagement:
-                    total_reps = int(goal.get("sets", 1)) * int(goal.get("reps", 1))
-                    tiers[tier] = calculate_muscle_load(
-                        weight_kg=user_context.weight_kg,
-                        total_reps=total_reps,
-                        level_coefficient=level_coefficient,
-                        muscle_engagement_percent=muscle_engagement,
-                    )
-                else:
-                    tiers[tier] = {}
-            muscle_load_by_difficulty = MuscleLoadByDifficulty(
-                beginner=tiers["beginner"],
-                intermediate=tiers["intermediate"],
-                mastery=tiers["mastery"],
-            )
-
-        recent_docs = await (
-            db["workout_sessions"]
-            .find({"user_email": user_context.email, "exercise_id": exercise_name})
-            .sort("started_at", -1)
-            .limit(5)
-            .to_list(None)
+        doc = await db["user_exercises"].find_one(
+            {"user_email": user_context.email, "exercise_name": exercise_name}
         )
-        progression_goals: dict[str, Any] | None = doc.get("progression_goals")
-        recent_reps = [d["total_reps"] for d in recent_docs]
-        level = compute_level(recent_reps, progression_goals)
-
-        recent_sets = [
-            RecentSet(
-                total_reps=d["total_reps"],
-                started_at=d["started_at"],
-                set_number=d["set_number"],
+        if doc is None:
+            await get_or_seed_user_exercises(db, user_context.email, user_context.weight_kg)
+            await refresh_user_exercise(
+                db,
+                user_context.email,
+                exercise_name,
+                user_context.weight_kg,
             )
-            for d in recent_docs
-        ]
+            doc = await db["user_exercises"].find_one(
+                {"user_email": user_context.email, "exercise_name": exercise_name}
+            )
+        if doc is None:
+            raise HTTPException(status_code=404, detail="Exercise not found")
 
-        target_reps: int | None = None
-        target_sets: int | None = None
-        if progression_goals:
-            goal = progression_goals.get(level) or {}
-            target_reps = goal.get("reps")
-            target_sets = goal.get("sets")
-
-        last_best_reps = max(recent_reps) if recent_reps else None
-        user_level = UserLevelInfo(
-            level=level,
-            recent_sets=recent_sets,
-            target_reps=target_reps,
-            target_sets=target_sets,
-            last_best_reps=last_best_reps,
-            rest_seconds=REST_SECONDS.get(level, 60),
-        )
+        user_level_value = doc.get("user_level")
+        if user_level_value:
+            user_level = UserLevelInfo(
+                level=user_level_value,
+                recent_sets=[RecentSet(**recent_set) for recent_set in doc.get("recent_sets", [])],
+                target_reps=doc.get("target_reps"),
+                target_sets=doc.get("target_sets"),
+                last_best_reps=doc.get("best_result"),
+                rest_seconds=doc.get("rest_seconds", REST_SECONDS.get(user_level_value, 60)),
+            )
+    else:
+        doc = await db["exercises"].find_one({"name": exercise_name, **SCHEMA_FILTER})
+        if doc is None:
+            raise HTTPException(status_code=404, detail="Exercise not found")
+        nxt = await db["exercises"].find_one({"family": doc["family"], "level": doc["level"] + 1})
+        doc = {
+            **doc,
+            "exercise_name": doc["name"],
+            "next_exercise_name": nxt["name"] if nxt else None,
+            "next_exercise_title": nxt["title"] if nxt else None,
+            "muscle_load_by_difficulty": None,
+        }
 
     media_doc = doc.get("media") if isinstance(doc.get("media"), dict) else None
     cadence_doc = doc.get("cadence") if isinstance(doc.get("cadence"), dict) else None
     progression_doc = (
         doc.get("progression_goals") if isinstance(doc.get("progression_goals"), dict) else None
     )
+    muscle_load_doc = (
+        doc.get("muscle_load_by_difficulty")
+        if isinstance(doc.get("muscle_load_by_difficulty"), dict)
+        else None
+    )
+    muscle_load_by_difficulty = (
+        MuscleLoadByDifficulty(**muscle_load_doc) if muscle_load_doc is not None else None
+    )
 
     return ExerciseDetailResponse(
-        name=doc["name"],
+        name=doc["exercise_name"],
         title=doc["title"],
         english_name=doc.get("english_name"),
         family=doc["family"],
@@ -218,8 +194,8 @@ async def get_exercise_detail(
         muscle_engagement_percent=dict(doc.get("muscle_engagement_percent", {})),
         level_coefficient=doc.get("level_coefficient", 0.5),
         height_multiplier=doc.get("height_multiplier", 0.5),
-        next_exercise_name=nxt["name"] if nxt else None,
-        next_exercise_title=nxt["title"] if nxt else None,
+        next_exercise_name=doc.get("next_exercise_name"),
+        next_exercise_title=doc.get("next_exercise_title"),
         muscle_load_by_difficulty=muscle_load_by_difficulty,
         user_level=user_level,
     )

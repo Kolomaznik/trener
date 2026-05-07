@@ -7,7 +7,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
 
 from app.db import get_db
-from app.services.fitness_math import compute_level
+from app.services.user_exercises import get_or_seed_user_exercises
 from config import settings as app_settings
 
 router = APIRouter(prefix="/exercises", tags=["exercises"])
@@ -30,15 +30,17 @@ class ExerciseListItem(BaseModel):
     next_exercise_title: str | None = None
 
 
-class _UserEmail(NamedTuple):
+class _UserContext(NamedTuple):
     email: str | None
+    weight_kg: float | None
 
 
-async def _get_optional_user_email(
+async def _get_optional_user_context(
     credentials: HTTPAuthorizationCredentials | None = Depends(_optional_bearer),
-) -> _UserEmail:
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> _UserContext:
     if credentials is None:
-        return _UserEmail(email=None)
+        return _UserContext(email=None, weight_kg=None)
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(
@@ -46,11 +48,18 @@ async def _get_optional_user_email(
                 headers={"Authorization": f"Bearer {credentials.credentials}"},
             )
     except httpx.HTTPError:
-        return _UserEmail(email=None)
+        return _UserContext(email=None, weight_kg=None)
     if resp.status_code != 200:
-        return _UserEmail(email=None)
+        return _UserContext(email=None, weight_kg=None)
     email = resp.json().get("email")
-    return _UserEmail(email=email or None)
+    if not email:
+        return _UserContext(email=None, weight_kg=None)
+    user_doc = await db["users"].find_one({"email": email}, {"weight_kg": 1})
+    raw_weight_kg = user_doc.get("weight_kg") if user_doc else None
+    return _UserContext(
+        email=email,
+        weight_kg=float(raw_weight_kg) if raw_weight_kg is not None else None,
+    )
 
 
 @router.get("", response_model=list[ExerciseListItem])
@@ -58,60 +67,56 @@ async def get_exercises(
     limit: int = Query(default=100, ge=1),
     skip: int = Query(default=0, ge=0),
     db: AsyncIOMotorDatabase = Depends(get_db),
-    user_email: _UserEmail = Depends(_get_optional_user_email),
+    user_context: _UserContext = Depends(_get_optional_user_context),
 ) -> list[ExerciseListItem]:
-    all_docs = await (
-        db["exercises"].find(SCHEMA_FILTER).sort([("family", 1), ("level", 1)]).to_list(None)
-    )
-
-    by_family: dict[str, list[dict[str, Any]]] = {}
-    for doc in all_docs:
-        by_family.setdefault(doc["family"], []).append(doc)
-    for siblings in by_family.values():
-        siblings.sort(key=lambda d: d["level"])
-
-    next_by_name: dict[str, dict[str, Any]] = {}
-    for siblings in by_family.values():
-        for index, current in enumerate(siblings):
-            if index + 1 < len(siblings):
-                next_by_name[current["name"]] = siblings[index + 1]
-
-    user_levels: dict[str, str] = {}
-    if user_email.email:
-        recent_sessions = await (
-            db["workout_sessions"]
-            .find({"user_email": user_email.email})
-            .sort("started_at", -1)
-            .limit(len(all_docs) * 5)
-            .to_list(None)
+    if user_context.email:
+        all_docs = await get_or_seed_user_exercises(
+            db=db,
+            user_email=user_context.email,
+            weight_kg=user_context.weight_kg,
         )
-        sessions_by_exercise: dict[str, list[int]] = {}
-        for session in recent_sessions:
-            ex_id = session.get("exercise_id")
-            if ex_id is None:
-                continue
-            reps_list = sessions_by_exercise.setdefault(ex_id, [])
-            if len(reps_list) < 5:
-                reps_list.append(session["total_reps"])
-        for doc in all_docs:
-            name = doc["name"]
-            recent_reps = sessions_by_exercise.get(name, [])
-            user_levels[name] = compute_level(recent_reps, doc.get("progression_goals"))
+    else:
+        exercises = await (
+            db["exercises"].find(SCHEMA_FILTER).sort([("family", 1), ("level", 1)]).to_list(None)
+        )
+
+        by_family: dict[str, list[dict[str, Any]]] = {}
+        for doc in exercises:
+            by_family.setdefault(doc["family"], []).append(doc)
+        for siblings in by_family.values():
+            siblings.sort(key=lambda d: d["level"])
+
+        next_by_name: dict[str, dict[str, Any]] = {}
+        for siblings in by_family.values():
+            for index, current in enumerate(siblings):
+                if index + 1 < len(siblings):
+                    next_by_name[current["name"]] = siblings[index + 1]
+
+        all_docs = [
+            {
+                **doc,
+                "exercise_name": doc["name"],
+                "user_level": None,
+                "next_exercise_name": next_by_name[doc["name"]]["name"]
+                if doc["name"] in next_by_name
+                else None,
+                "next_exercise_title": next_by_name[doc["name"]]["title"]
+                if doc["name"] in next_by_name
+                else None,
+            }
+            for doc in exercises
+        ]
 
     paginated = all_docs[skip : skip + limit]
     return [
         ExerciseListItem(
-            name=doc["name"],
+            name=doc["exercise_name"],
             title=doc["title"],
             family=doc["family"],
             level=doc["level"],
-            user_level=user_levels.get(doc["name"]),
-            next_exercise_name=next_by_name[doc["name"]]["name"]
-            if doc["name"] in next_by_name
-            else None,
-            next_exercise_title=next_by_name[doc["name"]]["title"]
-            if doc["name"] in next_by_name
-            else None,
+            user_level=doc.get("user_level"),
+            next_exercise_name=doc.get("next_exercise_name"),
+            next_exercise_title=doc.get("next_exercise_title"),
         )
         for doc in paginated
     ]

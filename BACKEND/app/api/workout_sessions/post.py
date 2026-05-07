@@ -13,6 +13,7 @@ from app.services.fitness_math import (
     evaluate_set_performance,
     interpolate_missing_reps,
 )
+from app.services.user_exercises import refresh_user_exercise
 
 router = APIRouter(prefix="/workout-sessions", tags=["workout-sessions"])
 
@@ -98,6 +99,13 @@ async def create_workout_session(
     }
 
     result = await db["workout_sessions"].insert_one(doc)
+    raw_weight_kg = user_doc.get("weight_kg")
+    await refresh_user_exercise(
+        db=db,
+        user_email=user.email,
+        exercise_name=payload.exercise_id,
+        weight_kg=float(raw_weight_kg) if raw_weight_kg is not None else None,
+    )
     return WorkoutSessionCreated(
         id=str(result.inserted_id),
         total_reps=corrected_total_reps,
