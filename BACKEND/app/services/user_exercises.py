@@ -298,11 +298,12 @@ async def _check_and_advance(
     success = latest_total_reps >= _as_int(target_reps, 0)
     now = datetime.now(UTC)
 
-    await db["user_exercises"].update_one(
-        {"_id": user_exercise["_id"]},
-        {"$set": {"consecutive_successes": 0, "updated_at": now}},
-    )
     if not success:
+        if _as_int(user_exercise.get("consecutive_successes"), 0) != 0:
+            await db["user_exercises"].update_one(
+                {"_id": user_exercise["_id"]},
+                {"$set": {"consecutive_successes": 0, "updated_at": now}},
+            )
         return None
 
     await _record_achievement(
