@@ -19,6 +19,13 @@ SCHEMA_FILTER: dict[str, Any] = {
 }
 
 
+def _as_int(value: Any, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def _build_static_payload(
     exercise_doc: dict[str, Any],
     next_doc: dict[str, Any] | None,
@@ -61,7 +68,7 @@ def _compute_muscle_load_by_difficulty(
         if not goal:
             tiers[tier] = {}
             continue
-        total_reps = int(goal.get("sets", 1)) * int(goal.get("reps", 1))
+        total_reps = _as_int(goal.get("sets"), 1) * _as_int(goal.get("reps"), 1)
         calculated = calculate_muscle_load(
             weight_kg=weight_kg,
             total_reps=total_reps,

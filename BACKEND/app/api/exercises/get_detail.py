@@ -132,6 +132,10 @@ async def get_exercise_detail(
         )
         if doc is None:
             await get_or_seed_user_exercises(db, user_context.email, user_context.weight_kg)
+            doc = await db["user_exercises"].find_one(
+                {"user_email": user_context.email, "exercise_name": exercise_name}
+            )
+        if doc is None:
             await refresh_user_exercise(
                 db,
                 user_context.email,
