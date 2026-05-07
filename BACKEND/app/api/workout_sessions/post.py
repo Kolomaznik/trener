@@ -13,7 +13,7 @@ from app.services.fitness_math import (
     evaluate_set_performance,
     interpolate_missing_reps,
 )
-from app.services.user_exercises import refresh_user_exercise
+from app.services.user_exercises import LevelUpInfo, refresh_user_exercise
 
 router = APIRouter(prefix="/workout-sessions", tags=["workout-sessions"])
 
@@ -41,6 +41,7 @@ class WorkoutSessionCreated(BaseModel):
     id: str
     total_reps: int
     evaluation: SetEvaluation | None = None
+    level_up: LevelUpInfo | None = None
 
 
 @router.post("", response_model=WorkoutSessionCreated, status_code=status.HTTP_201_CREATED)
@@ -64,6 +65,9 @@ async def create_workout_session(
     cadence = exercise_doc.get("cadence") or {}
     cadence_total_rep_time_sec: float | None = cadence.get("total_rep_time_sec")
     progression_goals: dict[str, Any] = exercise_doc.get("progression_goals") or {}
+    user_exercise = await db["user_exercises"].find_one(
+        {"user_email": user.email, "exercise_name": payload.exercise_id}
+    )
     recent_docs = await (
         db["workout_sessions"]
         .find({"user_email": user.email, "exercise_id": payload.exercise_id})
@@ -72,7 +76,9 @@ async def create_workout_session(
         .to_list(None)
     )
     recent_reps = [d["total_reps"] for d in recent_docs]
-    level = compute_level(recent_reps, progression_goals)
+    level = user_exercise.get("user_level") if user_exercise else None
+    if level not in {"beginner", "intermediate", "mastery"}:
+        level = compute_level(recent_reps, progression_goals)
     target_reps: int | None = (progression_goals.get(level) or {}).get("reps")
     evaluation = evaluate_set_performance(
         corrected_events,
@@ -100,7 +106,7 @@ async def create_workout_session(
 
     result = await db["workout_sessions"].insert_one(doc)
     raw_weight_kg = user_doc.get("weight_kg")
-    await refresh_user_exercise(
+    level_up = await refresh_user_exercise(
         db=db,
         user_email=user.email,
         exercise_name=payload.exercise_id,
@@ -110,4 +116,5 @@ async def create_workout_session(
         id=str(result.inserted_id),
         total_reps=corrected_total_reps,
         evaluation=evaluation,
+        level_up=level_up,
     )

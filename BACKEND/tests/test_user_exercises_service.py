@@ -192,6 +192,245 @@ def test_refresh_user_exercise_updates_progress_and_best_result(mock_db):
     )
     assert doc is not None
     assert doc["best_result"] == 14
+    assert doc["user_level"] == "beginner"
+    assert doc["target_reps"] == 10
+    assert doc["consecutive_successes"] == 1
+    assert len(doc["recent_sets"]) == 3
+
+
+def test_no_advance_on_insufficient_reps(mock_db):
+    _seed_exercises(mock_db)
+    now = datetime.now(UTC)
+    mock_db["workout_sessions"].insert_many(
+        [
+            {
+                "user_email": "alice@example.com",
+                "exercise_id": "pushups_level_1",
+                "total_reps": 8,
+                "started_at": now - timedelta(days=2),
+                "set_number": 1,
+            },
+            {
+                "user_email": "alice@example.com",
+                "exercise_id": "pushups_level_1",
+                "total_reps": 9,
+                "started_at": now - timedelta(days=1),
+                "set_number": 2,
+            },
+        ]
+    )
+    async_db = AsyncMongoMockClient(mock_mongo_client=mock_db.client)["test_db"]
+
+    level_up = asyncio.run(
+        refresh_user_exercise(
+            db=async_db,
+            user_email="alice@example.com",
+            exercise_name="pushups_level_1",
+            weight_kg=80.0,
+        )
+    )
+
+    doc = mock_db["user_exercises"].find_one(
+        {"user_email": "alice@example.com", "exercise_name": "pushups_level_1"}
+    )
+    assert level_up is None
+    assert doc["user_level"] == "beginner"
+    assert doc["consecutive_successes"] == 0
+
+
+def test_no_advance_on_single_success(mock_db):
+    _seed_exercises(mock_db)
+    now = datetime.now(UTC)
+    mock_db["workout_sessions"].insert_one(
+        {
+            "user_email": "alice@example.com",
+            "exercise_id": "pushups_level_1",
+            "total_reps": 10,
+            "started_at": now,
+            "set_number": 1,
+        }
+    )
+    async_db = AsyncMongoMockClient(mock_mongo_client=mock_db.client)["test_db"]
+
+    level_up = asyncio.run(
+        refresh_user_exercise(
+            db=async_db,
+            user_email="alice@example.com",
+            exercise_name="pushups_level_1",
+            weight_kg=80.0,
+        )
+    )
+
+    doc = mock_db["user_exercises"].find_one(
+        {"user_email": "alice@example.com", "exercise_name": "pushups_level_1"}
+    )
+    assert level_up is None
+    assert doc["user_level"] == "beginner"
+    assert doc["consecutive_successes"] == 1
+
+
+def test_advance_beginner_to_intermediate(mock_db):
+    _seed_exercises(mock_db)
+    now = datetime.now(UTC)
+    async_db = AsyncMongoMockClient(mock_mongo_client=mock_db.client)["test_db"]
+
+    mock_db["workout_sessions"].insert_one(
+        {
+            "user_email": "alice@example.com",
+            "exercise_id": "pushups_level_1",
+            "total_reps": 10,
+            "started_at": now - timedelta(days=1),
+            "set_number": 1,
+        }
+    )
+    asyncio.run(
+        refresh_user_exercise(
+            db=async_db,
+            user_email="alice@example.com",
+            exercise_name="pushups_level_1",
+            weight_kg=80.0,
+        )
+    )
+    mock_db["workout_sessions"].insert_one(
+        {
+            "user_email": "alice@example.com",
+            "exercise_id": "pushups_level_1",
+            "total_reps": 12,
+            "started_at": now,
+            "set_number": 2,
+        }
+    )
+
+    level_up = asyncio.run(
+        refresh_user_exercise(
+            db=async_db,
+            user_email="alice@example.com",
+            exercise_name="pushups_level_1",
+            weight_kg=80.0,
+        )
+    )
+
+    doc = mock_db["user_exercises"].find_one(
+        {"user_email": "alice@example.com", "exercise_name": "pushups_level_1"}
+    )
+    achievement = mock_db["user_achievements"].find_one({"user_email": "alice@example.com"})
+    assert level_up is not None
+    assert level_up.previous_level == "beginner"
+    assert level_up.new_level == "intermediate"
     assert doc["user_level"] == "intermediate"
     assert doc["target_reps"] == 25
-    assert len(doc["recent_sets"]) == 3
+    assert doc["consecutive_successes"] == 0
+    assert achievement["cells"]["pushups"]["1"]["stars"] == 1
+    assert achievement["cells"]["pushups"]["1"]["achieved_at"] is not None
+
+
+def test_advance_intermediate_to_mastery(mock_db):
+    _seed_exercises(mock_db)
+    async_db = AsyncMongoMockClient(mock_mongo_client=mock_db.client)["test_db"]
+    now = datetime.now(UTC)
+
+    for offset, reps in enumerate((10, 10, 25, 25), start=1):
+        mock_db["workout_sessions"].insert_one(
+            {
+                "user_email": "alice@example.com",
+                "exercise_id": "pushups_level_1",
+                "total_reps": reps,
+                "started_at": now + timedelta(minutes=offset),
+                "set_number": offset,
+            }
+        )
+        level_up = asyncio.run(
+            refresh_user_exercise(
+                db=async_db,
+                user_email="alice@example.com",
+                exercise_name="pushups_level_1",
+                weight_kg=80.0,
+            )
+        )
+
+    doc = mock_db["user_exercises"].find_one(
+        {"user_email": "alice@example.com", "exercise_name": "pushups_level_1"}
+    )
+    achievement = mock_db["user_achievements"].find_one({"user_email": "alice@example.com"})
+    assert level_up is not None
+    assert level_up.previous_level == "intermediate"
+    assert level_up.new_level == "mastery"
+    assert doc["user_level"] == "mastery"
+    assert doc["target_reps"] == 50
+    assert achievement["cells"]["pushups"]["1"]["stars"] == 2
+
+
+def test_mastery_completion_and_unlock(mock_db):
+    _seed_exercises(mock_db)
+    async_db = AsyncMongoMockClient(mock_mongo_client=mock_db.client)["test_db"]
+    now = datetime.now(UTC)
+
+    for offset, reps in enumerate((10, 10, 25, 25, 50, 50), start=1):
+        mock_db["workout_sessions"].insert_one(
+            {
+                "user_email": "alice@example.com",
+                "exercise_id": "pushups_level_1",
+                "total_reps": reps,
+                "started_at": now + timedelta(minutes=offset),
+                "set_number": offset,
+            }
+        )
+        level_up = asyncio.run(
+            refresh_user_exercise(
+                db=async_db,
+                user_email="alice@example.com",
+                exercise_name="pushups_level_1",
+                weight_kg=80.0,
+            )
+        )
+
+    completed_doc = mock_db["user_exercises"].find_one(
+        {"user_email": "alice@example.com", "exercise_name": "pushups_level_1"}
+    )
+    unlocked_doc = mock_db["user_exercises"].find_one(
+        {"user_email": "alice@example.com", "exercise_name": "pushups_level_2"}
+    )
+    achievement = mock_db["user_achievements"].find_one({"user_email": "alice@example.com"})
+    assert level_up is not None
+    assert level_up.previous_level == "mastery"
+    assert level_up.new_level == "completed"
+    assert level_up.exercise_unlocked == "pushups_level_2"
+    assert completed_doc["completed"] is True
+    assert completed_doc["completed_at"] is not None
+    assert completed_doc["consecutive_successes"] == 0
+    assert unlocked_doc is not None
+    assert unlocked_doc["user_level"] == "beginner"
+    assert unlocked_doc["consecutive_successes"] == 0
+    assert achievement["cells"]["pushups"]["1"]["stars"] == 3
+
+
+def test_reset_on_failure_between_successes(mock_db):
+    _seed_exercises(mock_db)
+    async_db = AsyncMongoMockClient(mock_mongo_client=mock_db.client)["test_db"]
+    now = datetime.now(UTC)
+
+    for offset, reps in enumerate((10, 8, 10), start=1):
+        mock_db["workout_sessions"].insert_one(
+            {
+                "user_email": "alice@example.com",
+                "exercise_id": "pushups_level_1",
+                "total_reps": reps,
+                "started_at": now + timedelta(minutes=offset),
+                "set_number": offset,
+            }
+        )
+        level_up = asyncio.run(
+            refresh_user_exercise(
+                db=async_db,
+                user_email="alice@example.com",
+                exercise_name="pushups_level_1",
+                weight_kg=80.0,
+            )
+        )
+
+    doc = mock_db["user_exercises"].find_one(
+        {"user_email": "alice@example.com", "exercise_name": "pushups_level_1"}
+    )
+    assert level_up is None
+    assert doc["user_level"] == "beginner"
+    assert doc["consecutive_successes"] == 1
