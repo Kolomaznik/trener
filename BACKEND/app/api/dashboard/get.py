@@ -2,8 +2,8 @@ import json
 from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field
-from pymongo.database import Database
 
 from app.auth import GoogleUser, get_current_user
 from app.db import get_db
@@ -36,10 +36,10 @@ class DashboardResponse(BaseModel):
 
 
 @router.get("", response_model=DashboardResponse)
-def get_dashboard(
+async def get_dashboard(
     end_date: str | None = Query(default=None, pattern=DATE_PATTERN),
     user: GoogleUser = Depends(get_current_user),
-    db: Database = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> DashboardResponse:
     if end_date is None:
         end = date.today()
@@ -58,13 +58,13 @@ def get_dashboard(
     start_dt = datetime(start.year, start.month, start.day)
     end_dt = datetime(end.year, end.month, end.day, 23, 59, 59, 999999)
 
-    sessions = db["workout_sessions"].find(
+    sessions = await db["workout_sessions"].find(
         {
             "user_email": user.email,
             "started_at": {"$gte": start_dt, "$lte": end_dt},
         },
         {"started_at": 1},
-    )
+    ).to_list(None)
 
     counts: dict[date, int] = {}
     for session in sessions:

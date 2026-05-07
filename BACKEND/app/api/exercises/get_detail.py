@@ -4,8 +4,8 @@ from typing import Any, NamedTuple
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field
-from pymongo.database import Database
 
 from app.db import get_db
 from app.services.fitness_math import (
@@ -94,7 +94,7 @@ class _UserContext(NamedTuple):
 
 async def _get_optional_user_context(
     credentials: HTTPAuthorizationCredentials | None = Depends(_optional_bearer),
-    db: Database = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> _UserContext:
     if credentials is None:
         return _UserContext(email=None, weight_kg=None)
@@ -114,7 +114,7 @@ async def _get_optional_user_context(
     if not email:
         return _UserContext(email=None, weight_kg=None)
 
-    user_doc = db["users"].find_one({"email": email})
+    user_doc = await db["users"].find_one({"email": email})
     if user_doc is None:
         return _UserContext(email=email, weight_kg=None)
 
@@ -126,14 +126,14 @@ async def _get_optional_user_context(
 @router.get("/{exercise_name}", response_model=ExerciseDetailResponse)
 async def get_exercise_detail(
     exercise_name: str,
-    db: Database = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     user_context: _UserContext = Depends(_get_optional_user_context),
 ) -> ExerciseDetailResponse:
-    doc = db["exercises"].find_one({"name": exercise_name, **SCHEMA_FILTER})
+    doc = await db["exercises"].find_one({"name": exercise_name, **SCHEMA_FILTER})
     if doc is None:
         raise HTTPException(status_code=404, detail="Exercise not found")
 
-    nxt = db["exercises"].find_one({"family": doc["family"], "level": doc["level"] + 1})
+    nxt = await db["exercises"].find_one({"family": doc["family"], "level": doc["level"] + 1})
 
     muscle_load_by_difficulty: MuscleLoadByDifficulty | None = None
     user_level: UserLevelInfo | None = None
@@ -162,11 +162,12 @@ async def get_exercise_detail(
                 mastery=tiers["mastery"],
             )
 
-        recent_docs = list(
+        recent_docs = await (
             db["workout_sessions"]
             .find({"user_email": user_context.email, "exercise_id": exercise_name})
             .sort("started_at", -1)
             .limit(5)
+            .to_list(None)
         )
         progression_goals: dict[str, Any] | None = doc.get("progression_goals")
         recent_reps = [d["total_reps"] for d in recent_docs]

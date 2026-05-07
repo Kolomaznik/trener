@@ -2,20 +2,39 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Avatar,
-  Descriptions,
+  Card,
+  Col,
   Form,
   InputNumber,
   Radio,
+  Row,
   Space,
   Spin,
   Typography,
 } from 'antd';
-import { CheckCircleTwoTone, CloseCircleTwoTone, LoadingOutlined } from '@ant-design/icons';
+import {
+  CheckCircleTwoTone,
+  CloseCircleTwoTone,
+  LoadingOutlined,
+  LockOutlined,
+} from '@ant-design/icons';
 import { isProfileComplete, useUserSettings } from '../context/UserSettingsContext.jsx';
 import { patchUserSettings } from '../api/user/settings/patch.js';
 
 const { Title, Text } = Typography;
 const DEBOUNCE_MS = 500;
+
+const unitLabelStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '0 11px',
+  background: 'rgba(0,0,0,0.02)',
+  border: '1px solid #d9d9d9',
+  borderLeft: 0,
+  borderRadius: '0 6px 6px 0',
+  color: 'rgba(0,0,0,0.45)',
+  whiteSpace: 'nowrap',
+};
 
 function SaveStatus({ status }) {
   if (status === 'saving') {
@@ -99,7 +118,7 @@ export default function Settings() {
     userSettings.birth_year != null ? currentYear - userSettings.birth_year : null;
 
   return (
-    <Typography>
+    <Typography style={{ maxWidth: 680 }}>
       <Title level={2}>Nastavení profilu</Title>
 
       {incomplete && (
@@ -111,102 +130,138 @@ export default function Settings() {
         />
       )}
 
-      <Descriptions
-        bordered
-        column={1}
-        size="small"
+      <Card
+        title={
+          <Space>
+            <LockOutlined />
+            <span>Účet Google</span>
+          </Space>
+        }
         style={{ marginBottom: 24 }}
-        items={[
-          {
-            key: 'avatar',
-            label: 'Avatar',
-            children: (
-              <Avatar
-                size={64}
-                src={userSettings.picture}
-                alt={userSettings.name ?? userSettings.email}
-              />
-            ),
-          },
-          { key: 'name', label: 'Jméno', children: userSettings.name ?? '—' },
-          { key: 'email', label: 'E-mail', children: userSettings.email },
-        ]}
-      />
-
-      <Form layout="vertical">
-        <Form.Item
-          label={
-            <Space>
-              <span>Pohlaví</span>
-              <SaveStatus status={statuses.gender} />
-            </Space>
-          }
-          required
-        >
-          <Radio.Group
-            value={userSettings.gender ?? undefined}
-            onChange={(event) => patchImmediate('gender', event.target.value)}
-          >
-            <Radio.Button value="male">Muž</Radio.Button>
-            <Radio.Button value="female">Žena</Radio.Button>
-          </Radio.Group>
-        </Form.Item>
-
-        <Form.Item
-          label={
-            <Space>
-              <span>Výška</span>
-              <SaveStatus status={statuses.height_cm} />
-            </Space>
-          }
-          required
-        >
-          <InputNumber
-            value={userSettings.height_cm ?? null}
-            min={50}
-            max={250}
-            addonAfter="cm"
-            onChange={(value) => patchDebounced('height_cm', value)}
+      >
+        <Space align="center" style={{ marginBottom: 12 }}>
+          <Avatar
+            size={64}
+            src={userSettings.picture}
+            alt={userSettings.name ?? userSettings.email}
           />
-        </Form.Item>
+          <div>
+            <div style={{ fontWeight: 500 }}>{userSettings.name ?? '—'}</div>
+            <div style={{ color: 'rgba(0,0,0,0.45)' }}>{userSettings.email}</div>
+          </div>
+        </Space>
+        <div>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Tyto údaje jsou spravovány přes váš Google účet a nelze je zde změnit.
+          </Text>
+        </div>
+      </Card>
 
-        <Form.Item
-          label={
-            <Space>
-              <span>Hmotnost</span>
-              <SaveStatus status={statuses.weight_kg} />
-            </Space>
-          }
-          required
-        >
-          <InputNumber
-            value={userSettings.weight_kg ?? null}
-            min={20}
-            max={300}
-            step={0.1}
-            addonAfter="kg"
-            onChange={(value) => patchDebounced('weight_kg', value)}
-          />
-        </Form.Item>
+      <Card title="Fyzické údaje">
+        <Form layout="vertical">
+          <p style={{ marginTop: 0, color: 'rgba(0,0,0,0.45)', fontSize: 13 }}>
+            Využíváme pro výpočet svalové zátěže při cvičení.
+          </p>
 
-        <Form.Item
-          label={
-            <Space>
-              <span>Rok narození</span>
-              <SaveStatus status={statuses.birth_year} />
-            </Space>
-          }
-          required
-          extra={computedAge != null ? `Aktuální věk: ${computedAge} let` : null}
-        >
-          <InputNumber
-            value={userSettings.birth_year ?? null}
-            min={1900}
-            max={currentYear}
-            onChange={(value) => patchDebounced('birth_year', value)}
-          />
-        </Form.Item>
-      </Form>
+          <Row gutter={24}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label={
+                  <Space>
+                    <span>Pohlaví</span>
+                    <SaveStatus status={statuses.gender} />
+                  </Space>
+                }
+                required
+              >
+                <Radio.Group
+                  value={userSettings.gender ?? undefined}
+                  onChange={(event) => patchImmediate('gender', event.target.value)}
+                  buttonStyle="solid"
+                  size="large"
+                >
+                  <Radio.Button value="male">Muž</Radio.Button>
+                  <Radio.Button value="female">Žena</Radio.Button>
+                </Radio.Group>
+              </Form.Item>
+            </Col>
+
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label={
+                  <Space>
+                    <span>Rok narození</span>
+                    <SaveStatus status={statuses.birth_year} />
+                  </Space>
+                }
+                required
+                extra={computedAge != null ? `Aktuální věk: ${computedAge} let` : null}
+              >
+                <InputNumber
+                  value={userSettings.birth_year ?? null}
+                  min={1900}
+                  max={currentYear}
+                  onChange={(value) => patchDebounced('birth_year', value)}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={24}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label={
+                  <Space>
+                    <span>Výška</span>
+                    <SaveStatus status={statuses.height_cm} />
+                  </Space>
+                }
+                required
+              >
+                <Space.Compact style={{ width: '100%' }}>
+                  <InputNumber
+                    aria-label="Výška"
+                    value={userSettings.height_cm ?? null}
+                    min={50}
+                    max={250}
+                    style={{ width: '100%' }}
+                    onChange={(value) => patchDebounced('height_cm', value)}
+                  />
+                  <span style={unitLabelStyle}>
+                    cm
+                  </span>
+                </Space.Compact>
+              </Form.Item>
+            </Col>
+
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label={
+                  <Space>
+                    <span>Hmotnost</span>
+                    <SaveStatus status={statuses.weight_kg} />
+                  </Space>
+                }
+                required
+              >
+                <Space.Compact style={{ width: '100%' }}>
+                  <InputNumber
+                    value={userSettings.weight_kg ?? null}
+                    min={20}
+                    max={300}
+                    step={0.1}
+                    style={{ width: '100%' }}
+                    onChange={(value) => patchDebounced('weight_kg', value)}
+                  />
+                  <span style={unitLabelStyle}>
+                    kg
+                  </span>
+                </Space.Compact>
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Card>
     </Typography>
   );
 }

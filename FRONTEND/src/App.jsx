@@ -12,7 +12,6 @@ import Home from './pages/Home.jsx';
 import Exercises from './pages/Exercises.jsx';
 import ExerciseDetail from './pages/ExerciseDetail.jsx';
 import VoiceCounting from './pages/VoiceCounting.jsx';
-import WorkoutSession from './pages/WorkoutSession.jsx';
 import Settings from './pages/Settings.jsx';
 import TreningVezne from './pages/TreningVezne.jsx';
 
@@ -274,7 +273,6 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/exercises" element={<Exercises />} />
             <Route path="/exercises/:name" element={<ExerciseDetail />} />
-            <Route path="/exercises/:name/workout" element={<WorkoutSession />} />
             <Route path="/trening-vezne" element={<TreningVezne />} />
             <Route path="/voice-counting" element={<VoiceCounting />} />
             <Route path="/settings" element={<Settings />} />
