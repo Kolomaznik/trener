@@ -2,9 +2,9 @@ from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, ConfigDict, Field
 from pymongo import ReturnDocument
-from pymongo.database import Database
 
 from app.auth import GoogleUser, get_current_user
 from app.db import get_db
@@ -22,16 +22,16 @@ class UserSettingsPatch(BaseModel):
 
 
 @router.patch("/user/settings", status_code=status.HTTP_204_NO_CONTENT)
-def patch_user_settings(
+async def patch_user_settings(
     patch: UserSettingsPatch = Body(...),
     user: GoogleUser = Depends(get_current_user),
-    db: Database = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> None:
     payload = patch.model_dump(exclude_unset=True)
     if not payload:
-        doc = db["users"].find_one({"email": user.email})
+        doc = await db["users"].find_one({"email": user.email})
     else:
-        doc = db["users"].find_one_and_update(
+        doc = await db["users"].find_one_and_update(
             {"email": user.email},
             {"$set": payload},
             return_document=ReturnDocument.AFTER,

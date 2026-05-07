@@ -2,9 +2,9 @@ from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, ConfigDict
 from pymongo import ReturnDocument
-from pymongo.database import Database
 
 from app.auth import GoogleUser, get_current_user
 from app.db import get_db
@@ -24,13 +24,13 @@ class UserSettingsResponse(BaseModel):
 
 
 @router.get("/user/settings", response_model=UserSettingsResponse)
-def get_user_settings(
+async def get_user_settings(
     user: GoogleUser = Depends(get_current_user),
-    db: Database = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> UserSettingsResponse:
     now = datetime.now(UTC)
     google_profile = user.model_dump(mode="json")
-    doc = db["users"].find_one_and_update(
+    doc = await db["users"].find_one_and_update(
         {"email": user.email},
         {
             "$setOnInsert": {

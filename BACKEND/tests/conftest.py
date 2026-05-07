@@ -4,6 +4,7 @@ from pathlib import Path
 import mongomock
 import pytest
 from fastapi.testclient import TestClient
+from mongomock_motor import AsyncMongoMockClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -79,7 +80,9 @@ def mock_db():
 
 @pytest.fixture
 def client(mock_db):
-    app.dependency_overrides[get_db] = lambda: mock_db
+    async_client = AsyncMongoMockClient(mock_mongo_client=mock_db.client)
+    async_db = async_client["test_db"]
+    app.dependency_overrides[get_db] = lambda: async_db
     yield TestClient(app)
     app.dependency_overrides.clear()
 
