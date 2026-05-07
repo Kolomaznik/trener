@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
 from pymongo import ReturnDocument
-from pymongo.database import Database
 
 from app.auth import GoogleUser, get_current_user
 from app.db import get_db
@@ -45,12 +45,12 @@ def _empty_matrix() -> dict[str, dict[str, dict]]:
 
 
 @router.get("/trening-vezne", response_model=TreningVezneResponse)
-def get_trening_vezne(
+async def get_trening_vezne(
     user: GoogleUser = Depends(get_current_user),
-    db: Database = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> TreningVezneResponse:
     now = datetime.now(UTC)
-    doc = db["user_achievements"].find_one_and_update(
+    doc = await db["user_achievements"].find_one_and_update(
         {"user_email": user.email},
         {
             "$setOnInsert": {
