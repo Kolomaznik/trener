@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Divider, Flex, Grid, Spin, Typography } from 'antd';
-import BodyHighlighter from '../components/BodyHighlighter.jsx';
 import { getDashboard } from '../api/dashboard/get.js';
 import { useUserSettings } from '../context/UserSettingsContext.jsx';
 
