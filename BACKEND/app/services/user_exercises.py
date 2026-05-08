@@ -54,9 +54,7 @@ def _normalize_progression_level(value: Any) -> str | None:
 
 def _empty_achievement_cells() -> dict[str, dict[str, dict[str, Any]]]:
     return {
-        family_key: {
-            str(level): {"stars": 0, "achieved_at": None} for level in ACHIEVEMENT_LEVELS
-        }
+        family_key: {str(level): {"stars": 0, "achieved_at": None} for level in ACHIEVEMENT_LEVELS}
         for family_key in FAMILY_KEY_MAP.values()
     }
 
@@ -88,6 +86,12 @@ async def _record_achievement(
         return
 
     level_key = str(level_number)
+    # MongoDB rejects an update that touches both an ancestor path
+    # ($setOnInsert: {cells: …}) and one of its descendants
+    # ($set: cells.<family>.<level>.<field>) — even when the document
+    # already exists and $setOnInsert is a no-op. Validation happens at
+    # parse time. So we split the write in two: first seed the document
+    # idempotently, then update the nested fields without upsert.
     await db["user_achievements"].update_one(
         {"user_email": user_email},
         {
@@ -96,13 +100,19 @@ async def _record_achievement(
                 "cells": _empty_achievement_cells(),
                 "created_at": now,
             },
+            "$set": {"updated_at": now},
+        },
+        upsert=True,
+    )
+    await db["user_achievements"].update_one(
+        {"user_email": user_email},
+        {
             "$set": {
                 f"cells.{family_key}.{level_key}.stars": stars,
                 f"cells.{family_key}.{level_key}.achieved_at": now,
                 "updated_at": now,
             },
         },
-        upsert=True,
     )
 
 
@@ -187,8 +197,7 @@ async def _upsert_user_exercise(
         .to_list(None)
     )
     level = (
-        _normalize_progression_level((existing_user_exercise or {}).get("user_level"))
-        or "beginner"
+        _normalize_progression_level((existing_user_exercise or {}).get("user_level")) or "beginner"
     )
     goal = progression_goals.get(level) or {}
     best_rows = await (
