@@ -1,3 +1,4 @@
+import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -12,6 +13,13 @@ from app.api.workout_sessions.post import router as workout_sessions_router
 from config import settings
 
 app = FastAPI(title=settings.app_name)
+
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        traces_sample_rate=settings.sentry_traces_sample_rate,
+        send_default_pii=False,
+    )
 
 app.add_middleware(
     CORSMiddleware,
