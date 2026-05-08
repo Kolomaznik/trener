@@ -249,15 +249,7 @@ export default function Home() {
         ))}
         <span>Více</span>
       </Flex>
-
       <Divider />
-
-      <Title level={3}>Svalová mapa</Title>
-      <Paragraph>
-        Interaktivní přehled svalových partií. Klikněte na sval nebo vyberte partii ze seznamu a
-        upravte barvu a intenzitu zvýraznění.
-      </Paragraph>
-      <BodyHighlighter gender={userSettings?.gender} />
     </Typography>
   );
 }
