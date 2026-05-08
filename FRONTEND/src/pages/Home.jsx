@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Divider, Flex, Grid, Spin, Typography } from 'antd';
-import BodyHighlighter from '../components/BodyHighlighter.jsx';
 import { getDashboard } from '../api/dashboard/get.js';
 import { useUserSettings } from '../context/UserSettingsContext.jsx';
 
@@ -249,15 +248,7 @@ export default function Home() {
         ))}
         <span>Více</span>
       </Flex>
-
       <Divider />
-
-      <Title level={3}>Svalová mapa</Title>
-      <Paragraph>
-        Interaktivní přehled svalových partií. Klikněte na sval nebo vyberte partii ze seznamu a
-        upravte barvu a intenzitu zvýraznění.
-      </Paragraph>
-      <BodyHighlighter gender={userSettings?.gender} />
     </Typography>
   );
 }

@@ -1,4 +1,3 @@
-import json
 from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -7,7 +6,6 @@ from pydantic import BaseModel, Field
 
 from app.auth import GoogleUser, get_current_user
 from app.db import get_db
-from config import settings
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -25,14 +23,8 @@ class YearSummary(BaseModel):
     days: list[DailyExerciseSummary]
 
 
-class MuscleMetrics(BaseModel):
-    strength: int = 0
-    increment_since_last_exercise: int = 0
-
-
 class DashboardResponse(BaseModel):
     year_summary: YearSummary
-    muscle_map: dict[str, MuscleMetrics]
 
 
 @router.get("", response_model=DashboardResponse)
@@ -79,25 +71,4 @@ async def get_dashboard(
 
     year_summary = YearSummary(start_date=start, end_date=end, days=days)
 
-    try:
-        data = json.loads(settings.muscle_map_json_path.read_text(encoding="utf-8"))
-    except FileNotFoundError as exc:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Muscle map file not found: {settings.muscle_map_json_path}",
-        ) from exc
-    except json.JSONDecodeError as exc:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Invalid JSON in muscle map file: {settings.muscle_map_json_path}",
-        ) from exc
-
-    groups = data.get("highlightableMuscleGroups", [])
-    muscle_map: dict[str, MuscleMetrics] = {}
-    for group in groups:
-        if isinstance(group, dict):
-            muscle_id = group.get("id")
-            if isinstance(muscle_id, str):
-                muscle_map[muscle_id] = MuscleMetrics()
-
-    return DashboardResponse(year_summary=year_summary, muscle_map=muscle_map)
+    return DashboardResponse(year_summary=year_summary)
