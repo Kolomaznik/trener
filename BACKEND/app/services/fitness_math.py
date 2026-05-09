@@ -131,6 +131,9 @@ class SetEvaluation(BaseModel):
 
     pace_label: str  # "too_fast" | "on_track" | "too_slow"
     trend_label: str  # "speeding_up" | "steady" | "slowing_down"
+    # "too_few" when total_reps < target_reps, "completed" when
+    # total_reps >= target_reps. ``None`` when target_reps is unknown.
+    repetition_label: str | None = None
     avg_interval_sec: float
     recommendation: str
     # True iff the user reached their target rep count AND held the prescribed
@@ -163,16 +166,17 @@ _TARGET_INCREMENT: int = 2  # reps added to target when recommending more volume
 
 
 def interpolate_missing_reps(
-    events: list[dict],
+    counting: list[dict],
     session_start_ms: int | None = None,
 ) -> tuple[list[dict], int]:
     """Fill gaps caused by unrecognised speech in a voice-counted rep sequence.
 
     The algorithm:
 
-    1. Sort events by ``timestamp_ms`` and de-duplicate consecutive events
-       with the same value within a 1 500 ms window (keeping the last one,
-       matching the frontend ``shouldAcceptEvent`` behaviour).
+    1. Sort counting events by ``timestamp_ms`` and de-duplicate
+       consecutive entries with the same value within a 1 500 ms window
+       (keeping the last one, matching the frontend ``shouldAcceptEvent``
+       behaviour).
     2. Compute the median inter-rep interval from the de-duplicated sequence.
     3. For each consecutive pair ``(a, b)`` where ``b.value > a.value + 1``:
        if the time gap is at least 50 % of what the missing reps would need
@@ -184,24 +188,24 @@ def interpolate_missing_reps(
        canonical rep count equals the last recognised value.
 
     Args:
-        events: Raw event dicts from the workout session (as stored by the
-            frontend).  Each dict must have ``value`` (int) and
-            ``timestamp_ms`` (int) keys.
+        counting: Raw counting-event dicts from the workout session (as
+            sent by the frontend).  Each dict must have ``value`` (int)
+            and ``timestamp_ms`` (int) keys.
         session_start_ms: Unix epoch milliseconds for the session start.
             Used only to evaluate whether reps before the first recognised
             number are plausible.
 
     Returns:
-        A ``(corrected_events, total_reps)`` tuple where ``corrected_events``
-        is the merged list (original events with ``interpolated=False`` and
-        synthesised events with ``interpolated=True``) sorted by timestamp,
+        A ``(corrected_counting, total_reps)`` tuple where ``corrected_counting``
+        is the merged list (original entries with ``interpolated=False`` and
+        synthesised entries with ``interpolated=True``) sorted by timestamp,
         and ``total_reps`` is the last recognised value.
     """
-    if not events:
+    if not counting:
         return [], 0
 
     # Sort by timestamp and de-duplicate same-value consecutive events
-    sorted_events = sorted(events, key=lambda e: e["timestamp_ms"])
+    sorted_events = sorted(counting, key=lambda e: e["timestamp_ms"])
     deduped: list[dict] = []
     for ev in sorted_events:
         if (
@@ -270,27 +274,28 @@ def interpolate_missing_reps(
 
 
 def evaluate_set_performance(
-    events: list[dict],
+    counting: list[dict],
     cadence_total_rep_time_sec: float | None,
     target_reps: int | None = None,
     total_reps: int | None = None,
 ) -> "SetEvaluation | None":
     """Analyse pace and trend of a set and return a coaching recommendation.
 
-    Uses only **real** (non-interpolated) events so that artificially inserted
-    timestamps do not skew the averages.
+    Uses only **real** (non-interpolated) counting entries so that
+    artificially inserted timestamps do not skew the averages.
 
     Args:
-        events: Corrected event list (may include interpolated events).
+        counting: Corrected counting-event list (may include interpolated
+            entries; the evaluator filters them out).
         cadence_total_rep_time_sec: Expected seconds per rep from the exercise
             cadence document.  ``None`` when cadence is not defined – in that
             case the function returns ``None``.
         target_reps: Optional target rep count used to personalise the
             recommendation when pace and trend are both good and to decide
-            ``is_completed``.
+            ``is_completed`` / ``repetition_label``.
         total_reps: Final corrected rep count for the set (post-interpolation).
             When provided together with ``target_reps``, drives the
-            ``is_completed`` flag on the result.
+            ``is_completed`` flag and the ``repetition_label`` on the result.
 
     Returns:
         A ``SetEvaluation`` instance, or ``None`` when there is not enough
@@ -299,7 +304,7 @@ def evaluate_set_performance(
     if cadence_total_rep_time_sec is None:
         return None
 
-    real_events = [e for e in events if not e.get("interpolated")]
+    real_events = [e for e in counting if not e.get("interpolated")]
     real_events.sort(key=lambda e: e["timestamp_ms"])
 
     if len(real_events) < 2:
@@ -359,16 +364,19 @@ def evaluate_set_performance(
         else:
             recommendation = "Skvělé a rovnoměrné tempo! Příště přidej pár opakování."
 
-    is_completed = (
-        target_reps is not None
-        and total_reps is not None
-        and total_reps >= target_reps
-        and pace_label == "on_track"
-    )
+    if target_reps is None or total_reps is None:
+        repetition_label: str | None = None
+    elif total_reps >= target_reps:
+        repetition_label = "completed"
+    else:
+        repetition_label = "too_few"
+
+    is_completed = repetition_label == "completed" and pace_label == "on_track"
 
     return SetEvaluation(
         pace_label=pace_label,
         trend_label=trend_label,
+        repetition_label=repetition_label,
         avg_interval_sec=round(avg_interval_sec, 2),
         recommendation=recommendation,
         is_completed=is_completed,

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Avatar, Button, Drawer, Grid, Layout, Menu, Spin, Typography } from 'antd';
-import { MenuOutlined, UserOutlined } from '@ant-design/icons';
+import { DatabaseOutlined, MenuOutlined, UserOutlined } from '@ant-design/icons';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { apiClient } from './api/client.js';
 import { getUserSettings } from './api/user/settings/get.js';
@@ -14,6 +14,7 @@ import ExerciseDetail from './pages/ExerciseDetail.jsx';
 import VoiceCounting from './pages/VoiceCounting.jsx';
 import Settings from './pages/Settings.jsx';
 import TreningVezne from './pages/TreningVezne.jsx';
+import ExercisesCatalog from './pages/admin/ExercisesCatalog.jsx';
 
 const { Header, Content } = Layout;
 const { useBreakpoint } = Grid;
@@ -181,13 +182,24 @@ export default function App() {
 
   const drawerBottomItems = [
     {
-      key: '/settings',
-      label: (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-          {avatarNode}
-          <span>{userSettings?.name ?? 'Nastavení'}</span>
-        </span>
-      ),
+      type: 'group',
+      label: 'Konfigurace',
+      children: [
+        {
+          key: '/admin/exercises',
+          icon: <DatabaseOutlined />,
+          label: 'Cviky (katalog)',
+        },
+        {
+          key: '/settings',
+          label: (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              {avatarNode}
+              <span>{userSettings?.name ?? 'Nastavení'}</span>
+            </span>
+          ),
+        },
+      ],
     },
   ];
 
@@ -276,6 +288,7 @@ export default function App() {
             <Route path="/trening-vezne" element={<TreningVezne />} />
             <Route path="/voice-counting" element={<VoiceCounting />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/admin/exercises" element={<ExercisesCatalog />} />
           </Routes>
         </Content>
       </Layout>

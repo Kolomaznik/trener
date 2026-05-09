@@ -6,8 +6,8 @@ import ExerciseDetail from './ExerciseDetail.jsx';
 vi.mock('../api/exercises/get_detail.js', () => ({
   getExerciseDetail: vi.fn(),
 }));
-vi.mock('../api/workout-sessions/post.js', () => ({
-  postWorkoutSession: vi.fn(),
+vi.mock('../api/exercise-series/post.js', () => ({
+  postExerciseSeries: vi.fn(),
 }));
 
 vi.mock('react-speech-recognition', () => {
@@ -36,7 +36,7 @@ vi.mock('react-speech-recognition', () => {
 });
 
 import { getExerciseDetail } from '../api/exercises/get_detail.js';
-import { postWorkoutSession } from '../api/workout-sessions/post.js';
+import { postExerciseSeries } from '../api/exercise-series/post.js';
 import * as speechModule from 'react-speech-recognition';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -143,9 +143,9 @@ describe('ExerciseDetail page', () => {
   beforeEach(() => {
     speechModule.__resetMockState();
     getExerciseDetail.mockReset();
-    postWorkoutSession.mockReset();
+    postExerciseSeries.mockReset();
     getExerciseDetail.mockResolvedValue(detailFixture);
-    postWorkoutSession.mockResolvedValue({ id: 'sess-1', total_reps: 0, evaluation: null });
+    postExerciseSeries.mockResolvedValue({ id: 'sess-1', total_reps: 0, evaluation: null });
   });
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -415,12 +415,12 @@ describe('ExerciseDetail page', () => {
     await waitFor(() => screen.getByRole('button', { name: /Konec série/ }));
     fireEvent.click(screen.getByRole('button', { name: /Konec série/ }));
 
-    await waitFor(() => expect(postWorkoutSession).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(postExerciseSeries).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId('live-stats')).not.toBeInTheDocument();
   });
 
   it('shows evaluation card when backend returns evaluation', async () => {
-    postWorkoutSession.mockResolvedValue({
+    postExerciseSeries.mockResolvedValue({
       id: 'sess-1',
       total_reps: 10,
       evaluation: {
@@ -451,7 +451,7 @@ describe('ExerciseDetail page', () => {
     await waitFor(() => screen.getByRole('button', { name: /Konec série/ }));
     fireEvent.click(screen.getByRole('button', { name: /Konec série/ }));
 
-    await waitFor(() => expect(postWorkoutSession).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(postExerciseSeries).toHaveBeenCalledTimes(1));
     // Start série button should be visible again
     expect(screen.getByRole('button', { name: /Start série/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Konec série/ })).not.toBeInTheDocument();

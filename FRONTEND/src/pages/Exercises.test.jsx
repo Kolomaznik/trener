@@ -3,30 +3,30 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Exercises from './Exercises.jsx';
 
-vi.mock('../api/exercises/get_list.js', () => ({
-  getExercises: vi.fn(),
+vi.mock('../api/user_exercises/get_list.js', () => ({
+  getUserExercises: vi.fn(),
 }));
 
-import { getExercises } from '../api/exercises/get_list.js';
+import { getUserExercises } from '../api/user_exercises/get_list.js';
 
-const listFixture = [
+const fixture = [
   {
-    name: 'pushups_level_1',
+    exercise_name: 'pushups_level_1',
     title: 'Kliky o zeď',
     family: 'Kliky',
     level: 1,
     user_level: 'intermediate',
-    next_exercise_name: 'pushups_level_2',
-    next_exercise_title: 'Kliky v předklonu',
+    target_reps: 25,
+    target_sets: 2,
   },
   {
-    name: 'pushups_level_2',
-    title: 'Kliky v předklonu',
-    family: 'Kliky',
-    level: 2,
-    user_level: null,
-    next_exercise_name: null,
-    next_exercise_title: null,
+    exercise_name: 'squats_level_1',
+    title: 'Dřepy ve svíčce',
+    family: 'Dřepy',
+    level: 1,
+    user_level: 'beginner',
+    target_reps: 10,
+    target_sets: 1,
   },
 ];
 
@@ -36,40 +36,30 @@ function renderWithRouter(initialPath = '/exercises') {
       <Routes>
         <Route path="/exercises" element={<Exercises />} />
         <Route path="/exercises/:name" element={<div data-testid="detail-marker" />} />
+        <Route path="/admin/exercises" element={<div data-testid="catalog-marker" />} />
       </Routes>
     </MemoryRouter>,
   );
 }
 
-describe('Exercises page (tile grid)', () => {
+describe('Exercises page (user list)', () => {
   beforeEach(() => {
-    getExercises.mockReset();
-    getExercises.mockResolvedValue(listFixture);
+    getUserExercises.mockReset();
+    getUserExercises.mockResolvedValue(fixture);
   });
 
-  it('renders tiles for each exercise', async () => {
+  it('renders one tile per added exercise', async () => {
     renderWithRouter();
 
-    await waitFor(() => expect(getExercises).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getUserExercises).toHaveBeenCalledTimes(1));
     expect(await screen.findByText('Kliky o zeď')).toBeInTheDocument();
-    expect(screen.getByText('Kliky v předklonu')).toBeInTheDocument();
-    expect(screen.getAllByText('Kliky').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText(/Level \d/).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('Dřepy ve svíčce')).toBeInTheDocument();
   });
 
-  it('shows user level tag when user_level is set', async () => {
+  it('shows the user level tag when present', async () => {
     renderWithRouter();
-
     expect(await screen.findByText('Středně pokročilý')).toBeInTheDocument();
-  });
-
-  it('shows "next level" hint on tiles that have one, "highest" otherwise', async () => {
-    renderWithRouter();
-
-    expect(
-      await screen.findByText(/Další úroveň: Kliky v předklonu/),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Nejvyšší úroveň této rodiny')).toBeInTheDocument();
+    expect(screen.getByText('Začátečník')).toBeInTheDocument();
   });
 
   it('navigates to detail when a tile is clicked', async () => {
@@ -84,20 +74,23 @@ describe('Exercises page (tile grid)', () => {
   });
 
   it('shows error alert when list fails to load', async () => {
-    getExercises.mockRejectedValue(new Error('boom'));
+    getUserExercises.mockRejectedValue(new Error('boom'));
     renderWithRouter();
 
     expect(
-      await screen.findByText('Nepodařilo se načíst seznam cviků.'),
+      await screen.findByText('Nepodařilo se načíst tvůj seznam cviků.'),
     ).toBeInTheDocument();
   });
 
-  it('shows empty state when no exercises in DB', async () => {
-    getExercises.mockResolvedValue([]);
+  it('shows empty state with link to catalog when user has no added exercises', async () => {
+    getUserExercises.mockResolvedValue([]);
     renderWithRouter();
 
-    expect(
-      await screen.findByText('Žádné cviky v databázi.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByTestId('empty-state')).toBeInTheDocument();
+    expect(screen.getByText(/přidej si je z katalogu/i)).toBeInTheDocument();
+
+    const button = screen.getByRole('button', { name: /Otevřít katalog cviků/i });
+    fireEvent.click(button);
+    expect(await screen.findByTestId('catalog-marker')).toBeInTheDocument();
   });
 });
