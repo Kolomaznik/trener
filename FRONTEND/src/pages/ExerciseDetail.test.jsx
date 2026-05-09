@@ -10,6 +10,12 @@ vi.mock('../api/exercise-series/post.js', () => ({
   postExerciseSeries: vi.fn(),
 }));
 
+vi.mock('@ant-design/plots', () => ({
+  Line: (props) => (
+    <div data-testid="line-chart" data-point-count={props.data?.length ?? 0} />
+  ),
+}));
+
 vi.mock('react-speech-recognition', () => {
   const initialState = {
     transcript: '',
@@ -99,11 +105,22 @@ const detailFixture = {
   height_multiplier: 0.40,
   user_level: {
     level: 'beginner',
-    recent_sets: [],
+    level_sets: [],
     target_reps: 10,
     target_sets: 1,
     last_best_reps: 9,
     rest_seconds: 90,
+  },
+};
+
+const detailFixtureWithLevelSets = {
+  ...detailFixture,
+  user_level: {
+    ...detailFixture.user_level,
+    level_sets: [
+      { total_reps: 6, started_at: '2026-05-01T07:30:00Z', set_number: 1 },
+      { total_reps: 9, started_at: '2026-05-03T18:15:00Z', set_number: 1 },
+    ],
   },
 };
 
@@ -175,6 +192,26 @@ describe('ExerciseDetail page', () => {
     expect(screen.getByText('Kliky')).toBeInTheDocument();
     expect(screen.getByText('Level 1')).toBeInTheDocument();
     expect(screen.getByText('Rehabilitační a přípravný cvik.')).toBeInTheDocument();
+  });
+
+  // ── Tvoje úroveň: level-progress plot ─────────────────────────────────────
+
+  it('does NOT render the level-progress plot when level_sets is empty', async () => {
+    renderWithRouter();
+
+    await screen.findByText('Kliky o zeď');
+    expect(screen.queryByLabelText('Průběh úrovně')).not.toBeInTheDocument();
+  });
+
+  it('renders the level-progress plot with one data point per set', async () => {
+    getExerciseDetail.mockResolvedValue(detailFixtureWithLevelSets);
+    renderWithRouter();
+
+    const plot = await screen.findByLabelText('Průběh úrovně');
+    expect(plot).toBeInTheDocument();
+    const chart = plot.querySelector('[data-testid="line-chart"]');
+    expect(chart).toBeInTheDocument();
+    expect(chart).toHaveAttribute('data-point-count', '2');
   });
 
   // ── Difficulty tabs ────────────────────────────────────────────────────────

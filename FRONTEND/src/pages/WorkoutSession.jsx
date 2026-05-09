@@ -372,7 +372,6 @@ export default function WorkoutSession() {
   const stopSet = async () => {
     await SpeechRecognition.stopListening();
     await releaseWakeLock();
-    const endedAt = new Date().toISOString();
     setSessionState('stopped');
     processedTokenCountRef.current = 0;
     resetTranscript();
@@ -386,7 +385,6 @@ export default function WorkoutSession() {
     const payload = {
       exercise_id: exerciseName,
       started_at: sessionStartedAt,
-      ended_at: endedAt,
       total_duration_sec: elapsed,
       total_reps: stats.count,
       counting: currentEvents.map(({ value, token, timestampMs, timestampIso }) => ({

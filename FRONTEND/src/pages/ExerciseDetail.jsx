@@ -24,6 +24,7 @@ import {
   StopOutlined,
 } from '@ant-design/icons';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
+import { Line } from '@ant-design/plots';
 import ReactMarkdown from 'react-markdown';
 import ExerciseMuscleMap from '../components/ExerciseMuscleMap.jsx';
 import { getExerciseDetail } from '../api/exercises/get_detail.js';
@@ -125,6 +126,41 @@ function IntervalSparkline({ intervalsMs, cadenceMs }) {
       <text x={0} y={PAD.top + innerH / 2} fontSize="11" fill="#888"
         transform={`rotate(-90,8,${PAD.top + innerH / 2})`} textAnchor="middle">s</text>
     </svg>
+  );
+}
+
+function LevelProgressPlot({ levelSets, targetReps }) {
+  if (!levelSets || levelSets.length === 0) return null;
+
+  const data = levelSets.map((s) => ({
+    time: new Date(s.started_at),
+    reps: s.total_reps,
+  }));
+
+  const annotations =
+    targetReps != null
+      ? [
+          {
+            type: 'lineY',
+            data: [targetReps],
+            style: { stroke: '#f5222d', lineDash: [4, 3], lineWidth: 1.5 },
+            labelFormatter: () => `cíl ${targetReps}`,
+          },
+        ]
+      : undefined;
+
+  return (
+    <div aria-label="Průběh úrovně" style={{ width: '100%', marginTop: 8 }}>
+      <Line
+        data={data}
+        xField="time"
+        yField="reps"
+        height={160}
+        point={{ shapeField: 'circle', sizeField: 3 }}
+        axis={{ x: { title: false }, y: { title: 'reps' } }}
+        annotations={annotations}
+      />
+    </div>
   );
 }
 
@@ -483,7 +519,6 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
   const stopSet = async () => {
     await SpeechRecognition.stopListening();
     await releaseWakeLock();
-    const endedAt = new Date().toISOString();
     setSessionState('stopped');
     processedTokenCountRef.current = 0;
     resetTranscript();
@@ -496,7 +531,6 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
     const payload = {
       exercise_id: exerciseName,
       started_at: sessionStartedAt,
-      ended_at: endedAt,
       total_duration_sec: elapsed,
       total_reps: stats.count,
       counting: currentEvents.map(({ value, token, timestampMs, timestampIso }) => ({
@@ -603,6 +637,10 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
                 🎯 Dnes překonej: <Text strong>{levelInfo.target_reps}</Text> opakování
               </Text>
             )}
+            <LevelProgressPlot
+              levelSets={levelInfo.level_sets}
+              targetReps={levelInfo.target_reps}
+            />
           </Space>
         </Card>
       )}

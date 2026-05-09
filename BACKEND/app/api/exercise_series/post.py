@@ -9,8 +9,10 @@ The endpoint:
 3. Looks up the user's current progression tier on the catalog and
    evaluates pace / trend / repetition_label / is_completed.
 4. Persists the full series doc — input ``counting`` events,
-   calculated ``total_reps``, evaluation result, and the target_reps
-   snapshot — into the ``exercise_series`` collection.
+   calculated ``total_reps``, evaluation result, and the ``user_level``
+   snapshot — into the ``exercise_series`` collection. ``target_reps``
+   is not stored; it is derivable from ``exercise_id`` plus
+   ``user_level`` against the catalog's ``progression_goals``.
 5. Calls ``refresh_user_exercise`` to update the streak (no second write
    to ``user_exercises`` if the latest set didn't change progression).
 
@@ -54,7 +56,6 @@ class CountingEvent(BaseModel):
 class ExerciseSeriesCreate(BaseModel):
     exercise_id: str
     started_at: datetime
-    ended_at: datetime
     total_duration_sec: float = Field(ge=0)
     total_reps: int = Field(ge=0)  # client estimate; server recomputes from counting
     counting: list[CountingEvent] = Field(default_factory=list)
@@ -65,6 +66,7 @@ class ExerciseSeriesCreated(BaseModel):
     id: str
     total_reps: int
     target_reps: int | None = None
+    user_level: str
     evaluation: SetEvaluation | None = None
     level_up: LevelUpInfo | None = None
 
@@ -114,18 +116,18 @@ async def create_exercise_series(
     )
 
     # Persist the full series — input + calculated + evaluation result
-    # + target_reps snapshot so historical entries stay interpretable
-    # after a level-up. Series are immutable once written.
+    # + user_level snapshot so historical entries stay interpretable
+    # after a level-up (target_reps is derivable from exercise_id +
+    # user_level against the catalog). Series are immutable once written.
     doc: dict[str, Any] = {
         "user_email": user.email,
         "exercise_id": payload.exercise_id,
         "started_at": payload.started_at,
-        "ended_at": payload.ended_at,
         "total_duration_sec": payload.total_duration_sec,
         "set_number": payload.set_number,
         "counting": corrected_counting,
         "total_reps": corrected_total_reps,
-        "target_reps": target_reps,
+        "user_level": level,
         "evaluation": evaluation.model_dump() if evaluation is not None else None,
     }
     result = await db["exercise_series"].insert_one(doc)
@@ -139,6 +141,7 @@ async def create_exercise_series(
         id=str(result.inserted_id),
         total_reps=corrected_total_reps,
         target_reps=target_reps,
+        user_level=level,
         evaluation=evaluation,
         level_up=level_up,
     )

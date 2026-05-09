@@ -104,15 +104,36 @@ def test_get_exercise_detail_returns_user_state_when_added(
             "updated_at": now - timedelta(days=1),
         }
     )
-    # A previous set drives best_result on cache refresh.
-    mock_db["exercise_series"].insert_one(
-        {
-            "user_email": "alice@example.com",
-            "exercise_id": "pushups_level_1",
-            "total_reps": 12,
-            "started_at": now,
-            "set_number": 1,
-        }
+    # Three series rows exercising the level_sets filter:
+    # 1) at current level → included in level_sets
+    # 2) at a different level → excluded
+    # 3) without user_level (legacy row, pre-feature) → excluded
+    mock_db["exercise_series"].insert_many(
+        [
+            {
+                "user_email": "alice@example.com",
+                "exercise_id": "pushups_level_1",
+                "total_reps": 12,
+                "started_at": now,
+                "set_number": 1,
+                "user_level": "beginner",
+            },
+            {
+                "user_email": "alice@example.com",
+                "exercise_id": "pushups_level_1",
+                "total_reps": 30,
+                "started_at": now - timedelta(days=2),
+                "set_number": 1,
+                "user_level": "intermediate",
+            },
+            {
+                "user_email": "alice@example.com",
+                "exercise_id": "pushups_level_1",
+                "total_reps": 8,
+                "started_at": now - timedelta(days=3),
+                "set_number": 1,
+            },
+        ]
     )
     _stub_google(monkeypatch)
 
@@ -123,7 +144,15 @@ def test_get_exercise_detail_returns_user_state_when_added(
     assert body["title"] == "Kliky o zeď"
     assert body["user_level"]["level"] == "beginner"
     assert body["user_level"]["target_reps"] == 10
-    assert body["user_level"]["last_best_reps"] == 12
+    # last_best_reps is intentionally cross-level (best across all series).
+    assert body["user_level"]["last_best_reps"] == 30
+
+    # level_sets contains only the current-level row; intermediate and
+    # legacy (no user_level) rows are filtered out.
+    level_sets = body["user_level"]["level_sets"]
+    assert len(level_sets) == 1
+    assert level_sets[0]["total_reps"] == 12
+    assert level_sets[0]["set_number"] == 1
 
     # Read-only: the endpoint did NOT advance the streak.
     row = mock_db["user_exercises"].find_one(

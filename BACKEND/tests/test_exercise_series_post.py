@@ -8,7 +8,6 @@ SESSION_PAYLOAD = {
     "exercise_id": "pushups_level_1",
     "exercise_name": "Kliky o zeď",
     "started_at": "2026-05-03T10:00:00Z",
-    "ended_at": "2026-05-03T10:01:00Z",
     "total_duration_sec": 60.0,
     "total_reps": 15,
     "counting": [],
@@ -68,7 +67,6 @@ def _payload_with_reps(total_reps: int, *, set_number: int = 1) -> dict:
         "exercise_id": "pushups_level_1",
         "exercise_name": "Kliky o zeď",
         "started_at": "2026-05-03T10:00:00Z",
-        "ended_at": "2026-05-03T10:01:00Z",
         "total_duration_sec": 60.0,
         "total_reps": total_reps,
         "set_number": set_number,
@@ -126,14 +124,15 @@ def test_post_exercise_series_refreshes_user_exercises(authed_client, mock_db, f
     assert "recent_sets" not in user_exercise
 
 
-def test_exercise_series_persists_evaluation_and_target_reps(
+def test_exercise_series_persists_evaluation_and_user_level(
     authed_client,
     mock_db,
     fake_google,
 ):
     """Each series doc carries the calculated evaluation block and the
-    target_reps snapshot at the moment of saving — these used to be
-    recomputed at return time and never stored."""
+    user_level snapshot at the moment of saving. target_reps is no
+    longer cached on the row — it's derivable from exercise_id +
+    user_level via the catalog's progression_goals."""
     _seed_pushups_level_1(mock_db)
     _add_pushups_for_user(authed_client, fake_google)
     fake_google.set_user(google_payload())
@@ -149,8 +148,8 @@ def test_exercise_series_persists_evaluation_and_target_reps(
     assert len(series) == 1
     doc = series[0]
 
-    # Snapshot of the catalog goal at the time of the set.
-    assert doc["target_reps"] == 10
+    # Snapshot of the user's tier at the time of the set.
+    assert doc["user_level"] == "beginner"
 
     # Evaluation block is persisted — see SetEvaluation in fitness_math.
     assert doc["evaluation"] is not None
@@ -164,6 +163,7 @@ def test_exercise_series_persists_evaluation_and_target_reps(
         "muscle_engagement_percent",
         "exercise_name",
         "saved_at",
+        "target_reps",
     ):
         assert forbidden not in doc, f"{forbidden} should not be stored on exercise_series"
 

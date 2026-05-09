@@ -65,7 +65,6 @@ Backend automaticky doplní:
   "exercise_id": "pushups_level_1",
   "exercise_name": "Kliky o zeď",
   "started_at": "2026-05-03T10:00:00Z",
-  "ended_at": "2026-05-03T10:01:00Z",
   "total_duration_sec": 60.0,
   "total_reps": 15,
   "set_number": 1,

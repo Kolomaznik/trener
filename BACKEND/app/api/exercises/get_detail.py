@@ -53,7 +53,7 @@ class MuscleLoadByDifficulty(BaseModel):
     mastery: dict[str, MuscleEngagement] = Field(default_factory=dict)
 
 
-class RecentSet(BaseModel):
+class LevelSet(BaseModel):
     total_reps: int
     started_at: datetime
     set_number: int
@@ -61,7 +61,7 @@ class RecentSet(BaseModel):
 
 class UserLevelInfo(BaseModel):
     level: str
-    recent_sets: list[RecentSet]
+    level_sets: list[LevelSet]
     target_reps: int | None = None
     target_sets: int | None = None
     last_best_reps: int | None = None
@@ -182,8 +182,10 @@ async def get_exercise_detail(
             progression_goals: dict[str, Any] = exercise_doc.get("progression_goals") or {}
             goal = progression_goals.get(level) or {}
 
-            # Latest 5 sets + best result, derived from exercise_series
-            # in a single $facet pipeline.
+            # All sets at the user's current level (chronological) + best
+            # result across all levels, derived from exercise_series in a
+            # single $facet pipeline. Rows without `user_level` (recorded
+            # before that field was added) are excluded from level_sets.
             facet_rows = await (
                 db["exercise_series"]
                 .aggregate(
@@ -196,9 +198,9 @@ async def get_exercise_detail(
                         },
                         {
                             "$facet": {
-                                "recent": [
-                                    {"$sort": {"started_at": -1}},
-                                    {"$limit": 5},
+                                "level_sets": [
+                                    {"$match": {"user_level": level}},
+                                    {"$sort": {"started_at": 1}},
                                     {
                                         "$project": {
                                             "_id": 0,
@@ -222,14 +224,14 @@ async def get_exercise_detail(
                 )
                 .to_list(1)
             )
-            facet = facet_rows[0] if facet_rows else {"recent": [], "best": []}
-            recent_sets = [RecentSet(**rs) for rs in facet.get("recent", [])]
+            facet = facet_rows[0] if facet_rows else {"level_sets": [], "best": []}
+            level_sets = [LevelSet(**rs) for rs in facet.get("level_sets", [])]
             best_rows = facet.get("best") or []
             last_best_reps = best_rows[0]["best_result"] if best_rows else None
 
             user_level = UserLevelInfo(
                 level=level,
-                recent_sets=recent_sets,
+                level_sets=level_sets,
                 target_reps=goal.get("reps"),
                 target_sets=goal.get("sets"),
                 last_best_reps=last_best_reps,
