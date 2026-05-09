@@ -50,13 +50,17 @@ async def get_dashboard(
     start_dt = datetime(start.year, start.month, start.day)
     end_dt = datetime(end.year, end.month, end.day, 23, 59, 59, 999999)
 
-    sessions = await db["workout_sessions"].find(
-        {
-            "user_email": user.email,
-            "started_at": {"$gte": start_dt, "$lte": end_dt},
-        },
-        {"started_at": 1},
-    ).to_list(None)
+    sessions = (
+        await db["exercise_series"]
+        .find(
+            {
+                "user_email": user.email,
+                "started_at": {"$gte": start_dt, "$lte": end_dt},
+            },
+            {"started_at": 1},
+        )
+        .to_list(None)
+    )
 
     counts: dict[date, int] = {}
     for session in sessions:

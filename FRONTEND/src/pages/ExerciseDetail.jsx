@@ -27,7 +27,8 @@ import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognitio
 import ReactMarkdown from 'react-markdown';
 import ExerciseMuscleMap from '../components/ExerciseMuscleMap.jsx';
 import { getExerciseDetail } from '../api/exercises/get_detail.js';
-import { postWorkoutSession } from '../api/workout-sessions/post.js';
+import { addUserExercise } from '../api/user_exercises/post.js';
+import { postExerciseSeries } from '../api/exercise-series/post.js';
 import {
   computeSessionStats,
   parseNumberFromTokens,
@@ -335,6 +336,8 @@ export default function ExerciseDetail() {
 function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
   // ── Workout session state ─────────────────────────────────────────────────
   const levelInfo = detail.user_level ?? null;
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState(null);
   const [setNumber, setSetNumber] = useState(1);
   const [sessionState, setSessionState] = useState('idle');
   const [events, setEvents] = useState([]);
@@ -439,6 +442,22 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
     }
   };
 
+  const handleAddExercise = async () => {
+    setAddError(null);
+    setAdding(true);
+    try {
+      await addUserExercise(exerciseName);
+      const fresh = await getExerciseDetail(exerciseName);
+      setDetail(fresh);
+    } catch (err) {
+      console.error('Failed to add exercise:', err);
+      const detail = err?.response?.data?.detail;
+      setAddError(detail || 'Cvik se nepodařilo přidat.');
+    } finally {
+      setAdding(false);
+    }
+  };
+
   const startSet = async () => {
     setMicError('');
     setSaveError(null);
@@ -476,12 +495,11 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
     const stats = computeSessionStats(currentEvents);
     const payload = {
       exercise_id: exerciseName,
-      exercise_name: detail?.title ?? exerciseName,
       started_at: sessionStartedAt,
       ended_at: endedAt,
       total_duration_sec: elapsed,
       total_reps: stats.count,
-      events: currentEvents.map(({ value, token, timestampMs, timestampIso }) => ({
+      counting: currentEvents.map(({ value, token, timestampMs, timestampIso }) => ({
         value,
         token,
         timestamp_ms: timestampMs,
@@ -493,7 +511,7 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
     let evaluation = null;
     let correctedTotalReps = null;
     try {
-      const result = await postWorkoutSession(payload);
+      const result = await postExerciseSeries(payload);
       if (result?.evaluation != null) evaluation = result.evaluation;
       if (result?.total_reps != null) correctedTotalReps = result.total_reps;
       const freshDetail = await getExerciseDetail(exerciseName);
@@ -589,7 +607,33 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
         </Card>
       )}
 
-      {/* ── Exercise counter: série tracker ──────────────────────────────── */}
+      {/* ── Add-to-list CTA when the user hasn't added the exercise ─────── */}
+      {!levelInfo && (
+        <Card
+          size="small"
+          data-testid="add-cta"
+          style={{ borderColor: '#91caff', background: '#e6f4ff' }}
+        >
+          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            <Text>
+              Tento cvik zatím nemáš v seznamu. Přidej ho a začni s ním
+              trénovat.
+            </Text>
+            {addError && <Alert type="error" showIcon message={addError} />}
+            <Button
+              type="primary"
+              icon={<PlayCircleOutlined />}
+              loading={adding}
+              onClick={handleAddExercise}
+            >
+              Přidat do mých cviků
+            </Button>
+          </Space>
+        </Card>
+      )}
+
+      {/* ── Exercise counter: série tracker (added users only) ──────────── */}
+      {levelInfo && (
       <Card
         size="small"
         title={
@@ -724,6 +768,7 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
           )}
         </Space>
       </Card>
+      )}
 
       {/* ── Description ──────────────────────────────────────────────────── */}
       {detail.description && (

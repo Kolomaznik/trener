@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert,
+  Button,
   Card,
   Col,
   Empty,
@@ -11,7 +12,8 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import { getExercises } from '../api/exercises/get_list.js';
+import { DatabaseOutlined } from '@ant-design/icons';
+import { getUserExercises } from '../api/user_exercises/get_list.js';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -37,14 +39,14 @@ export default function Exercises() {
     let active = true;
     setLoading(true);
     setError(null);
-    getExercises()
+    getUserExercises()
       .then((data) => {
         if (active) setExercises(data);
       })
       .catch((err) => {
         if (!active) return;
-        console.error('Failed to load exercises:', err);
-        setError('Nepodařilo se načíst seznam cviků.');
+        console.error('Failed to load user exercises:', err);
+        setError('Nepodařilo se načíst tvůj seznam cviků.');
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -57,10 +59,9 @@ export default function Exercises() {
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <Typography>
-        <Title level={2}>Cviky</Title>
+        <Title level={2}>Moje cviky</Title>
         <Paragraph>
-          Vyberte cvik z dlaždic níže. Detail s instrukcemi, tempem a svalovou mapou se otevře
-          po kliknutí.
+          Tvůj osobní seznam. Cviky přidáváš v katalogu — viz tlačítko níže.
         </Paragraph>
       </Typography>
 
@@ -77,14 +78,25 @@ export default function Exercises() {
           ))}
         </Row>
       ) : exercises.length === 0 ? (
-        <Empty description="Žádné cviky v databázi." />
+        <Empty
+          description="Zatím nemáš žádné cviky. Přidej si je z katalogu."
+          data-testid="empty-state"
+        >
+          <Button
+            type="primary"
+            icon={<DatabaseOutlined />}
+            onClick={() => navigate('/admin/exercises')}
+          >
+            Otevřít katalog cviků
+          </Button>
+        </Empty>
       ) : (
         <Row gutter={[16, 16]}>
           {exercises.map((item) => (
-            <Col key={item.name} xs={24} sm={12} lg={8}>
+            <Col key={item.exercise_name} xs={24} sm={12} lg={8}>
               <ExerciseTile
                 item={item}
-                onClick={() => navigate(`/exercises/${item.name}`)}
+                onClick={() => navigate(`/exercises/${item.exercise_name}`)}
               />
             </Col>
           ))}
@@ -113,17 +125,14 @@ function ExerciseTile({ item, onClick }) {
               {LEVEL_LABELS[item.user_level] ?? 'Neznámá úroveň'}
             </Tag>
           )}
+          {item.completed && <Tag color="green">Dokončeno</Tag>}
         </Space>
         <Title level={4} style={{ margin: 0 }}>
           {item.title}
         </Title>
-        {item.next_exercise_name ? (
+        {item.target_reps != null && (
           <Text type="secondary" style={{ fontSize: 12 }}>
-            Další úroveň: {item.next_exercise_title}
-          </Text>
-        ) : (
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Nejvyšší úroveň této rodiny
+            Cíl: {item.target_sets ?? 1} × {item.target_reps} opakování
           </Text>
         )}
       </Space>

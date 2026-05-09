@@ -1,6 +1,3 @@
-import app.api.exercises.get_list as get_list_module
-from tests.conftest import FakeAsyncClient, FakeResponse, google_payload
-
 AUTH = {"Authorization": "Bearer dummy-token"}
 
 
@@ -34,45 +31,6 @@ def _seed_level_one_exercises(mock_db):
                 "muscle_engagement_percent": {"quadriceps": 40},
             },
             {
-                "_id": "pullups_level_1",
-                "name": "pullups_level_1",
-                "title": "Svislé přítahy",
-                "family": "Shyby",
-                "level": 1,
-                "progression_goals": {
-                    "beginner": {"sets": 1, "reps": 10},
-                    "intermediate": {"sets": 2, "reps": 20},
-                    "mastery": {"sets": 3, "reps": 40},
-                },
-                "muscle_engagement_percent": {"lats": 30},
-            },
-            {
-                "_id": "legraises_level_1",
-                "name": "legraises_level_1",
-                "title": "Přítahy kolen v sedě",
-                "family": "Zdvihy nohou",
-                "level": 1,
-                "progression_goals": {
-                    "beginner": {"sets": 1, "reps": 10},
-                    "intermediate": {"sets": 2, "reps": 25},
-                    "mastery": {"sets": 3, "reps": 40},
-                },
-                "muscle_engagement_percent": {"abs": 45},
-            },
-            {
-                "_id": "bridges_level_1",
-                "name": "bridges_level_1",
-                "title": "Krátké mosty",
-                "family": "Mosty",
-                "level": 1,
-                "progression_goals": {
-                    "beginner": {"sets": 1, "reps": 10},
-                    "intermediate": {"sets": 2, "reps": 25},
-                    "mastery": {"sets": 3, "reps": 50},
-                },
-                "muscle_engagement_percent": {"glutes": 40},
-            },
-            {
                 "_id": "hspu_level_1",
                 "name": "hspu_level_1",
                 "title": "Stojka na hlavě o zeď",
@@ -89,29 +47,38 @@ def _seed_level_one_exercises(mock_db):
     )
 
 
-def test_get_exercises_returns_200(client):
-    response = client.get("/exercises")
-    assert response.status_code == 200
-
-
-def test_get_exercises_seeds_big5_for_authenticated_user(client, mock_db, monkeypatch):
+def test_get_exercises_catalog_returns_lean_rows_without_auth(client, mock_db):
+    """The /exercises/catalog endpoint is the admin table data source.
+    No authentication required, returns only (name, title, family, level)
+    sorted by family then level."""
     _seed_level_one_exercises(mock_db)
-    mock_db["users"].insert_one({"email": "alice@example.com", "weight_kg": 80.0})
 
-    FakeAsyncClient.next_response = FakeResponse(200, google_payload())
-    FakeAsyncClient.next_exception = None
-    monkeypatch.setattr(get_list_module.httpx, "AsyncClient", FakeAsyncClient)
-
-    response = client.get("/exercises", headers=AUTH)
+    response = client.get("/exercises/catalog")
     assert response.status_code == 200
 
     items = response.json()
-    assert len(items) == 5
-    assert {item["name"] for item in items} == {
-        "pushups_level_1",
-        "squats_level_1",
-        "pullups_level_1",
-        "legraises_level_1",
-        "bridges_level_1",
-    }
-    assert mock_db["user_exercises"].count_documents({"user_email": "alice@example.com"}) == 5
+    assert len(items) == 3
+    for item in items:
+        assert set(item.keys()) == {"name", "title", "family", "level"}
+    families = [item["family"] for item in items]
+    assert families == sorted(families)
+
+
+def test_catalog_does_not_create_user_exercises_rows(client, mock_db):
+    """Opening the catalog must not seed any user-specific data, even when
+    a Bearer token is present (the endpoint is auth-agnostic)."""
+    _seed_level_one_exercises(mock_db)
+    mock_db["users"].insert_one({"email": "alice@example.com", "weight_kg": 80.0})
+
+    response = client.get("/exercises/catalog", headers=AUTH)
+    assert response.status_code == 200
+    items = response.json()
+    assert all("user_level" not in item for item in items)
+    assert mock_db["user_exercises"].count_documents({}) == 0
+
+
+def test_legacy_trainee_endpoint_is_gone(client):
+    """The /exercises root endpoint was removed. Detail (/exercises/{name})
+    and catalog (/exercises/catalog) are the only routes the prefix exposes."""
+    response = client.get("/exercises")
+    assert response.status_code == 404

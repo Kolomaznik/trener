@@ -28,7 +28,7 @@ import {
   tokenizeTranscript,
 } from '../features/voiceCounting.js';
 import { getExerciseDetail } from '../api/exercises/get_detail.js';
-import { postWorkoutSession } from '../api/workout-sessions/post.js';
+import { postExerciseSeries } from '../api/exercise-series/post.js';
 import ExerciseMuscleMap from '../components/ExerciseMuscleMap.jsx';
 
 const { Title, Paragraph, Text } = Typography;
@@ -385,12 +385,11 @@ export default function WorkoutSession() {
     const stats = computeSessionStats(currentEvents);
     const payload = {
       exercise_id: exerciseName,
-      exercise_name: detail?.title ?? exerciseName,
       started_at: sessionStartedAt,
       ended_at: endedAt,
       total_duration_sec: elapsed,
       total_reps: stats.count,
-      events: currentEvents.map(({ value, token, timestampMs, timestampIso }) => ({
+      counting: currentEvents.map(({ value, token, timestampMs, timestampIso }) => ({
         value,
         token,
         timestamp_ms: timestampMs,
@@ -400,7 +399,7 @@ export default function WorkoutSession() {
     };
 
     try {
-      const result = await postWorkoutSession(payload);
+      const result = await postExerciseSeries(payload);
       if (result?.evaluation != null) setEvaluation(result.evaluation);
       if (result?.total_reps != null) setCorrectedTotalReps(result.total_reps);
       // Re-fetch detail to get refreshed user_level

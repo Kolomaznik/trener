@@ -1,18 +1,53 @@
+"""Per-user exercise state machine — slim, intrinsic state only.
+
+Each ``user_exercises`` document tracks one user's progression on one
+exercise. It stores **only** intrinsic per-user state. Catalog data
+(cadence, progression goals, family, level number, …), per-user
+derived values (target_reps, target_sets, rest_seconds), and
+session-derived values (best_result, recent_sets,
+muscle_load_by_difficulty) are computed on demand at the endpoint that
+serves them — they are no longer cached on this row.
+
+Document shape::
+
+    {
+        "user_email":            str,
+        "exercise_name":         str,
+        "user_level":            "beginner" | "intermediate" | "mastery",
+        "completed":             bool,
+        "level_history":         [ {level, trigger, achieved_at}, ... ],
+        "created_at":            datetime,
+        "consecutive_successes": int,    # set lazily on first streak event
+    }
+
+Lifecycle
+---------
+* **Add** — user explicitly adds via ``add_user_exercise``. No auto-seed.
+* **List** — ``list_user_exercises`` joins the catalog and projects the
+  current tier's ``target_reps`` / ``target_sets`` and a tier→seconds
+  ``rest_seconds`` so the trainee list page can render without a second
+  catalog round-trip.
+* **Refresh after a workout** — POST /workout-sessions calls
+  ``refresh_user_exercise`` which delegates to ``_check_and_advance``.
+  This evaluates the latest workout_session's ``total_reps`` against
+  ``progression_goals[user_level].reps`` and updates only the streak
+  fields (``consecutive_successes`` / on level-up, ``user_level``,
+  ``level_history``, ``completed``).
+
+Level-up rule
+-------------
+A user advances ``user_level`` only when their last
+``LEVEL_UP_THRESHOLD`` consecutive sets all met ``target_reps``. Any
+under-target set resets the streak to zero.
+"""
+
 from datetime import UTC, datetime
 from typing import Any
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
 
-from app.services.fitness_math import REST_SECONDS, calculate_muscle_load
-
-BIG5_LEVEL_ONE_NAMES: tuple[str, ...] = (
-    "pushups_level_1",
-    "squats_level_1",
-    "pullups_level_1",
-    "legraises_level_1",
-    "bridges_level_1",
-)
+from app.services.fitness_math import REST_SECONDS
 
 SCHEMA_FILTER: dict[str, Any] = {
     "level": {"$exists": True},
@@ -34,11 +69,19 @@ FAMILY_KEY_MAP: dict[str, str] = {
 }
 ACHIEVEMENT_LEVELS: tuple[int, ...] = tuple(range(1, 11))
 
+# Number of consecutive successful sets (set total_reps >= target_reps)
+# required before user_level advances by one tier.
+LEVEL_UP_THRESHOLD: int = 3
+
 
 class LevelUpInfo(BaseModel):
     previous_level: str
     new_level: str
-    exercise_unlocked: str | None = None
+
+
+class UserExerciseAlreadyExists(Exception):
+    """Raised when add_user_exercise is called for a (user, exercise) that
+    already has a row. The endpoint layer maps this to HTTP 409."""
 
 
 def _as_int(value: Any, default: int) -> int:
@@ -71,6 +114,10 @@ def _next_progression_level(level: str) -> str | None:
     return PROGRESSION_LEVELS[next_index]
 
 
+def _level_history_entry(level: str, trigger: str, when: datetime) -> dict[str, Any]:
+    return {"level": level, "trigger": trigger, "achieved_at": when}
+
+
 async def _record_achievement(
     *,
     db: AsyncIOMotorDatabase,
@@ -89,9 +136,8 @@ async def _record_achievement(
     # MongoDB rejects an update that touches both an ancestor path
     # ($setOnInsert: {cells: …}) and one of its descendants
     # ($set: cells.<family>.<level>.<field>) — even when the document
-    # already exists and $setOnInsert is a no-op. Validation happens at
-    # parse time. So we split the write in two: first seed the document
-    # idempotently, then update the nested fields without upsert.
+    # already exists and $setOnInsert is a no-op. So the write is
+    # split: first seed the document, then set the leaf fields.
     await db["user_achievements"].update_one(
         {"user_email": user_email},
         {
@@ -116,171 +162,91 @@ async def _record_achievement(
     )
 
 
-def _build_static_payload(
-    exercise_doc: dict[str, Any],
-    next_doc: dict[str, Any] | None,
-) -> dict[str, Any]:
-    media = exercise_doc.get("media")
-    cadence = exercise_doc.get("cadence")
-    progression_goals = exercise_doc.get("progression_goals")
-    muscle_engagement_percent = exercise_doc.get("muscle_engagement_percent")
-    return {
-        "title": exercise_doc["title"],
-        "english_name": exercise_doc.get("english_name"),
-        "family": exercise_doc["family"],
-        "level": exercise_doc["level"],
-        "description": exercise_doc.get("description", ""),
-        "media": dict(media) if isinstance(media, dict) else None,
-        "cadence": dict(cadence) if isinstance(cadence, dict) else None,
-        "progression_goals": dict(progression_goals) if isinstance(progression_goals, dict) else {},
-        "muscle_engagement_percent": dict(muscle_engagement_percent)
-        if isinstance(muscle_engagement_percent, dict)
-        else {},
-        "level_coefficient": exercise_doc.get("level_coefficient", 0.5),
-        "height_multiplier": exercise_doc.get("height_multiplier", 0.5),
-        "next_exercise_name": next_doc["name"] if next_doc else None,
-        "next_exercise_title": next_doc["title"] if next_doc else None,
-    }
-
-
-def _compute_muscle_load_by_difficulty(
-    *,
-    progression_goals: dict[str, Any],
-    muscle_engagement_percent: dict[str, int],
-    level_coefficient: float,
-    weight_kg: float | None,
-) -> dict[str, dict[str, Any]] | None:
-    if weight_kg is None:
-        return None
-    tiers: dict[str, dict[str, Any]] = {}
-    for tier in PROGRESSION_LEVELS:
-        goal = progression_goals.get(tier)
-        if not goal:
-            tiers[tier] = {}
-            continue
-        total_reps = _as_int(goal.get("sets"), 1) * _as_int(goal.get("reps"), 1)
-        calculated = calculate_muscle_load(
-            weight_kg=weight_kg,
-            total_reps=total_reps,
-            level_coefficient=level_coefficient,
-            muscle_engagement_percent=muscle_engagement_percent,
-        )
-        tiers[tier] = {muscle: engagement.model_dump() for muscle, engagement in calculated.items()}
-    return tiers
-
-
-async def _upsert_user_exercise(
-    *,
+async def add_user_exercise(
     db: AsyncIOMotorDatabase,
     user_email: str,
-    exercise_doc: dict[str, Any],
-    weight_kg: float | None,
+    exercise_name: str,
 ) -> dict[str, Any]:
-    now = datetime.now(UTC)
-    exercise_name = exercise_doc["name"]
-    existing_user_exercise = await db["user_exercises"].find_one(
+    """Add an exercise to the user's personal list.
+
+    Inserts a slim ``user_exercises`` row at level ``beginner`` with a
+    one-entry ``level_history`` (``trigger="seed"``). Raises:
+
+    * ``ValueError`` — exercise_name does not exist in the catalog.
+    * ``UserExerciseAlreadyExists`` — the user has already added this
+      exercise.
+    """
+    exercise_doc = await db["exercises"].find_one({"name": exercise_name, **SCHEMA_FILTER})
+    if exercise_doc is None:
+        raise ValueError(f"exercise not found: {exercise_name}")
+
+    existing = await db["user_exercises"].find_one(
         {"user_email": user_email, "exercise_name": exercise_name}
     )
-    next_doc = await db["exercises"].find_one(
-        {"family": exercise_doc["family"], "level": exercise_doc["level"] + 1}
-    )
-    static_payload = _build_static_payload(exercise_doc, next_doc)
-    progression_goals: dict[str, Any] = static_payload["progression_goals"]
-    muscle_engagement_percent: dict[str, int] = static_payload["muscle_engagement_percent"]
-    level_coefficient: float = static_payload["level_coefficient"]
+    if existing is not None:
+        raise UserExerciseAlreadyExists(exercise_name)
 
-    recent_docs = await (
-        db["workout_sessions"]
-        .find({"user_email": user_email, "exercise_id": exercise_name})
-        .sort("started_at", -1)
-        .limit(5)
-        .to_list(None)
-    )
-    level = (
-        _normalize_progression_level((existing_user_exercise or {}).get("user_level")) or "beginner"
-    )
-    goal = progression_goals.get(level) or {}
-    best_rows = await (
-        db["workout_sessions"]
-        .aggregate(
-            [
-                {"$match": {"user_email": user_email, "exercise_id": exercise_name}},
-                {"$group": {"_id": None, "best_result": {"$max": "$total_reps"}}},
-            ]
-        )
-        .to_list(1)
-    )
-    best_result = best_rows[0]["best_result"] if best_rows else 0
-
-    payload: dict[str, Any] = {
+    now = datetime.now(UTC)
+    # Note: `consecutive_successes` is intentionally absent on insert. The
+    # streak machine treats missing as zero (see `_check_and_advance`), and
+    # the field is set lazily on the user's first successful set.
+    document: dict[str, Any] = {
         "user_email": user_email,
         "exercise_name": exercise_name,
-        **static_payload,
-        "user_level": level,
-        "consecutive_successes": _as_int(
-            (existing_user_exercise or {}).get("consecutive_successes"),
-            0,
-        ),
-        "completed": bool((existing_user_exercise or {}).get("completed", False)),
-        "completed_at": (existing_user_exercise or {}).get("completed_at"),
-        "target_reps": goal.get("reps"),
-        "target_sets": goal.get("sets"),
-        "best_result": best_result,
-        "rest_seconds": REST_SECONDS.get(level, 60),
-        "recent_sets": [
-            {
-                "total_reps": d["total_reps"],
-                "started_at": d["started_at"],
-                "set_number": d["set_number"],
-            }
-            for d in recent_docs
-        ],
-        "muscle_load_by_difficulty": _compute_muscle_load_by_difficulty(
-            progression_goals=progression_goals,
-            muscle_engagement_percent=muscle_engagement_percent,
-            level_coefficient=level_coefficient,
-            weight_kg=weight_kg,
-        ),
-        "updated_at": now,
+        "user_level": "beginner",
+        "completed": False,
+        "level_history": [_level_history_entry("beginner", "seed", now)],
+        "created_at": now,
     }
-
-    await db["user_exercises"].update_one(
-        {"user_email": user_email, "exercise_name": exercise_name},
-        {"$setOnInsert": {"created_at": now}, "$set": payload},
-        upsert=True,
-    )
-    return payload
+    await db["user_exercises"].insert_one(document)
+    return document
 
 
-async def _unlock_next_exercise(
-    *,
+async def list_user_exercises(
     db: AsyncIOMotorDatabase,
     user_email: str,
-    current_user_exercise: dict[str, Any],
-    weight_kg: float | None,
-) -> str | None:
-    next_doc = await db["exercises"].find_one(
+) -> list[dict[str, Any]]:
+    """Return every exercise the user has added, with catalog data joined
+    and the current tier's targets projected.
+
+    Empty list when the user hasn't added anything. Catalog
+    ``title``/``family``/``level`` and per-tier ``target_reps`` /
+    ``target_sets`` / ``rest_seconds`` are computed at read time — they
+    are not cached on the row.
+    """
+    pipeline = [
+        {"$match": {"user_email": user_email}},
         {
-            "family": current_user_exercise["family"],
-            "level": current_user_exercise["level"] + 1,
-        }
-    )
-    if next_doc is None:
-        return None
+            "$lookup": {
+                "from": "exercises",
+                "localField": "exercise_name",
+                "foreignField": "name",
+                "as": "_catalog",
+            }
+        },
+        {"$unwind": {"path": "$_catalog", "preserveNullAndEmptyArrays": True}},
+    ]
+    rows = await db["user_exercises"].aggregate(pipeline).to_list(None)
 
-    existing_next = await db["user_exercises"].find_one(
-        {"user_email": user_email, "exercise_name": next_doc["name"]}
-    )
-    if existing_next is not None:
-        return None
-
-    await _upsert_user_exercise(
-        db=db,
-        user_email=user_email,
-        exercise_doc=next_doc,
-        weight_kg=weight_kg,
-    )
-    return next_doc["name"]
+    enriched: list[dict[str, Any]] = []
+    for row in rows:
+        catalog = row.pop("_catalog", None) or {}
+        level = _normalize_progression_level(row.get("user_level")) or "beginner"
+        progression_goals = catalog.get("progression_goals") or {}
+        goal = progression_goals.get(level) or {}
+        enriched.append(
+            {
+                **row,
+                "title": catalog.get("title"),
+                "family": catalog.get("family"),
+                "level": catalog.get("level"),
+                "target_reps": goal.get("reps"),
+                "target_sets": goal.get("sets"),
+                "rest_seconds": REST_SECONDS.get(level, 60),
+            }
+        )
+    enriched.sort(key=lambda r: (r.get("family") or "", r.get("level") or 0))
+    return enriched
 
 
 async def _check_and_advance(
@@ -288,8 +254,11 @@ async def _check_and_advance(
     db: AsyncIOMotorDatabase,
     user_email: str,
     exercise_name: str,
-    weight_kg: float | None,
 ) -> LevelUpInfo | None:
+    """Evaluate the latest set against the current target and update
+    streak / level. ``target_reps`` is now read from the catalog rather
+    than the user_exercise row (which no longer caches it).
+    """
     user_exercise = await db["user_exercises"].find_one(
         {"user_email": user_email, "exercise_name": exercise_name}
     )
@@ -297,13 +266,26 @@ async def _check_and_advance(
         return None
 
     current_level = _normalize_progression_level(user_exercise.get("user_level"))
-    target_reps = user_exercise.get("target_reps")
-    recent_sets = user_exercise.get("recent_sets") or []
-    if current_level is None or target_reps is None or not recent_sets:
+    if current_level is None:
         return None
 
-    latest_set = recent_sets[0]
-    latest_total_reps = _as_int(latest_set.get("total_reps"), 0)
+    exercise_doc = await db["exercises"].find_one({"name": exercise_name, **SCHEMA_FILTER})
+    if exercise_doc is None:
+        return None
+    progression_goals = exercise_doc.get("progression_goals") or {}
+    current_goal = progression_goals.get(current_level) or {}
+    target_reps = current_goal.get("reps")
+    if target_reps is None:
+        return None
+
+    latest_session = await db["exercise_series"].find_one(
+        {"user_email": user_email, "exercise_id": exercise_name},
+        sort=[("started_at", -1)],
+    )
+    if latest_session is None:
+        return None
+
+    latest_total_reps = _as_int(latest_session.get("total_reps"), 0)
     success = latest_total_reps >= _as_int(target_reps, 0)
     now = datetime.now(UTC)
 
@@ -311,135 +293,75 @@ async def _check_and_advance(
         if _as_int(user_exercise.get("consecutive_successes"), 0) != 0:
             await db["user_exercises"].update_one(
                 {"_id": user_exercise["_id"]},
-                {"$set": {"consecutive_successes": 0, "updated_at": now}},
+                {"$set": {"consecutive_successes": 0}},
             )
         return None
 
+    new_streak = _as_int(user_exercise.get("consecutive_successes"), 0) + 1
+    if new_streak < LEVEL_UP_THRESHOLD:
+        await db["user_exercises"].update_one(
+            {"_id": user_exercise["_id"]},
+            {"$set": {"consecutive_successes": new_streak}},
+        )
+        return None
+
+    # Threshold reached → level up.
     await _record_achievement(
         db=db,
         user_email=user_email,
-        family=user_exercise["family"],
-        level_number=_as_int(user_exercise["level"], 1),
+        family=exercise_doc.get("family") or "",
+        level_number=_as_int(exercise_doc.get("level"), 1),
         completed_progression_level=current_level,
         now=now,
     )
 
     next_progression_level = _next_progression_level(current_level)
     if next_progression_level is not None:
-        next_goal = (user_exercise.get("progression_goals") or {}).get(next_progression_level) or {}
         await db["user_exercises"].update_one(
             {"_id": user_exercise["_id"]},
             {
                 "$set": {
                     "user_level": next_progression_level,
-                    "target_reps": next_goal.get("reps"),
-                    "target_sets": next_goal.get("sets"),
-                    "rest_seconds": REST_SECONDS.get(next_progression_level, 60),
                     "consecutive_successes": 0,
-                    "updated_at": now,
-                }
+                },
+                "$push": {
+                    "level_history": _level_history_entry(
+                        next_progression_level, "consecutive_successes", now
+                    ),
+                },
             },
         )
         return LevelUpInfo(previous_level=current_level, new_level=next_progression_level)
 
-    unlocked_exercise = await _unlock_next_exercise(
-        db=db,
-        user_email=user_email,
-        current_user_exercise=user_exercise,
-        weight_kg=weight_kg,
-    )
+    # Mastery completed → mark this exercise done. The completion
+    # timestamp lives on the last level_history entry; we no longer
+    # mirror it onto a separate completed_at field.
     await db["user_exercises"].update_one(
         {"_id": user_exercise["_id"]},
         {
             "$set": {
                 "completed": True,
-                "completed_at": now,
                 "consecutive_successes": 0,
-                "updated_at": now,
-            }
+            },
+            "$push": {
+                "level_history": _level_history_entry("completed", "consecutive_successes", now),
+            },
         },
     )
-    return LevelUpInfo(
-        previous_level=current_level,
-        new_level="completed",
-        exercise_unlocked=unlocked_exercise,
-    )
-
-
-async def get_or_seed_user_exercises(
-    db: AsyncIOMotorDatabase,
-    user_email: str,
-    weight_kg: float | None,
-) -> list[dict[str, Any]]:
-    existing = await (
-        db["user_exercises"]
-        .find({"user_email": user_email})
-        .sort([("family", 1), ("level", 1)])
-        .to_list(None)
-    )
-    if existing:
-        return existing
-
-    docs = await (
-        db["exercises"]
-        .find({"name": {"$in": list(BIG5_LEVEL_ONE_NAMES)}, **SCHEMA_FILTER})
-        .to_list(None)
-    )
-    order = {name: idx for idx, name in enumerate(BIG5_LEVEL_ONE_NAMES)}
-    docs.sort(key=lambda d: order.get(d["name"], 999))
-
-    for doc in docs:
-        await _upsert_user_exercise(
-            db=db,
-            user_email=user_email,
-            exercise_doc=doc,
-            weight_kg=weight_kg,
-        )
-
-    return await (
-        db["user_exercises"]
-        .find({"user_email": user_email})
-        .sort([("family", 1), ("level", 1)])
-        .to_list(None)
-    )
+    return LevelUpInfo(previous_level=current_level, new_level="completed")
 
 
 async def refresh_user_exercise(
     db: AsyncIOMotorDatabase,
     user_email: str,
     exercise_name: str,
-    weight_kg: float | None,
 ) -> LevelUpInfo | None:
-    exercise_doc = await db["exercises"].find_one({"name": exercise_name, **SCHEMA_FILTER})
-    if exercise_doc is None:
-        return None
-
-    await _upsert_user_exercise(
-        db=db,
-        user_email=user_email,
-        exercise_doc=exercise_doc,
-        weight_kg=weight_kg,
-    )
+    """Evaluate the latest set against the streak. Returns ``None`` when
+    the user hasn't added the exercise. Used from POST /workout-sessions
+    only.
+    """
     return await _check_and_advance(
         db=db,
         user_email=user_email,
         exercise_name=exercise_name,
-        weight_kg=weight_kg,
-    )
-
-
-async def sync_exercise_static_fields(
-    db: AsyncIOMotorDatabase,
-    exercise_name: str,
-) -> None:
-    exercise_doc = await db["exercises"].find_one({"name": exercise_name, **SCHEMA_FILTER})
-    if exercise_doc is None:
-        return
-    next_doc = await db["exercises"].find_one(
-        {"family": exercise_doc["family"], "level": exercise_doc["level"] + 1}
-    )
-    now = datetime.now(UTC)
-    await db["user_exercises"].update_many(
-        {"exercise_name": exercise_name},
-        {"$set": {**_build_static_payload(exercise_doc, next_doc), "updated_at": now}},
     )
