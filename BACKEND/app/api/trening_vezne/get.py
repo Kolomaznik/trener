@@ -7,18 +7,13 @@ from pymongo import ReturnDocument
 
 from app.auth import GoogleUser, get_current_user
 from app.db import get_db
+from app.services.user_exercises import (
+    ACHIEVEMENT_LEVELS,
+    FAMILIES,
+    empty_achievement_cells,
+)
 
 router = APIRouter(tags=["trening-vezne"])
-
-FAMILIES: list[dict[str, str]] = [
-    {"key": "pushups", "title": "Kliky"},
-    {"key": "squats", "title": "Dřepy"},
-    {"key": "pullups", "title": "Shyby"},
-    {"key": "legraises", "title": "Zdvihy nohou"},
-    {"key": "bridges", "title": "Mosty"},
-    {"key": "hspu", "title": "Kliky ve stojce"},
-]
-LEVELS: list[int] = list(range(1, 11))
 
 
 class FamilyMeta(BaseModel):
@@ -37,11 +32,8 @@ class TreningVezneResponse(BaseModel):
     cells: dict[str, dict[str, Cell]]
 
 
-def _empty_matrix() -> dict[str, dict[str, dict]]:
-    return {
-        family["key"]: {str(level): {"stars": 0, "achieved_at": None} for level in LEVELS}
-        for family in FAMILIES
-    }
+_FAMILY_META: list[FamilyMeta] = [FamilyMeta(key=key, title=title) for title, key in FAMILIES]
+_LEVELS: list[int] = list(ACHIEVEMENT_LEVELS)
 
 
 @router.get("/trening-vezne", response_model=TreningVezneResponse)
@@ -55,7 +47,7 @@ async def get_trening_vezne(
         {
             "$setOnInsert": {
                 "user_email": user.email,
-                "cells": _empty_matrix(),
+                "cells": empty_achievement_cells(),
                 "created_at": now,
             },
             "$set": {"updated_at": now},
@@ -66,14 +58,14 @@ async def get_trening_vezne(
 
     stored_cells: dict = doc.get("cells") or {}
     reconciled: dict[str, dict[str, Cell]] = {}
-    for family in FAMILIES:
-        family_cells = stored_cells.get(family["key"]) or {}
-        reconciled[family["key"]] = {
-            str(level): Cell(**(family_cells.get(str(level)) or {})) for level in LEVELS
+    for family in _FAMILY_META:
+        family_cells = stored_cells.get(family.key) or {}
+        reconciled[family.key] = {
+            str(level): Cell(**(family_cells.get(str(level)) or {})) for level in _LEVELS
         }
 
     return TreningVezneResponse(
-        families=[FamilyMeta(**f) for f in FAMILIES],
-        levels=LEVELS,
+        families=_FAMILY_META,
+        levels=_LEVELS,
         cells=reconciled,
     )

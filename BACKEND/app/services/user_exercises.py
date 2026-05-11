@@ -59,14 +59,18 @@ PROGRESSION_STARS: dict[str, int] = {
     "intermediate": 2,
     "mastery": 3,
 }
-FAMILY_KEY_MAP: dict[str, str] = {
-    "Kliky": "pushups",
-    "Dřepy": "squats",
-    "Shyby": "pullups",
-    "Zdvihy nohou": "legraises",
-    "Mosty": "bridges",
-    "Kliky ve stojce": "hspu",
-}
+# Canonical ordered (catalog_family_title, achievement_key) pairs. The
+# tuple order drives the order in which families are rendered in the
+# Trénink věžné UI; FAMILY_KEY_MAP is derived for title→key lookups.
+FAMILIES: tuple[tuple[str, str], ...] = (
+    ("Kliky", "pushups"),
+    ("Dřepy", "squats"),
+    ("Shyby", "pullups"),
+    ("Zdvihy nohou", "legraises"),
+    ("Mosty", "bridges"),
+    ("Kliky ve stojce", "hspu"),
+)
+FAMILY_KEY_MAP: dict[str, str] = dict(FAMILIES)
 ACHIEVEMENT_LEVELS: tuple[int, ...] = tuple(range(1, 11))
 
 # Number of consecutive successful sets (set total_reps >= target_reps)
@@ -95,7 +99,12 @@ def _normalize_progression_level(value: Any) -> str | None:
     return value if value in PROGRESSION_LEVELS else None
 
 
-def _empty_achievement_cells() -> dict[str, dict[str, dict[str, Any]]]:
+def empty_achievement_cells() -> dict[str, dict[str, dict[str, Any]]]:
+    """Empty stars/achieved_at matrix keyed by family_key → level → cell.
+
+    Used both when seeding ``user_achievements`` rows and when the
+    Trénink věžné endpoint needs a placeholder shape.
+    """
     return {
         family_key: {str(level): {"stars": 0, "achieved_at": None} for level in ACHIEVEMENT_LEVELS}
         for family_key in FAMILY_KEY_MAP.values()
@@ -143,7 +152,7 @@ async def _record_achievement(
         {
             "$setOnInsert": {
                 "user_email": user_email,
-                "cells": _empty_achievement_cells(),
+                "cells": empty_achievement_cells(),
                 "created_at": now,
             },
             "$set": {"updated_at": now},

@@ -34,11 +34,9 @@ from app.services.fitness_math import (
     evaluate_set_performance,
     interpolate_missing_reps,
 )
-from app.services.user_exercises import LevelUpInfo, refresh_user_exercise
+from app.services.user_exercises import PROGRESSION_LEVELS, LevelUpInfo, refresh_user_exercise
 
 router = APIRouter(prefix="/exercise-series", tags=["exercise-series"])
-
-_VALID_LEVELS = {"beginner", "intermediate", "mastery"}
 
 
 class CountingEvent(BaseModel):
@@ -101,7 +99,7 @@ async def create_exercise_series(
     # progression_goals tier we evaluate against. We do not recompute it
     # from history here — that's the job of refresh_user_exercise.
     level = user_exercise.get("user_level")
-    if level not in _VALID_LEVELS:
+    if level not in PROGRESSION_LEVELS:
         level = "beginner"
 
     cadence = exercise_doc.get("cadence") or {}
