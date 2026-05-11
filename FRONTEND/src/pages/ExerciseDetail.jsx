@@ -84,6 +84,10 @@ function IntervalSparkline({ intervalsMs, cadenceMs }) {
     interval: v / 1000,
   }));
 
+  const cadenceSec = cadenceMs != null ? cadenceMs / 1000 : 0;
+  const dataMax = data.reduce((m, d) => Math.max(m, d.interval), 0);
+  const yMax = Math.max(cadenceSec, dataMax) + 1;
+
   const annotations =
     cadenceMs != null
       ? [
@@ -108,6 +112,7 @@ function IntervalSparkline({ intervalsMs, cadenceMs }) {
         height={110}
         point={{ shapeField: 'circle', sizeField: 3 }}
         axis={{ x: { title: false }, y: { title: 'reps' } }}
+        scale={{ y: { domain: [0, yMax] } }}
         annotations={annotations}
         tooltip={false}
       />
@@ -123,6 +128,9 @@ function LevelProgressPlot({ levelSets, targetReps }) {
     reps: s.total_reps,
     completed: s.is_completed === true,
   }));
+
+  const dataMax = data.reduce((m, d) => Math.max(m, d.reps), 0);
+  const yMax = Math.max(targetReps ?? 0, dataMax) + 1;
 
   const annotations =
     targetReps != null
@@ -155,6 +163,7 @@ function LevelProgressPlot({ levelSets, targetReps }) {
           },
         }}
         axis={{ x: { title: false }, y: { title: 'reps' } }}
+        scale={{ y: { domain: [0, yMax] } }}
         annotations={annotations}
         tooltip={false}
       />
