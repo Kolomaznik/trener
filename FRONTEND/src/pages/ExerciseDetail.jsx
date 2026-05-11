@@ -150,7 +150,10 @@ function LevelProgressPlot({ levelSets, targetReps }) {
       : undefined;
 
   return (
-    <div aria-label="Průběh úrovně" style={{ width: '100%', marginTop: 8 }}>
+    <div
+      aria-label="Průběh úrovně"
+      style={{ width: '100%', marginTop: 8, pointerEvents: 'none' }}
+    >
       <Line
         data={data}
         xField="time"
@@ -159,6 +162,7 @@ function LevelProgressPlot({ levelSets, targetReps }) {
         point={{ shapeField: 'circle', sizeField: 3 }}
         axis={{ x: { title: false }, y: { title: 'reps' } }}
         annotations={annotations}
+        tooltip={false}
       />
     </div>
   );
