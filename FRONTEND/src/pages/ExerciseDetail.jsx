@@ -72,11 +72,6 @@ const TREND_LABELS = {
 
 function IntervalSparkline({ intervalsMs, cadenceMs }) {
   if (!intervalsMs || intervalsMs.length < 1) return null;
-  const VW = 400;
-  const VH = 110;
-  const PAD = { top: 10, right: 16, bottom: 28, left: 40 };
-  const innerW = VW - PAD.left - PAD.right;
-  const innerH = VH - PAD.top - PAD.bottom;
 
   // Rep 1 has no preceding interval. Prepend the median so the first rep
   // shows on the X axis instead of being missing from the chart.
@@ -84,48 +79,39 @@ function IntervalSparkline({ intervalsMs, cadenceMs }) {
   const medianMs = sortedIntervals[Math.floor(sortedIntervals.length / 2)];
   const displayValues = [medianMs, ...intervalsMs];
 
-  const maxVal = cadenceMs != null
-    ? Math.max(...displayValues, cadenceMs * 1.3)
-    : Math.max(...displayValues);
-  const minVal = 0;
-  const span = maxVal - minVal || 1;
+  const data = displayValues.map((v, i) => ({
+    rep: i + 1,
+    interval: v / 1000,
+  }));
 
-  const toX = (i) => PAD.left + (i / Math.max(displayValues.length - 1, 1)) * innerW;
-  const toY = (v) => PAD.top + innerH - ((v - minVal) / span) * innerH;
-
-  const pts = displayValues.map((v, i) => `${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
-  const cadenceY = cadenceMs != null ? toY(cadenceMs) : null;
+  const annotations =
+    cadenceMs != null
+      ? [
+          {
+            type: 'lineY',
+            data: [cadenceMs / 1000],
+            style: { stroke: '#f5222d', lineDash: [4, 3], lineWidth: 1.5 },
+            labelFormatter: () => `${(cadenceMs / 1000).toFixed(0)}s`,
+          },
+        ]
+      : undefined;
 
   return (
-    <svg
-      viewBox={`0 0 ${VW} ${VH}`}
+    <div
       aria-label="Průběh tempa"
-      style={{ display: 'block', width: '100%', marginTop: 8, overflow: 'visible' }}
+      style={{ width: '100%', marginTop: 8, pointerEvents: 'none' }}
     >
-      {cadenceY != null && (
-        <>
-          <line
-            x1={PAD.left} y1={cadenceY}
-            x2={PAD.left + innerW} y2={cadenceY}
-            stroke="#f5222d" strokeWidth="1.5" strokeDasharray="4 3"
-          />
-          <text x={PAD.left + innerW + 2} y={cadenceY + 4} fontSize="11" fill="#f5222d">
-            {(cadenceMs / 1000).toFixed(0)}s
-          </text>
-        </>
-      )}
-      {displayValues.length > 1 && (
-        <polyline points={pts} fill="none" stroke="#1677ff" strokeWidth="2.5" strokeLinejoin="round" />
-      )}
-      {displayValues.map((v, i) => (
-        <g key={i}>
-          <circle cx={toX(i)} cy={toY(v)} r="4" fill="#1677ff" />
-          <text x={toX(i)} y={VH - 6} textAnchor="middle" fontSize="11" fill="#888">{i + 1}</text>
-        </g>
-      ))}
-      <text x={0} y={PAD.top + innerH / 2} fontSize="11" fill="#888"
-        transform={`rotate(-90,8,${PAD.top + innerH / 2})`} textAnchor="middle">s</text>
-    </svg>
+      <Line
+        data={data}
+        xField="rep"
+        yField="interval"
+        height={110}
+        point={{ shapeField: 'circle', sizeField: 3 }}
+        axis={{ x: { title: false }, y: { title: 'reps' } }}
+        annotations={annotations}
+        tooltip={false}
+      />
+    </div>
   );
 }
 
@@ -135,6 +121,7 @@ function LevelProgressPlot({ levelSets, targetReps }) {
   const data = levelSets.map((s) => ({
     time: new Date(s.started_at),
     reps: s.total_reps,
+    completed: s.is_completed === true,
   }));
 
   const annotations =
@@ -159,7 +146,14 @@ function LevelProgressPlot({ levelSets, targetReps }) {
         xField="time"
         yField="reps"
         height={160}
-        point={{ shapeField: 'circle', sizeField: 3 }}
+        point={{
+          shapeField: 'circle',
+          sizeField: 4,
+          style: {
+            fill: (d) => (d.completed ? '#52c41a' : '#1677ff'),
+            stroke: (d) => (d.completed ? '#52c41a' : '#1677ff'),
+          },
+        }}
         axis={{ x: { title: false }, y: { title: 'reps' } }}
         annotations={annotations}
         tooltip={false}

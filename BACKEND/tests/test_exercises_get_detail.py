@@ -187,6 +187,7 @@ def test_get_exercise_detail_returns_user_state_when_added(
     assert len(level_sets) == 1
     assert level_sets[0]["total_reps"] == 12
     assert level_sets[0]["set_number"] == 1
+    assert level_sets[0]["is_completed"] is True
 
     # today_sets carries the full rehydration shape for the in-progress
     # workout: timestamps -> intervals_ms, persisted evaluation block.

@@ -66,6 +66,7 @@ class LevelSet(BaseModel):
     total_reps: int
     started_at: datetime
     set_number: int
+    is_completed: bool | None = None
 
 
 class TodaySet(BaseModel):
@@ -231,6 +232,7 @@ async def get_exercise_detail(
                                             "total_reps": 1,
                                             "started_at": 1,
                                             "set_number": 1,
+                                            "is_completed": "$evaluation.is_completed",
                                         }
                                     },
                                 ],
