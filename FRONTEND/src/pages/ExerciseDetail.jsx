@@ -123,8 +123,8 @@ function IntervalSparkline({ intervalsMs, cadenceMs }) {
 function LevelProgressPlot({ levelSets, targetReps }) {
   if (!levelSets || levelSets.length === 0) return null;
 
-  const data = levelSets.map((s) => ({
-    time: new Date(s.started_at),
+  const data = levelSets.map((s, i) => ({
+    session: i + 1,
     reps: s.total_reps,
     completed: s.is_completed === true,
   }));
@@ -151,7 +151,7 @@ function LevelProgressPlot({ levelSets, targetReps }) {
     >
       <Line
         data={data}
-        xField="time"
+        xField="session"
         yField="reps"
         height={160}
         point={{
