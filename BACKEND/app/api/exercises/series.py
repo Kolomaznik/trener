@@ -1,4 +1,4 @@
-"""POST /exercise-series — record one finished set.
+"""PUT /exercises/series — record one finished set.
 
 The endpoint:
 
@@ -15,6 +15,10 @@ The endpoint:
    ``user_level`` against the catalog's ``progression_goals``.
 5. Calls ``refresh_user_exercise`` to update the streak (no second write
    to ``user_exercises`` if the latest set didn't change progression).
+
+Project convention: PUT returns the full resource so the client can
+render the new state without a follow-up GET. (POSTs in this codebase
+should only return ``{id, state}``.)
 
 The persisted shape is the contract documented in
 ``MONGO_DB`` plan file under "exercise_series document schema".
@@ -39,7 +43,7 @@ from app.services.user_exercises import PROGRESSION_LEVELS, LevelUpInfo, refresh
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/exercise-series", tags=["exercise-series"])
+router = APIRouter(prefix="/exercises/series", tags=["exercises"])
 
 
 class CountingEvent(BaseModel):
@@ -72,8 +76,8 @@ class ExerciseSeriesCreated(BaseModel):
     level_up: LevelUpInfo | None = None
 
 
-@router.post("", response_model=ExerciseSeriesCreated, status_code=status.HTTP_201_CREATED)
-async def create_exercise_series(
+@router.put("", response_model=ExerciseSeriesCreated, status_code=status.HTTP_201_CREATED)
+async def put_exercise_series(
     payload: ExerciseSeriesCreate = Body(...),
     user: GoogleUser = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_db),

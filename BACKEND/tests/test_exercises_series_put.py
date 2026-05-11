@@ -83,31 +83,31 @@ def _payload_with_reps(total_reps: int, *, set_number: int = 1) -> dict:
     }
 
 
-def test_post_exercise_series_returns_400_when_exercise_not_added(authed_client, mock_db):
-    """Auto-creation removed: posting for an unadded exercise must fail."""
+def test_put_exercise_series_returns_400_when_exercise_not_added(authed_client, mock_db):
+    """Auto-creation removed: PUTting for an unadded exercise must fail."""
     _seed_pushups_level_1(mock_db)
 
-    response = authed_client.post("/exercise-series", json=SESSION_PAYLOAD, headers=AUTH)
+    response = authed_client.put("/exercises/series", json=SESSION_PAYLOAD, headers=AUTH)
     assert response.status_code == 400
     assert "Cviky (katalog)" in response.json()["detail"]
     assert mock_db["user_exercises"].count_documents({}) == 0
 
 
-def test_post_exercise_series_returns_201(authed_client, mock_db, fake_google):
+def test_put_exercise_series_returns_201(authed_client, mock_db, fake_google):
     _seed_pushups_level_1(mock_db)
     _add_pushups_for_user(authed_client, fake_google)
     fake_google.set_user(google_payload())
 
-    response = authed_client.post("/exercise-series", json=SESSION_PAYLOAD, headers=AUTH)
+    response = authed_client.put("/exercises/series", json=SESSION_PAYLOAD, headers=AUTH)
     assert response.status_code == 201
 
 
-def test_post_exercise_series_refreshes_user_exercises(authed_client, mock_db, fake_google):
+def test_put_exercise_series_refreshes_user_exercises(authed_client, mock_db, fake_google):
     _seed_pushups_level_1(mock_db)
     _add_pushups_for_user(authed_client, fake_google)
     fake_google.set_user(google_payload())
 
-    response = authed_client.post("/exercise-series", json=SESSION_PAYLOAD, headers=AUTH)
+    response = authed_client.put("/exercises/series", json=SESSION_PAYLOAD, headers=AUTH)
     assert response.status_code == 201
 
     user_exercise = mock_db["user_exercises"].find_one(
@@ -124,7 +124,7 @@ def test_post_exercise_series_refreshes_user_exercises(authed_client, mock_db, f
     assert "recent_sets" not in user_exercise
 
 
-def test_exercise_series_persists_evaluation_and_user_level(
+def test_exercise_series_persists_evaluation_and_user_level_on_put(
     authed_client,
     mock_db,
     fake_google,
@@ -137,8 +137,8 @@ def test_exercise_series_persists_evaluation_and_user_level(
     _add_pushups_for_user(authed_client, fake_google)
     fake_google.set_user(google_payload())
 
-    response = authed_client.post(
-        "/exercise-series",
+    response = authed_client.put(
+        "/exercises/series",
         json=_payload_with_reps(12),
         headers=AUTH,
     )
@@ -178,8 +178,8 @@ def test_single_above_target_set_does_not_advance_level(authed_client, mock_db, 
     _add_pushups_for_user(authed_client, fake_google)
     fake_google.set_user(google_payload())
 
-    response = authed_client.post(
-        "/exercise-series",
+    response = authed_client.put(
+        "/exercises/series",
         json=_payload_with_reps(12),
         headers=AUTH,
     )
@@ -204,8 +204,8 @@ def test_three_above_target_sets_advance_level_exactly_once(authed_client, mock_
     final_body = None
     for set_number in range(1, 4):
         fake_google.set_user(google_payload())
-        response = authed_client.post(
-            "/exercise-series",
+        response = authed_client.put(
+            "/exercises/series",
             json=_payload_with_reps(12, set_number=set_number),
             headers=AUTH,
         )

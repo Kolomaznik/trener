@@ -4,9 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.dashboard.get import router as dashboard_router
 from app.api.dashboard.muscle_load_get import router as dashboard_muscle_load_router
-from app.api.exercise_series.post import router as exercise_series_router
 from app.api.exercises.get_detail import router as exercises_detail_router
 from app.api.exercises.get_list import router as exercises_list_router
+from app.api.exercises.series import router as exercises_series_router
 from app.api.health.get import router as health_router
 from app.api.trening_vezne.get import router as trening_vezne_router
 from app.api.user.settings.get import router as user_settings_get_router
@@ -38,7 +38,7 @@ app.include_router(dashboard_router)
 app.include_router(dashboard_muscle_load_router)
 app.include_router(exercises_list_router)
 app.include_router(exercises_detail_router)
-app.include_router(exercise_series_router)
+app.include_router(exercises_series_router)
 app.include_router(user_exercises_get_router)
 app.include_router(user_exercises_post_router)
 app.include_router(user_settings_get_router)
