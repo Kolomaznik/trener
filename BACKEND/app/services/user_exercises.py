@@ -41,6 +41,7 @@ A user advances ``user_level`` only when their last
 under-target set resets the streak to zero.
 """
 
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
@@ -48,6 +49,8 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
 
 from app.services.fitness_math import REST_SECONDS
+
+logger = logging.getLogger(__name__)
 
 SCHEMA_FILTER: dict[str, Any] = {
     "level": {"$exists": True},
@@ -88,10 +91,26 @@ class UserExerciseAlreadyExists(Exception):
     already has a row. The endpoint layer maps this to HTTP 409."""
 
 
-def _as_int(value: Any, default: int) -> int:
+def _as_int(value: Any, default: int, *, field: str) -> int:
+    """Coerce ``value`` to int; on a non-None garbage value, log and fall back.
+
+    ``None`` is treated as legitimate "missing" (silently returns ``default``),
+    because some call sites use this for lazily-seeded fields like
+    ``consecutive_successes``. Any other unparseable value is logged as a
+    warning so data-shape drift surfaces instead of silently corrupting the
+    streak machine.
+    """
+    if value is None:
+        return default
     try:
         return int(value)
     except (TypeError, ValueError):
+        logger.warning(
+            "user_exercises: non-integer value for %s (got %r); falling back to %d",
+            field,
+            value,
+            default,
+        )
         return default
 
 
@@ -294,19 +313,24 @@ async def _check_and_advance(
     if latest_session is None:
         return None
 
-    latest_total_reps = _as_int(latest_session.get("total_reps"), 0)
-    success = latest_total_reps >= _as_int(target_reps, 0)
+    latest_total_reps = _as_int(latest_session.get("total_reps"), 0, field="total_reps")
+    success = latest_total_reps >= _as_int(target_reps, 0, field="target_reps")
     now = datetime.now(UTC)
 
     if not success:
-        if _as_int(user_exercise.get("consecutive_successes"), 0) != 0:
+        if (
+            _as_int(user_exercise.get("consecutive_successes"), 0, field="consecutive_successes")
+            != 0
+        ):
             await db["user_exercises"].update_one(
                 {"_id": user_exercise["_id"]},
                 {"$set": {"consecutive_successes": 0}},
             )
         return None
 
-    new_streak = _as_int(user_exercise.get("consecutive_successes"), 0) + 1
+    new_streak = (
+        _as_int(user_exercise.get("consecutive_successes"), 0, field="consecutive_successes") + 1
+    )
     if new_streak < LEVEL_UP_THRESHOLD:
         await db["user_exercises"].update_one(
             {"_id": user_exercise["_id"]},
@@ -319,7 +343,7 @@ async def _check_and_advance(
         db=db,
         user_email=user_email,
         family=exercise_doc.get("family") or "",
-        level_number=_as_int(exercise_doc.get("level"), 1),
+        level_number=_as_int(exercise_doc.get("level"), 1, field="exercises.level"),
         completed_progression_level=current_level,
         now=now,
     )
