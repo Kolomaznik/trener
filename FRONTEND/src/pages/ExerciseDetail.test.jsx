@@ -9,6 +9,9 @@ vi.mock('../api/exercises/get_detail.js', () => ({
 vi.mock('../api/exercises/series.js', () => ({
   putExerciseSeries: vi.fn(),
 }));
+vi.mock('../api/user_exercises/get_list.js', () => ({
+  getUserExercises: vi.fn(),
+}));
 
 vi.mock('@ant-design/plots', () => ({
   Line: (props) => (
@@ -43,6 +46,7 @@ vi.mock('react-speech-recognition', () => {
 
 import { getExerciseDetail } from '../api/exercises/get_detail.js';
 import { putExerciseSeries } from '../api/exercises/series.js';
+import { getUserExercises } from '../api/user_exercises/get_list.js';
 import * as speechModule from 'react-speech-recognition';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -201,9 +205,11 @@ describe('ExerciseDetail page', () => {
   beforeEach(() => {
     speechModule.__resetMockState();
     getExerciseDetail.mockReset();
-    putExerciseSeries.mockReset();
+    postExerciseSeries.mockReset();
+    getUserExercises.mockReset();
     getExerciseDetail.mockResolvedValue(detailFixture);
-    putExerciseSeries.mockResolvedValue({ id: 'sess-1', total_reps: 0, evaluation: null });
+    postExerciseSeries.mockResolvedValue({ id: 'sess-1', total_reps: 0, evaluation: null });
+    getUserExercises.mockResolvedValue([]);
   });
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -467,21 +473,35 @@ describe('ExerciseDetail page', () => {
     expect(await screen.findByTestId('list-marker')).toBeInTheDocument();
   });
 
-  it('navigates to next exercise when "next level" button is clicked', async () => {
+  it('navigates to next exercise via the carousel "next" preview', async () => {
     getExerciseDetail.mockImplementation(async (id) =>
       id === 'pushups_level_2' ? detailFixtureLevel2 : detailFixture,
     );
+    getUserExercises.mockResolvedValue([
+      { exercise_name: 'pushups_level_1', title: 'Kliky o zeď', user_level: 'beginner' },
+      { exercise_name: 'pushups_level_2', title: 'Kliky v předklonu', user_level: 'beginner' },
+    ]);
     renderWithRouter();
 
-    await screen.findByText('Kliky o zeď');
-    fireEvent.click(screen.getByRole('button', { name: 'Kliky v předklonu' }));
+    const nextPreview = await screen.findByTestId('carousel-next');
+    expect(nextPreview).toHaveTextContent('Kliky v předklonu');
+    fireEvent.click(nextPreview);
 
     await waitFor(() =>
       expect(getExerciseDetail).toHaveBeenCalledWith('pushups_level_2'),
     );
-    expect(
-      await screen.findByText('Nejvyšší úroveň této rodiny'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Kliky v předklonu')).toBeInTheDocument();
+  });
+
+  it('does not render a next preview when the current exercise is the last in the user list', async () => {
+    getUserExercises.mockResolvedValue([
+      { exercise_name: 'pushups_level_1', title: 'Kliky o zeď', user_level: 'beginner' },
+    ]);
+    renderWithRouter();
+
+    await screen.findByText('Kliky o zeď');
+    expect(screen.queryByTestId('carousel-next')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('carousel-prev')).not.toBeInTheDocument();
   });
 
   // ── Error states ───────────────────────────────────────────────────────────
