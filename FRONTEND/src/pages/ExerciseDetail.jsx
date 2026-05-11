@@ -29,7 +29,7 @@ import ReactMarkdown from 'react-markdown';
 import ExerciseMuscleMap from '../components/ExerciseMuscleMap.jsx';
 import { getExerciseDetail } from '../api/exercises/get_detail.js';
 import { addUserExercise } from '../api/user_exercises/post.js';
-import { postExerciseSeries } from '../api/exercise-series/post.js';
+import { putExerciseSeries } from '../api/exercises/series.js';
 import {
   computeSessionStats,
   parseNumberFromTokens,
@@ -72,11 +72,6 @@ const TREND_LABELS = {
 
 function IntervalSparkline({ intervalsMs, cadenceMs }) {
   if (!intervalsMs || intervalsMs.length < 1) return null;
-  const VW = 400;
-  const VH = 110;
-  const PAD = { top: 10, right: 16, bottom: 28, left: 40 };
-  const innerW = VW - PAD.left - PAD.right;
-  const innerH = VH - PAD.top - PAD.bottom;
 
   // Rep 1 has no preceding interval. Prepend the median so the first rep
   // shows on the X axis instead of being missing from the chart.
@@ -84,48 +79,44 @@ function IntervalSparkline({ intervalsMs, cadenceMs }) {
   const medianMs = sortedIntervals[Math.floor(sortedIntervals.length / 2)];
   const displayValues = [medianMs, ...intervalsMs];
 
-  const maxVal = cadenceMs != null
-    ? Math.max(...displayValues, cadenceMs * 1.3)
-    : Math.max(...displayValues);
-  const minVal = 0;
-  const span = maxVal - minVal || 1;
+  const data = displayValues.map((v, i) => ({
+    rep: i + 1,
+    interval: v / 1000,
+  }));
 
-  const toX = (i) => PAD.left + (i / Math.max(displayValues.length - 1, 1)) * innerW;
-  const toY = (v) => PAD.top + innerH - ((v - minVal) / span) * innerH;
+  const cadenceSec = cadenceMs != null ? cadenceMs / 1000 : 0;
+  const dataMax = data.reduce((m, d) => Math.max(m, d.interval), 0);
+  const yMax = Math.max(cadenceSec, dataMax) + 1;
 
-  const pts = displayValues.map((v, i) => `${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
-  const cadenceY = cadenceMs != null ? toY(cadenceMs) : null;
+  const annotations =
+    cadenceMs != null
+      ? [
+          {
+            type: 'lineY',
+            data: [cadenceMs / 1000],
+            style: { stroke: '#f5222d', lineDash: [4, 3], lineWidth: 1.5 },
+            labelFormatter: () => `${(cadenceMs / 1000).toFixed(0)}s`,
+          },
+        ]
+      : undefined;
 
   return (
-    <svg
-      viewBox={`0 0 ${VW} ${VH}`}
+    <div
       aria-label="Průběh tempa"
-      style={{ display: 'block', width: '100%', marginTop: 8, overflow: 'visible' }}
+      style={{ width: '100%', marginTop: 8, pointerEvents: 'none' }}
     >
-      {cadenceY != null && (
-        <>
-          <line
-            x1={PAD.left} y1={cadenceY}
-            x2={PAD.left + innerW} y2={cadenceY}
-            stroke="#f5222d" strokeWidth="1.5" strokeDasharray="4 3"
-          />
-          <text x={PAD.left + innerW + 2} y={cadenceY + 4} fontSize="11" fill="#f5222d">
-            {(cadenceMs / 1000).toFixed(0)}s
-          </text>
-        </>
-      )}
-      {displayValues.length > 1 && (
-        <polyline points={pts} fill="none" stroke="#1677ff" strokeWidth="2.5" strokeLinejoin="round" />
-      )}
-      {displayValues.map((v, i) => (
-        <g key={i}>
-          <circle cx={toX(i)} cy={toY(v)} r="4" fill="#1677ff" />
-          <text x={toX(i)} y={VH - 6} textAnchor="middle" fontSize="11" fill="#888">{i + 1}</text>
-        </g>
-      ))}
-      <text x={0} y={PAD.top + innerH / 2} fontSize="11" fill="#888"
-        transform={`rotate(-90,8,${PAD.top + innerH / 2})`} textAnchor="middle">s</text>
-    </svg>
+      <Line
+        data={data}
+        xField="rep"
+        yField="interval"
+        height={110}
+        point={{ shapeField: 'circle', sizeField: 3 }}
+        axis={{ x: { title: false }, y: { title: 'reps' } }}
+        scale={{ y: { domain: [0, yMax] } }}
+        annotations={annotations}
+        tooltip={false}
+      />
+    </div>
   );
 }
 
@@ -135,7 +126,11 @@ function LevelProgressPlot({ levelSets, targetReps }) {
   const data = levelSets.map((s) => ({
     time: new Date(s.started_at),
     reps: s.total_reps,
+    completed: s.is_completed === true,
   }));
+
+  const dataMax = data.reduce((m, d) => Math.max(m, d.reps), 0);
+  const yMax = Math.max(targetReps ?? 0, dataMax) + 1;
 
   const annotations =
     targetReps != null
@@ -150,15 +145,27 @@ function LevelProgressPlot({ levelSets, targetReps }) {
       : undefined;
 
   return (
-    <div aria-label="Průběh úrovně" style={{ width: '100%', marginTop: 8 }}>
+    <div
+      aria-label="Průběh úrovně"
+      style={{ width: '100%', marginTop: 8, pointerEvents: 'none' }}
+    >
       <Line
         data={data}
         xField="time"
         yField="reps"
         height={160}
-        point={{ shapeField: 'circle', sizeField: 3 }}
+        point={{
+          shapeField: 'circle',
+          sizeField: 4,
+          style: {
+            fill: (d) => (d.completed ? '#52c41a' : '#1677ff'),
+            stroke: (d) => (d.completed ? '#52c41a' : '#1677ff'),
+          },
+        }}
         axis={{ x: { title: false }, y: { title: 'reps' } }}
+        scale={{ y: { domain: [0, yMax] } }}
         annotations={annotations}
+        tooltip={false}
       />
     </div>
   );
@@ -342,15 +349,6 @@ export default function ExerciseDetail() {
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      <Button
-        type="link"
-        icon={<ArrowLeftOutlined />}
-        onClick={() => navigate('/exercises')}
-        style={{ padding: 0 }}
-      >
-        Zpět na seznam
-      </Button>
-
       {error && <Alert type="error" message={error} showIcon />}
 
       {loading || !detail ? (
@@ -386,6 +384,30 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
   // intervalsMs, evaluation }. Appended in stopSet, never cleared during the
   // session so the user can scroll back through every series they finished.
   const [completedSets, setCompletedSets] = useState([]);
+  const [hydrated, setHydrated] = useState(false);
+
+  // First-paint rehydration: when the user returns to the page mid-day,
+  // populate completedSets from the server's today_sets so they can keep
+  // adding series. Bounded to once because stopSet refetches detail.
+  useEffect(() => {
+    if (hydrated) return;
+    if (!detail.user_level) return;
+    const today = detail.user_level.today_sets ?? [];
+    if (today.length > 0) {
+      setCompletedSets(
+        today.map((t) => ({
+          setNumber: t.set_number,
+          rawEventCount: t.total_reps,
+          correctedTotalReps: t.total_reps,
+          durationSec: t.total_duration_sec,
+          intervalsMs: t.intervals_ms ?? [],
+          evaluation: t.evaluation ?? null,
+        })),
+      );
+      setSetNumber(today.length + 1);
+    }
+    setHydrated(true);
+  }, [detail.user_level, hydrated]);
 
   const processedTokenCountRef = useRef(0);
   const previousEventRef = useRef(null);
@@ -545,7 +567,7 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
     let evaluation = null;
     let correctedTotalReps = null;
     try {
-      const result = await postExerciseSeries(payload);
+      const result = await putExerciseSeries(payload);
       if (result?.evaluation != null) evaluation = result.evaluation;
       if (result?.total_reps != null) correctedTotalReps = result.total_reps;
       const freshDetail = await getExerciseDetail(exerciseName);
