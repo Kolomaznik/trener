@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, date, datetime, time
 from typing import Any, NamedTuple
 
 import httpx
@@ -11,10 +11,19 @@ from app.db import get_db
 from app.services.fitness_math import (
     REST_SECONDS,
     MuscleEngagement,
+    SetEvaluation,
     calculate_muscle_load,
 )
 from app.services.user_exercises import PROGRESSION_LEVELS, _normalize_progression_level
 from config import settings as app_settings
+
+
+def _intervals_from_counting(counting: list[dict]) -> list[int]:
+    """Diff of consecutive ``timestamp_ms`` values — the inter-rep intervals
+    the frontend's IntervalSparkline expects."""
+    timestamps = [e["timestamp_ms"] for e in counting if "timestamp_ms" in e]
+    return [b - a for a, b in zip(timestamps, timestamps[1:], strict=False)]
+
 
 router = APIRouter(prefix="/exercises", tags=["exercises"])
 
@@ -59,9 +68,20 @@ class LevelSet(BaseModel):
     set_number: int
 
 
+class TodaySet(BaseModel):
+    set_number: int
+    total_reps: int
+    total_duration_sec: float
+    started_at: datetime
+    intervals_ms: list[int]
+    evaluation: SetEvaluation | None = None
+
+
 class UserLevelInfo(BaseModel):
     level: str
     level_sets: list[LevelSet]
+    today_sets: list[TodaySet]
+    today_date: date
     target_reps: int | None = None
     target_sets: int | None = None
     last_best_reps: int | None = None
@@ -183,9 +203,13 @@ async def get_exercise_detail(
             goal = progression_goals.get(level) or {}
 
             # All sets at the user's current level (chronological) + best
-            # result across all levels, derived from exercise_series in a
-            # single $facet pipeline. Rows without `user_level` (recorded
-            # before that field was added) are excluded from level_sets.
+            # result across all levels + today's sets (full detail for the
+            # frontend's CompletedSetCard rehydration), derived from
+            # exercise_series in a single $facet pipeline. Rows without
+            # `user_level` (recorded before that field was added) are
+            # excluded from level_sets.
+            today_date = datetime.now(UTC).date()
+            today_start_utc = datetime.combine(today_date, time.min, tzinfo=UTC)
             facet_rows = await (
                 db["exercise_series"]
                 .aggregate(
@@ -210,6 +234,21 @@ async def get_exercise_detail(
                                         }
                                     },
                                 ],
+                                "today": [
+                                    {"$match": {"started_at": {"$gte": today_start_utc}}},
+                                    {"$sort": {"started_at": 1}},
+                                    {
+                                        "$project": {
+                                            "_id": 0,
+                                            "set_number": 1,
+                                            "total_reps": 1,
+                                            "total_duration_sec": 1,
+                                            "started_at": 1,
+                                            "counting": 1,
+                                            "evaluation": 1,
+                                        }
+                                    },
+                                ],
                                 "best": [
                                     {
                                         "$group": {
@@ -224,14 +263,29 @@ async def get_exercise_detail(
                 )
                 .to_list(1)
             )
-            facet = facet_rows[0] if facet_rows else {"level_sets": [], "best": []}
+            facet = facet_rows[0] if facet_rows else {"level_sets": [], "today": [], "best": []}
             level_sets = [LevelSet(**rs) for rs in facet.get("level_sets", [])]
+            today_sets = [
+                TodaySet(
+                    set_number=row["set_number"],
+                    total_reps=row["total_reps"],
+                    total_duration_sec=row["total_duration_sec"],
+                    started_at=row["started_at"],
+                    intervals_ms=_intervals_from_counting(row.get("counting") or []),
+                    evaluation=(
+                        SetEvaluation(**row["evaluation"]) if row.get("evaluation") else None
+                    ),
+                )
+                for row in facet.get("today", [])
+            ]
             best_rows = facet.get("best") or []
             last_best_reps = best_rows[0]["best_result"] if best_rows else None
 
             user_level = UserLevelInfo(
                 level=level,
                 level_sets=level_sets,
+                today_sets=today_sets,
+                today_date=today_date,
                 target_reps=goal.get("reps"),
                 target_sets=goal.get("sets"),
                 last_best_reps=last_best_reps,

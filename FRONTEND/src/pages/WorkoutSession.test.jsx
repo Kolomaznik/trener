@@ -6,8 +6,8 @@ import WorkoutSession from './WorkoutSession.jsx';
 vi.mock('../api/exercises/get_detail.js', () => ({
   getExerciseDetail: vi.fn(),
 }));
-vi.mock('../api/exercise-series/post.js', () => ({
-  postExerciseSeries: vi.fn(),
+vi.mock('../api/exercises/series.js', () => ({
+  putExerciseSeries: vi.fn(),
 }));
 
 vi.mock('react-speech-recognition', () => {
@@ -50,7 +50,7 @@ vi.mock('react-speech-recognition', () => {
 
 import * as speechModule from 'react-speech-recognition';
 import { getExerciseDetail } from '../api/exercises/get_detail.js';
-import { postExerciseSeries } from '../api/exercise-series/post.js';
+import { putExerciseSeries } from '../api/exercises/series.js';
 
 const levelFixtureBeginner = {
   level: 'beginner',
@@ -112,10 +112,10 @@ describe('WorkoutSession page', () => {
   beforeEach(() => {
     speechModule.__resetMockState();
     getExerciseDetail.mockReset();
-    postExerciseSeries.mockReset();
+    putExerciseSeries.mockReset();
 
     getExerciseDetail.mockResolvedValue(detailFixture);
-    postExerciseSeries.mockResolvedValue({ id: 'session-1', total_reps: 0, evaluation: null });
+    putExerciseSeries.mockResolvedValue({ id: 'session-1', total_reps: 0, evaluation: null });
   });
 
   it('shows skeleton while loading', () => {
@@ -204,9 +204,9 @@ describe('WorkoutSession page', () => {
     fireEvent.click(screen.getByRole('button', { name: /Konec série/ }));
 
     await waitFor(() => expect(speechModule.__mocks.stopListening).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(postExerciseSeries).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(putExerciseSeries).toHaveBeenCalledTimes(1));
 
-    const call = postExerciseSeries.mock.calls[0][0];
+    const call = putExerciseSeries.mock.calls[0][0];
     expect(call.exercise_id).toBe('pushups_level_1');
     expect(call.set_number).toBe(1);
   });
@@ -309,8 +309,8 @@ describe('WorkoutSession page', () => {
     expect(await screen.findByTestId('detail-marker')).toBeInTheDocument();
   });
 
-  it('shows save error when postExerciseSeries fails', async () => {
-    postExerciseSeries.mockRejectedValue(new Error('Network error'));
+  it('shows save error when putExerciseSeries fails', async () => {
+    putExerciseSeries.mockRejectedValue(new Error('Network error'));
     renderWithRouter();
     await screen.findByText('Kliky o zeď');
 
@@ -334,7 +334,7 @@ describe('WorkoutSession page', () => {
     await waitFor(() => screen.getByRole('button', { name: /Konec série/ }));
     fireEvent.click(screen.getByRole('button', { name: /Konec série/ }));
 
-    await waitFor(() => expect(postExerciseSeries).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(putExerciseSeries).toHaveBeenCalledTimes(1));
     // After stopping the live counter row should be gone
     expect(screen.queryByTestId('live-stats')).not.toBeInTheDocument();
   });
@@ -348,12 +348,12 @@ describe('WorkoutSession page', () => {
     fireEvent.click(screen.getByRole('button', { name: /Konec série/ }));
 
     // Give time for async save to complete
-    await waitFor(() => expect(postExerciseSeries).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(putExerciseSeries).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId('rest-timer')).not.toBeInTheDocument();
   });
 
   it('shows evaluation card after set when backend returns evaluation', async () => {
-    postExerciseSeries.mockResolvedValue({
+    putExerciseSeries.mockResolvedValue({
       id: 'session-1',
       total_reps: 10,
       evaluation: {
@@ -377,7 +377,7 @@ describe('WorkoutSession page', () => {
   });
 
   it('shows rep correction notice when corrected count differs from recognised count', async () => {
-    postExerciseSeries.mockResolvedValue({
+    putExerciseSeries.mockResolvedValue({
       id: 'session-1',
       total_reps: 10,
       evaluation: null,

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Avatar, Button, Drawer, Grid, Layout, Menu, Spin, Typography } from 'antd';
-import { DatabaseOutlined, MenuOutlined, UserOutlined } from '@ant-design/icons';
+import { DatabaseOutlined, MenuOutlined, UserOutlined, HomeOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { apiClient } from './api/client.js';
 import { getUserSettings } from './api/user/settings/get.js';
@@ -174,10 +174,13 @@ export default function App() {
   );
 
   const drawerTopItems = [
-    { key: '/', label: 'Overview' },
-    { key: '/exercises', label: 'Exercises' },
-    { key: '/trening-vezne', label: 'Trénink vězně' },
-    { key: '/voice-counting', label: 'Voice counting' },
+    { key: '/',
+      icon: <HomeOutlined/>,
+      label: 'Přehled'
+    },
+    { key: '/exercises',
+      icon: <ThunderboltOutlined />,
+      label: 'Cvičení' },
   ];
 
   const drawerBottomItems = [

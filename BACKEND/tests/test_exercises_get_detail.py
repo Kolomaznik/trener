@@ -104,24 +104,57 @@ def test_get_exercise_detail_returns_user_state_when_added(
             "updated_at": now - timedelta(days=1),
         }
     )
-    # Three series rows exercising the level_sets filter:
-    # 1) at current level → included in level_sets
-    # 2) at a different level → excluded
-    # 3) without user_level (legacy row, pre-feature) → excluded
+    # Three series rows exercising the level_sets and today_sets filters:
+    # 1) at current level, today → included in level_sets AND today_sets
+    # 2) at a different level, 2 days ago → excluded from both
+    # 3) without user_level (legacy row), 3 days ago → excluded from both
     mock_db["exercise_series"].insert_many(
         [
             {
                 "user_email": "alice@example.com",
                 "exercise_id": "pushups_level_1",
                 "total_reps": 12,
+                "total_duration_sec": 33.0,
                 "started_at": now,
                 "set_number": 1,
                 "user_level": "beginner",
+                "counting": [
+                    {
+                        "value": 1,
+                        "token": "1",
+                        "timestamp_ms": 1000,
+                        "timestamp_iso": "",
+                        "interpolated": False,
+                    },
+                    {
+                        "value": 2,
+                        "token": "2",
+                        "timestamp_ms": 4000,
+                        "timestamp_iso": "",
+                        "interpolated": False,
+                    },
+                    {
+                        "value": 3,
+                        "token": "3",
+                        "timestamp_ms": 5500,
+                        "timestamp_iso": "",
+                        "interpolated": False,
+                    },
+                ],
+                "evaluation": {
+                    "pace_label": "on_track",
+                    "trend_label": "steady",
+                    "repetition_label": "completed",
+                    "avg_interval_sec": 2.25,
+                    "recommendation": "",
+                    "is_completed": True,
+                },
             },
             {
                 "user_email": "alice@example.com",
                 "exercise_id": "pushups_level_1",
                 "total_reps": 30,
+                "total_duration_sec": 60.0,
                 "started_at": now - timedelta(days=2),
                 "set_number": 1,
                 "user_level": "intermediate",
@@ -130,6 +163,7 @@ def test_get_exercise_detail_returns_user_state_when_added(
                 "user_email": "alice@example.com",
                 "exercise_id": "pushups_level_1",
                 "total_reps": 8,
+                "total_duration_sec": 30.0,
                 "started_at": now - timedelta(days=3),
                 "set_number": 1,
             },
@@ -153,6 +187,23 @@ def test_get_exercise_detail_returns_user_state_when_added(
     assert len(level_sets) == 1
     assert level_sets[0]["total_reps"] == 12
     assert level_sets[0]["set_number"] == 1
+
+    # today_sets carries the full rehydration shape for the in-progress
+    # workout: timestamps -> intervals_ms, persisted evaluation block.
+    today_sets = body["user_level"]["today_sets"]
+    assert len(today_sets) == 1
+    only_today = today_sets[0]
+    assert only_today["set_number"] == 1
+    assert only_today["total_reps"] == 12
+    assert only_today["total_duration_sec"] == 33.0
+    # intervals_ms = diff of consecutive timestamp_ms in counting.
+    assert only_today["intervals_ms"] == [3000, 1500]
+    assert only_today["evaluation"]["repetition_label"] == "completed"
+    assert only_today["evaluation"]["pace_label"] == "on_track"
+
+    # The server's "today" anchor is exposed so the client can label
+    # the rehydrated state correctly.
+    assert body["user_level"]["today_date"] == datetime.now(UTC).date().isoformat()
 
     # Read-only: the endpoint did NOT advance the streak.
     row = mock_db["user_exercises"].find_one(

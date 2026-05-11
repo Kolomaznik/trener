@@ -29,7 +29,7 @@ import ReactMarkdown from 'react-markdown';
 import ExerciseMuscleMap from '../components/ExerciseMuscleMap.jsx';
 import { getExerciseDetail } from '../api/exercises/get_detail.js';
 import { addUserExercise } from '../api/user_exercises/post.js';
-import { postExerciseSeries } from '../api/exercise-series/post.js';
+import { putExerciseSeries } from '../api/exercises/series.js';
 import {
   computeSessionStats,
   parseNumberFromTokens,
@@ -346,15 +346,6 @@ export default function ExerciseDetail() {
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      <Button
-        type="link"
-        icon={<ArrowLeftOutlined />}
-        onClick={() => navigate('/exercises')}
-        style={{ padding: 0 }}
-      >
-        Zpět na seznam
-      </Button>
-
       {error && <Alert type="error" message={error} showIcon />}
 
       {loading || !detail ? (
@@ -390,6 +381,30 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
   // intervalsMs, evaluation }. Appended in stopSet, never cleared during the
   // session so the user can scroll back through every series they finished.
   const [completedSets, setCompletedSets] = useState([]);
+  const [hydrated, setHydrated] = useState(false);
+
+  // First-paint rehydration: when the user returns to the page mid-day,
+  // populate completedSets from the server's today_sets so they can keep
+  // adding series. Bounded to once because stopSet refetches detail.
+  useEffect(() => {
+    if (hydrated) return;
+    if (!detail.user_level) return;
+    const today = detail.user_level.today_sets ?? [];
+    if (today.length > 0) {
+      setCompletedSets(
+        today.map((t) => ({
+          setNumber: t.set_number,
+          rawEventCount: t.total_reps,
+          correctedTotalReps: t.total_reps,
+          durationSec: t.total_duration_sec,
+          intervalsMs: t.intervals_ms ?? [],
+          evaluation: t.evaluation ?? null,
+        })),
+      );
+      setSetNumber(today.length + 1);
+    }
+    setHydrated(true);
+  }, [detail.user_level, hydrated]);
 
   const processedTokenCountRef = useRef(0);
   const previousEventRef = useRef(null);
@@ -549,7 +564,7 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
     let evaluation = null;
     let correctedTotalReps = null;
     try {
-      const result = await postExerciseSeries(payload);
+      const result = await putExerciseSeries(payload);
       if (result?.evaluation != null) evaluation = result.evaluation;
       if (result?.total_reps != null) correctedTotalReps = result.total_reps;
       const freshDetail = await getExerciseDetail(exerciseName);
