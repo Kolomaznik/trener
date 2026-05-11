@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-import app.api.exercises.get_detail as get_detail_module
+import app.auth as auth_module
 from tests.conftest import FakeAsyncClient, FakeResponse, google_payload
 
 AUTH = {"Authorization": "Bearer dummy-token"}
@@ -36,7 +36,7 @@ def seeded_db(mock_db):
 def _stub_google(monkeypatch):
     FakeAsyncClient.next_response = FakeResponse(200, google_payload())
     FakeAsyncClient.next_exception = None
-    monkeypatch.setattr(get_detail_module.httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr(auth_module.httpx, "AsyncClient", FakeAsyncClient)
 
 
 def test_get_exercise_detail_returns_200_anonymous(client, seeded_db):

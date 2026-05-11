@@ -1,12 +1,11 @@
 from datetime import datetime
-from typing import Any, NamedTuple
+from typing import Any
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field
 
+from app.auth import GoogleUser, get_optional_user
 from app.db import get_db
 from app.services.fitness_math import (
     REST_SECONDS,
@@ -14,7 +13,6 @@ from app.services.fitness_math import (
     calculate_muscle_load,
 )
 from app.services.user_exercises import PROGRESSION_LEVELS, _normalize_progression_level
-from config import settings as app_settings
 
 router = APIRouter(prefix="/exercises", tags=["exercises"])
 
@@ -22,8 +20,6 @@ SCHEMA_FILTER: dict[str, Any] = {
     "level": {"$exists": True},
     "family": {"$exists": True},
 }
-
-_optional_bearer = HTTPBearer(auto_error=False)
 
 
 class Cadence(BaseModel):
@@ -87,40 +83,12 @@ class ExerciseDetailResponse(BaseModel):
     user_level: UserLevelInfo | None = None
 
 
-class _UserContext(NamedTuple):
-    email: str | None
-    weight_kg: float | None
-
-
-async def _get_optional_user_context(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_optional_bearer),
-    db: AsyncIOMotorDatabase = Depends(get_db),
-) -> _UserContext:
-    if credentials is None:
-        return _UserContext(email=None, weight_kg=None)
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(
-                app_settings.google_userinfo_url,
-                headers={"Authorization": f"Bearer {credentials.credentials}"},
-            )
-    except httpx.HTTPError:
-        return _UserContext(email=None, weight_kg=None)
-
-    if resp.status_code != 200:
-        return _UserContext(email=None, weight_kg=None)
-
-    email = resp.json().get("email")
-    if not email:
-        return _UserContext(email=None, weight_kg=None)
-
+async def _user_weight_kg(db: AsyncIOMotorDatabase, email: str) -> float | None:
     user_doc = await db["users"].find_one({"email": email})
     if user_doc is None:
-        return _UserContext(email=email, weight_kg=None)
-
+        return None
     raw = user_doc.get("weight_kg")
-    weight_kg = float(raw) if raw is not None else None
-    return _UserContext(email=email, weight_kg=weight_kg)
+    return float(raw) if raw is not None else None
 
 
 def _muscle_load_by_difficulty(
@@ -158,7 +126,7 @@ def _muscle_load_by_difficulty(
 async def get_exercise_detail(
     exercise_name: str,
     db: AsyncIOMotorDatabase = Depends(get_db),
-    user_context: _UserContext = Depends(_get_optional_user_context),
+    user: GoogleUser | None = Depends(get_optional_user),
 ) -> ExerciseDetailResponse:
     # Catalog data (cadence, progression_goals, family, level, …) is the
     # source of truth — always read from `exercises`.
@@ -173,9 +141,9 @@ async def get_exercise_detail(
     user_level: UserLevelInfo | None = None
     muscle_load_by_difficulty: MuscleLoadByDifficulty | None = None
 
-    if user_context.email is not None:
+    if user is not None:
         user_exercise = await db["user_exercises"].find_one(
-            {"user_email": user_context.email, "exercise_name": exercise_name}
+            {"user_email": user.email, "exercise_name": exercise_name}
         )
         if user_exercise is not None:
             level = _normalize_progression_level(user_exercise.get("user_level")) or "beginner"
@@ -192,7 +160,7 @@ async def get_exercise_detail(
                     [
                         {
                             "$match": {
-                                "user_email": user_context.email,
+                                "user_email": user.email,
                                 "exercise_id": exercise_name,
                             }
                         },
@@ -242,11 +210,12 @@ async def get_exercise_detail(
                 exercise_doc.get("muscle_engagement_percent") or {}
             )
             level_coefficient: float = exercise_doc.get("level_coefficient", 0.5)
+            weight_kg = await _user_weight_kg(db, user.email)
             mld = _muscle_load_by_difficulty(
                 progression_goals=progression_goals,
                 muscle_engagement_percent=muscle_engagement_percent,
                 level_coefficient=level_coefficient,
-                weight_kg=user_context.weight_kg,
+                weight_kg=weight_kg,
             )
             if mld is not None:
                 muscle_load_by_difficulty = MuscleLoadByDifficulty(**mld)
