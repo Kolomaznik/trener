@@ -45,7 +45,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/exercises/series", tags=["exercises"])
 
-
 class CountingEvent(BaseModel):
     """One voice-counted rep event. The list of these on the request body
     is named ``counting`` to make the domain meaning explicit on the wire
