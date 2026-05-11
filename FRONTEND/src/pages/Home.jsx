@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Divider, Flex, Grid, Spin, Typography } from 'antd';
+import { Alert, Divider, Flex, Grid, Segmented, Spin, Typography } from 'antd';
 import { getDashboard } from '../api/dashboard/get.js';
+import { getDashboardMuscleLoad } from '../api/dashboard/get_muscle_load.js';
 import { useUserSettings } from '../context/UserSettingsContext.jsx';
+import ExerciseMuscleMap from '../components/ExerciseMuscleMap.jsx';
+
+const MUSCLE_RANGE_OPTIONS = [
+  { label: 'Dnes', value: 'today' },
+  { label: 'Týden', value: 'week' },
+  { label: 'Měsíc', value: 'month' },
+  { label: 'Rok', value: 'year' },
+];
 
 const { Title, Paragraph } = Typography;
 const HEATMAP_COLORS = ['#ebedf0', '#c6e48b', '#7bc96f', '#239a3b', '#196127'];
@@ -51,6 +60,11 @@ export default function Home() {
   const [containerWidth, setContainerWidth] = useState(0);
   const containerRef = useRef(null);
 
+  const [muscleRange, setMuscleRange] = useState('week');
+  const [muscleData, setMuscleData] = useState(null);
+  const [muscleLoading, setMuscleLoading] = useState(true);
+  const [muscleError, setMuscleError] = useState('');
+
   useEffect(() => {
     const node = containerRef.current;
     if (!node) return undefined;
@@ -82,6 +96,30 @@ export default function Home() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getDashboardMuscleLoad(muscleRange)
+      .then((data) => {
+        if (cancelled) return;
+        setMuscleData(data);
+        setMuscleError('');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setMuscleError('Nepodařilo se načíst zátěž svalů.');
+        setMuscleData(null);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setMuscleLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [muscleRange]);
 
   const { weeks, monthLabels } = useMemo(() => {
     if (!overview?.start_date || !overview?.end_date) {
@@ -130,6 +168,28 @@ export default function Home() {
 
     return { weeks: builtWeeks, monthLabels: labels };
   }, [overview]);
+
+  const muscleLoadEntries = useMemo(
+    () => Object.entries(muscleData?.muscle_load ?? {}),
+    [muscleData],
+  );
+
+  const muscleEngagement = useMemo(() => {
+    if (muscleLoadEntries.length === 0) return {};
+    const maxLoad = Math.max(...muscleLoadEntries.map(([, m]) => m.muscle_load), 1);
+    return Object.fromEntries(
+      muscleLoadEntries.map(([muscle, { muscle_load }]) => [
+        muscle,
+        Math.round((muscle_load / maxLoad) * 100),
+      ]),
+    );
+  }, [muscleLoadEntries]);
+
+  const muscleLoadRange = useMemo(() => {
+    if (muscleLoadEntries.length === 0) return null;
+    const loads = muscleLoadEntries.map(([, m]) => m.muscle_load);
+    return { min: Math.min(...loads), max: Math.max(...loads) };
+  }, [muscleLoadEntries]);
 
   const { visibleWeeks, visibleMonthLabels } = useMemo(() => {
     if (containerWidth <= 0 || weeks.length === 0) {
@@ -249,6 +309,47 @@ export default function Home() {
         <span>Více</span>
       </Flex>
       <Divider />
+
+      <Flex justify="center" style={{ marginBottom: 12 }}>
+        <Segmented
+          options={MUSCLE_RANGE_OPTIONS}
+          value={muscleRange}
+          onChange={setMuscleRange}
+        />
+      </Flex>
+
+      {muscleError && (
+        <Alert type="error" showIcon message={muscleError} style={{ marginBottom: 12 }} />
+      )}
+
+      {muscleLoading ? (
+        <Flex justify="center" style={{ padding: 24 }}>
+          <Spin />
+        </Flex>
+      ) : muscleData?.muscle_load == null ? (
+        <Alert
+          type="info"
+          showIcon
+          message="Vyplňte hmotnost v profilu pro výpočet přemístěné zátěže."
+        />
+      ) : muscleLoadEntries.length === 0 ? (
+        <Paragraph type="secondary" style={{ textAlign: 'center' }}>
+          V tomto období zatím nejsou žádné série.
+        </Paragraph>
+      ) : (
+        <>
+          <ExerciseMuscleMap
+            engagement={muscleEngagement}
+            mode="load"
+            loadRange={muscleLoadRange}
+          />
+          <Paragraph type="secondary" style={{ textAlign: 'center', marginTop: 8 }}>
+            Celková zátěž: {(muscleData.total_load_kg / 1000).toFixed(2)} t
+            {' · '}
+            {muscleData.series_count} sérií
+          </Paragraph>
+        </>
+      )}
     </Typography>
   );
 }

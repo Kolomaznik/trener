@@ -24,6 +24,7 @@ The persisted shape is the contract documented in
 ``MONGO_DB`` plan file under "exercise_series document schema".
 """
 
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -38,11 +39,11 @@ from app.services.fitness_math import (
     evaluate_set_performance,
     interpolate_missing_reps,
 )
-from app.services.user_exercises import LevelUpInfo, refresh_user_exercise
+from app.services.user_exercises import PROGRESSION_LEVELS, LevelUpInfo, refresh_user_exercise
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/exercises/series", tags=["exercises"])
-
-_VALID_LEVELS = {"beginner", "intermediate", "mastery"}
 
 
 class CountingEvent(BaseModel):
@@ -105,7 +106,14 @@ async def put_exercise_series(
     # progression_goals tier we evaluate against. We do not recompute it
     # from history here — that's the job of refresh_user_exercise.
     level = user_exercise.get("user_level")
-    if level not in _VALID_LEVELS:
+    if level not in PROGRESSION_LEVELS:
+        logger.warning(
+            "exercise_series: user_exercises row for %s/%s has invalid user_level=%r; "
+            "falling back to 'beginner'",
+            user.email,
+            payload.exercise_id,
+            level,
+        )
         level = "beginner"
 
     cadence = exercise_doc.get("cadence") or {}
