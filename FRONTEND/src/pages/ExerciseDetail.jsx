@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Alert,
   Button,
@@ -30,6 +30,7 @@ import ExerciseMuscleMap from '../components/ExerciseMuscleMap.jsx';
 import { getExerciseDetail } from '../api/exercises/get_detail.js';
 import { addUserExercise } from '../api/user_exercises/post.js';
 import { putExerciseSeries } from '../api/exercises/series.js';
+import { getUserExercises } from '../api/user_exercises/get_list.js';
 import {
   computeSessionStats,
   parseNumberFromTokens,
@@ -123,8 +124,8 @@ function IntervalSparkline({ intervalsMs, cadenceMs }) {
 function LevelProgressPlot({ levelSets, targetReps }) {
   if (!levelSets || levelSets.length === 0) return null;
 
-  const data = levelSets.map((s) => ({
-    time: new Date(s.started_at),
+  const data = levelSets.map((s, i) => ({
+    session: i + 1,
     reps: s.total_reps,
     completed: s.is_completed === true,
   }));
@@ -151,7 +152,7 @@ function LevelProgressPlot({ levelSets, targetReps }) {
     >
       <Line
         data={data}
-        xField="time"
+        xField="session"
         yField="reps"
         height={160}
         point={{
@@ -320,6 +321,7 @@ export default function ExerciseDetail() {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [userList, setUserList] = useState([]);
 
   useEffect(() => {
     if (!exerciseName) return undefined;
@@ -347,6 +349,20 @@ export default function ExerciseDetail() {
     };
   }, [exerciseName]);
 
+  useEffect(() => {
+    let active = true;
+    getUserExercises()
+      .then((list) => {
+        if (active) setUserList(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        // Not critical — carousel siblings just won't render.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       {error && <Alert type="error" message={error} showIcon />}
@@ -359,17 +375,179 @@ export default function ExerciseDetail() {
         <ExerciseDetailBody
           detail={detail}
           setDetail={setDetail}
-          navigate={navigate}
           exerciseName={exerciseName}
+          userList={userList}
         />
       )}
     </Space>
   );
 }
 
-function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
+const CAROUSEL_SLIDE_MS = 260;
+
+const CAROUSEL_CSS = `
+@keyframes hc-in-right { from { transform: translateX(60%) scale(0.92); opacity: 0; } to { transform: translateX(0) scale(1); opacity: 1; } }
+@keyframes hc-in-left  { from { transform: translateX(-60%) scale(0.92); opacity: 0; } to { transform: translateX(0) scale(1); opacity: 1; } }
+@keyframes hc-out-left { from { transform: translateX(0) scale(1); opacity: 1; } to { transform: translateX(-60%) scale(0.92); opacity: 0; } }
+@keyframes hc-out-right{ from { transform: translateX(0) scale(1); opacity: 1; } to { transform: translateX(60%) scale(0.92); opacity: 0; } }
+
+.hc-side-preview-slot {
+  flex: 0 0 5%;
+  display: flex;
+  align-items: center;
+  padding: 0;
+}
+.hc-side-preview {
+  width: 100%;
+  height: 80%;
+  background: #ffffff;
+  border: 1px solid #f0f0f0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.hc-side-preview-left {
+  border-radius: 0 10px 10px 0;
+  border-left: none;
+}
+.hc-side-preview-right {
+  border-radius: 10px 0 0 10px;
+  border-right: none;
+}
+.hc-side-preview:hover { opacity: 1; }
+.hc-side-preview:focus-visible {
+  outline: 2px solid #1677ff;
+  outline-offset: 2px;
+}
+`;
+
+function CarouselHeader({ detail, prev, next }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [slideFromInitial] = useState(() => location.state?.slideFrom ?? null);
+  const [outgoing, setOutgoing] = useState(null); // 'next' | 'prev' | null
+  const touchStartXRef = useRef(null);
+
+  useEffect(() => {
+    if (!outgoing) return undefined;
+    const target = outgoing === 'next' ? next : prev;
+    if (!target) {
+      setOutgoing(null);
+      return undefined;
+    }
+    const slideFrom = outgoing === 'next' ? 'right' : 'left';
+    const id = setTimeout(() => {
+      navigate(`/exercises/${target.exercise_name}`, { state: { slideFrom } });
+    }, CAROUSEL_SLIDE_MS);
+    return () => clearTimeout(id);
+  }, [outgoing, next, prev, navigate]);
+
+  const goTo = (dir) => {
+    if (outgoing) return;
+    const target = dir === 'next' ? next : prev;
+    if (!target) return;
+    setOutgoing(dir);
+  };
+
+  const handleTouchStart = (e) => {
+    touchStartXRef.current = e.touches[0]?.clientX ?? null;
+  };
+  const handleTouchEnd = (e) => {
+    const startX = touchStartXRef.current;
+    touchStartXRef.current = null;
+    if (startX == null) return;
+    const dx = (e.changedTouches[0]?.clientX ?? startX) - startX;
+    if (dx > 50) goTo('prev');
+    else if (dx < -50) goTo('next');
+  };
+
+  let animation;
+  if (outgoing === 'next') animation = `hc-out-left ${CAROUSEL_SLIDE_MS}ms ease forwards`;
+  else if (outgoing === 'prev') animation = `hc-out-right ${CAROUSEL_SLIDE_MS}ms ease forwards`;
+  else if (slideFromInitial === 'right') animation = `hc-in-right ${CAROUSEL_SLIDE_MS}ms ease`;
+  else if (slideFromInitial === 'left') animation = `hc-in-left ${CAROUSEL_SLIDE_MS}ms ease`;
+
+  return (
+    <div style={{ overflow: 'hidden', marginLeft: -32, marginRight: -32 }}>
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          display: 'flex',
+          alignItems: 'stretch',
+          gap: 12,
+          touchAction: 'pan-y',
+          paddingLeft: 16,
+          paddingRight: 16,
+        }}
+      >
+        <style>{CAROUSEL_CSS}</style>
+        <CarouselSidePreview item={prev} side="left" onClick={() => goTo('prev')} />
+        <div
+          style={{
+            flex: '1 1 auto',
+            minWidth: 0,
+            animation,
+            willChange: animation ? 'transform, opacity' : undefined,
+          }}
+        >
+          <Card>
+            <div style={{ textAlign: 'center' }}>
+              <Title level={2} style={{ margin: 0 }}>
+                {detail.title}
+              </Title>
+              {detail.english_name && (
+                <Text type="secondary">{detail.english_name}</Text>
+              )}
+              <div style={{ marginTop: 8 }}>
+                <Space size={4} wrap style={{ justifyContent: 'center' }}>
+                  <Tag color="blue">{detail.family}</Tag>
+                  <Tag>Level {detail.level}</Tag>
+                </Space>
+              </div>
+            </div>
+          </Card>
+        </div>
+        <CarouselSidePreview item={next} side="right" onClick={() => goTo('next')} />
+      </div>
+    </div>
+  );
+}
+
+function CarouselSidePreview({ item, side, onClick }) {
+  const sideClass = side === 'left' ? 'hc-side-preview-left' : 'hc-side-preview-right';
+  const inner = item ? (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`${side === 'left' ? 'Předchozí' : 'Další'} cvik: ${item.title ?? item.exercise_name}`}
+      data-testid={`carousel-${side === 'left' ? 'prev' : 'next'}`}
+      className={`hc-side-preview ${sideClass}`}
+    />
+  ) : (
+    <div
+      className={`hc-side-preview ${sideClass}`}
+      aria-hidden
+      style={{ visibility: 'hidden' }}
+    />
+  );
+  return <div className="hc-side-preview-slot">{inner}</div>;
+}
+
+function ExerciseDetailBody({ detail, setDetail, exerciseName, userList }) {
   // ── Workout session state ─────────────────────────────────────────────────
   const levelInfo = detail.user_level ?? null;
+
+  const { prevExercise, nextExercise } = useMemo(() => {
+    const idx = userList.findIndex((e) => e.exercise_name === exerciseName);
+    const len = userList.length;
+    if (idx < 0 || len < 2) return { prevExercise: null, nextExercise: null };
+    return {
+      prevExercise: userList[(idx - 1 + len) % len],
+      nextExercise: userList[(idx + 1) % len],
+    };
+  }, [userList, exerciseName]);
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState(null);
   const [setNumber, setSetNumber] = useState(1);
@@ -619,21 +797,8 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      {/* ── Compact header: name, tags ───────────────────────────────────── */}
-      <Card>
-        <Space direction="vertical" size={4}>
-          <Title level={2} style={{ margin: 0 }}>
-            {detail.title}
-          </Title>
-          {detail.english_name && (
-            <Text type="secondary">{detail.english_name}</Text>
-          )}
-          <Space size={4} wrap>
-            <Tag color="blue">{detail.family}</Tag>
-            <Tag>Level {detail.level}</Tag>
-          </Space>
-        </Space>
-      </Card>
+      {/* ── Compact header: carousel with prev/next exercise previews ──── */}
+      <CarouselHeader detail={detail} prev={prevExercise} next={nextExercise} />
 
       {/* ── Personal goal: Tvoje úroveň ──────────────────────────────────── */}
       {levelInfo && (
@@ -870,26 +1035,6 @@ function ExerciseDetailBody({ detail, setDetail, navigate, exerciseName }) {
         <ProgressionAndMuscleCard detail={detail} />
       )}
 
-      {detail.next_exercise_name ? (
-        <Alert
-          type="info"
-          showIcon
-          message={
-            <Space>
-              <Text>Další úroveň:</Text>
-              <Button
-                type="link"
-                onClick={() => navigate(`/exercises/${detail.next_exercise_name}`)}
-                style={{ padding: 0 }}
-              >
-                {detail.next_exercise_title}
-              </Button>
-            </Space>
-          }
-        />
-      ) : (
-        <Alert type="success" showIcon message="Nejvyšší úroveň této rodiny" />
-      )}
     </Space>
   );
 }

@@ -9,6 +9,9 @@ vi.mock('../api/exercises/get_detail.js', () => ({
 vi.mock('../api/exercises/series.js', () => ({
   putExerciseSeries: vi.fn(),
 }));
+vi.mock('../api/user_exercises/get_list.js', () => ({
+  getUserExercises: vi.fn(),
+}));
 
 vi.mock('@ant-design/plots', () => ({
   Line: (props) => (
@@ -43,6 +46,7 @@ vi.mock('react-speech-recognition', () => {
 
 import { getExerciseDetail } from '../api/exercises/get_detail.js';
 import { putExerciseSeries } from '../api/exercises/series.js';
+import { getUserExercises } from '../api/user_exercises/get_list.js';
 import * as speechModule from 'react-speech-recognition';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -202,8 +206,10 @@ describe('ExerciseDetail page', () => {
     speechModule.__resetMockState();
     getExerciseDetail.mockReset();
     putExerciseSeries.mockReset();
+    getUserExercises.mockReset();
     getExerciseDetail.mockResolvedValue(detailFixture);
     putExerciseSeries.mockResolvedValue({ id: 'sess-1', total_reps: 0, evaluation: null });
+    getUserExercises.mockResolvedValue([]);
   });
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -251,9 +257,8 @@ describe('ExerciseDetail page', () => {
     expect(cards[1]).toHaveTextContent('Série 1:');
 
     // Starting the next series should be set #3, but we can't observe the
-    // number directly here; postExerciseSeries→putExerciseSeries call would
-    // include set_number: 3. We assert by tail-counting via the payload in
-    // the existing stop-set tests.
+    // number directly here; putExerciseSeries call would include set_number: 3.
+    // We assert by tail-counting via the payload in the existing stop-set tests.
   });
 
   // ── Tvoje úroveň: level-progress plot ─────────────────────────────────────
@@ -458,30 +463,48 @@ describe('ExerciseDetail page', () => {
 
   // ── Navigation ─────────────────────────────────────────────────────────────
 
-  it('navigates back to list when "Zpět na seznam" button is clicked', async () => {
-    renderWithRouter();
-
-    await screen.findByText('Kliky o zeď');
-    fireEvent.click(screen.getByRole('button', { name: /Zpět na seznam/ }));
-
-    expect(await screen.findByTestId('list-marker')).toBeInTheDocument();
-  });
-
-  it('navigates to next exercise when "next level" button is clicked', async () => {
+  it('navigates to next exercise via the carousel "next" preview', async () => {
     getExerciseDetail.mockImplementation(async (id) =>
       id === 'pushups_level_2' ? detailFixtureLevel2 : detailFixture,
     );
+    getUserExercises.mockResolvedValue([
+      { exercise_name: 'pushups_level_1', title: 'Kliky o zeď', user_level: 'beginner' },
+      { exercise_name: 'pushups_level_2', title: 'Kliky v předklonu', user_level: 'beginner' },
+    ]);
     renderWithRouter();
 
-    await screen.findByText('Kliky o zeď');
-    fireEvent.click(screen.getByRole('button', { name: 'Kliky v předklonu' }));
+    const nextPreview = await screen.findByTestId('carousel-next');
+    expect(nextPreview).toHaveAccessibleName(/Kliky v předklonu/);
+    fireEvent.click(nextPreview);
 
     await waitFor(() =>
       expect(getExerciseDetail).toHaveBeenCalledWith('pushups_level_2'),
     );
-    expect(
-      await screen.findByText('Nejvyšší úroveň této rodiny'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Kliky v předklonu')).toBeInTheDocument();
+  });
+
+  it('does not render carousel previews when the user has only one exercise', async () => {
+    getUserExercises.mockResolvedValue([
+      { exercise_name: 'pushups_level_1', title: 'Kliky o zeď', user_level: 'beginner' },
+    ]);
+    renderWithRouter();
+
+    await screen.findByText('Kliky o zeď');
+    expect(screen.queryByTestId('carousel-next')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('carousel-prev')).not.toBeInTheDocument();
+  });
+
+  it('wraps around at the ends — next of last item is first, prev of first is last', async () => {
+    getUserExercises.mockResolvedValue([
+      { exercise_name: 'pushups_level_1', title: 'Kliky o zeď', user_level: 'beginner' },
+      { exercise_name: 'pushups_level_2', title: 'Kliky v předklonu', user_level: 'beginner' },
+      { exercise_name: 'pushups_level_3', title: 'Kliky na lavici', user_level: 'beginner' },
+    ]);
+    renderWithRouter('/exercises/pushups_level_1');
+
+    // First item: prev wraps to last, next is the second item.
+    expect(await screen.findByTestId('carousel-prev')).toHaveAccessibleName(/Kliky na lavici/);
+    expect(screen.getByTestId('carousel-next')).toHaveAccessibleName(/Kliky v předklonu/);
   });
 
   // ── Error states ───────────────────────────────────────────────────────────
