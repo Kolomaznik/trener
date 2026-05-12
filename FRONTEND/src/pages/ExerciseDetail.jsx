@@ -543,10 +543,11 @@ function ExerciseDetailBody({ detail, setDetail, exerciseName, userList }) {
 
   const { prevExercise, nextExercise } = useMemo(() => {
     const idx = userList.findIndex((e) => e.exercise_name === exerciseName);
-    if (idx < 0) return { prevExercise: null, nextExercise: null };
+    const len = userList.length;
+    if (idx < 0 || len < 2) return { prevExercise: null, nextExercise: null };
     return {
-      prevExercise: idx > 0 ? userList[idx - 1] : null,
-      nextExercise: idx < userList.length - 1 ? userList[idx + 1] : null,
+      prevExercise: userList[(idx - 1 + len) % len],
+      nextExercise: userList[(idx + 1) % len],
     };
   }, [userList, exerciseName]);
   const [adding, setAdding] = useState(false);

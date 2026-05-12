@@ -492,7 +492,7 @@ describe('ExerciseDetail page', () => {
     expect(await screen.findByText('Kliky v předklonu')).toBeInTheDocument();
   });
 
-  it('does not render a next preview when the current exercise is the last in the user list', async () => {
+  it('does not render carousel previews when the user has only one exercise', async () => {
     getUserExercises.mockResolvedValue([
       { exercise_name: 'pushups_level_1', title: 'Kliky o zeď', user_level: 'beginner' },
     ]);
@@ -501,6 +501,19 @@ describe('ExerciseDetail page', () => {
     await screen.findByText('Kliky o zeď');
     expect(screen.queryByTestId('carousel-next')).not.toBeInTheDocument();
     expect(screen.queryByTestId('carousel-prev')).not.toBeInTheDocument();
+  });
+
+  it('wraps around at the ends — next of last item is first, prev of first is last', async () => {
+    getUserExercises.mockResolvedValue([
+      { exercise_name: 'pushups_level_1', title: 'Kliky o zeď', user_level: 'beginner' },
+      { exercise_name: 'pushups_level_2', title: 'Kliky v předklonu', user_level: 'beginner' },
+      { exercise_name: 'pushups_level_3', title: 'Kliky na lavici', user_level: 'beginner' },
+    ]);
+    renderWithRouter('/exercises/pushups_level_1');
+
+    // First item: prev wraps to last, next is the second item.
+    expect(await screen.findByTestId('carousel-prev')).toHaveTextContent('Kliky na lavici');
+    expect(screen.getByTestId('carousel-next')).toHaveTextContent('Kliky v předklonu');
   });
 
   // ── Error states ───────────────────────────────────────────────────────────
