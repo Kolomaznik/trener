@@ -205,10 +205,10 @@ describe('ExerciseDetail page', () => {
   beforeEach(() => {
     speechModule.__resetMockState();
     getExerciseDetail.mockReset();
-    postExerciseSeries.mockReset();
+    putExerciseSeries.mockReset();
     getUserExercises.mockReset();
     getExerciseDetail.mockResolvedValue(detailFixture);
-    postExerciseSeries.mockResolvedValue({ id: 'sess-1', total_reps: 0, evaluation: null });
+    putExerciseSeries.mockResolvedValue({ id: 'sess-1', total_reps: 0, evaluation: null });
     getUserExercises.mockResolvedValue([]);
   });
 
@@ -257,9 +257,8 @@ describe('ExerciseDetail page', () => {
     expect(cards[1]).toHaveTextContent('Série 1:');
 
     // Starting the next series should be set #3, but we can't observe the
-    // number directly here; postExerciseSeries→putExerciseSeries call would
-    // include set_number: 3. We assert by tail-counting via the payload in
-    // the existing stop-set tests.
+    // number directly here; putExerciseSeries call would include set_number: 3.
+    // We assert by tail-counting via the payload in the existing stop-set tests.
   });
 
   // ── Tvoje úroveň: level-progress plot ─────────────────────────────────────
