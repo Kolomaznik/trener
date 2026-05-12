@@ -1,37 +1,22 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import {
   Alert,
   Button,
   Card,
-  Col,
   Empty,
-  Row,
   Skeleton,
   Space,
-  Tag,
   Typography,
 } from 'antd';
 import { DatabaseOutlined } from '@ant-design/icons';
 import { getUserExercises } from '../api/user_exercises/get_list.js';
 
-const { Title, Paragraph, Text } = Typography;
-
-const LEVEL_LABELS = {
-  beginner: 'Začátečník',
-  intermediate: 'Středně pokročilý',
-  mastery: 'Mistr',
-};
-
-const LEVEL_COLORS = {
-  beginner: 'default',
-  intermediate: 'blue',
-  mastery: 'gold',
-};
+const { Title, Paragraph } = Typography;
 
 export default function Exercises() {
   const navigate = useNavigate();
-  const [exercises, setExercises] = useState([]);
+  const [firstName, setFirstName] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -41,7 +26,9 @@ export default function Exercises() {
     setError(null);
     getUserExercises()
       .then((data) => {
-        if (active) setExercises(data);
+        if (!active) return;
+        const list = Array.isArray(data) ? data : [];
+        setFirstName(list.length > 0 ? list[0].exercise_name : null);
       })
       .catch((err) => {
         if (!active) return;
@@ -56,6 +43,22 @@ export default function Exercises() {
     };
   }, []);
 
+  if (loading) {
+    return (
+      <Card>
+        <Skeleton active paragraph={{ rows: 3 }} />
+      </Card>
+    );
+  }
+
+  if (error) {
+    return <Alert type="error" message={error} showIcon />;
+  }
+
+  if (firstName) {
+    return <Navigate to={`/exercises/${firstName}`} replace />;
+  }
+
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <Typography>
@@ -64,78 +67,18 @@ export default function Exercises() {
           Tvůj osobní seznam. Cviky přidáváš v katalogu — viz tlačítko níže.
         </Paragraph>
       </Typography>
-
-      {error && <Alert type="error" message={error} showIcon />}
-
-      {loading ? (
-        <Row gutter={[16, 16]}>
-          {[0, 1, 2].map((i) => (
-            <Col key={i} xs={24} sm={12} lg={8}>
-              <Card>
-                <Skeleton active paragraph={{ rows: 3 }} />
-              </Card>
-            </Col>
-          ))}
-        </Row>
-      ) : exercises.length === 0 ? (
-        <Empty
-          description="Zatím nemáš žádné cviky. Přidej si je z katalogu."
-          data-testid="empty-state"
+      <Empty
+        description="Zatím nemáš žádné cviky. Přidej si je z katalogu."
+        data-testid="empty-state"
+      >
+        <Button
+          type="primary"
+          icon={<DatabaseOutlined />}
+          onClick={() => navigate('/admin/exercises')}
         >
-          <Button
-            type="primary"
-            icon={<DatabaseOutlined />}
-            onClick={() => navigate('/admin/exercises')}
-          >
-            Otevřít katalog cviků
-          </Button>
-        </Empty>
-      ) : (
-        <Row gutter={[16, 16]}>
-          {exercises.map((item) => (
-            <Col key={item.exercise_name} xs={24} sm={12} lg={8}>
-              <ExerciseTile
-                item={item}
-                onClick={() => navigate(`/exercises/${item.exercise_name}`)}
-              />
-            </Col>
-          ))}
-        </Row>
-      )}
+          Otevřít katalog cviků
+        </Button>
+      </Empty>
     </Space>
-  );
-}
-
-function ExerciseTile({ item, onClick }) {
-  return (
-    <Card
-      hoverable
-      onClick={onClick}
-      role="button"
-      aria-label={`Otevřít cvik ${item.title}`}
-      styles={{ body: { padding: 16 } }}
-      style={{ height: '100%' }}
-    >
-      <Space direction="vertical" size={8} style={{ width: '100%' }}>
-        <Space size={4} wrap>
-          <Tag color="blue">{item.family}</Tag>
-          <Tag>Level {item.level}</Tag>
-          {item.user_level && (
-            <Tag color={LEVEL_COLORS[item.user_level] ?? 'default'}>
-              {LEVEL_LABELS[item.user_level] ?? 'Neznámá úroveň'}
-            </Tag>
-          )}
-          {item.completed && <Tag color="green">Dokončeno</Tag>}
-        </Space>
-        <Title level={4} style={{ margin: 0 }}>
-          {item.title}
-        </Title>
-        {item.target_reps != null && (
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Cíl: {item.target_sets ?? 1} × {item.target_reps} opakování
-          </Text>
-        )}
-      </Space>
-    </Card>
   );
 }
