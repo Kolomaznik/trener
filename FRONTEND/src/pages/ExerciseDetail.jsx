@@ -391,42 +391,34 @@ const CAROUSEL_CSS = `
 @keyframes hc-out-left { from { transform: translateX(0) scale(1); opacity: 1; } to { transform: translateX(-60%) scale(0.92); opacity: 0; } }
 @keyframes hc-out-right{ from { transform: translateX(0) scale(1); opacity: 1; } to { transform: translateX(60%) scale(0.92); opacity: 0; } }
 
-.hc-side-preview {
-  flex: 0 0 18%;
-  background: #fafafa;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  padding: 12px 6px;
-  cursor: pointer;
-  color: rgba(0, 0, 0, 0.55);
-  text-align: center;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.3;
-  min-width: 0;
-  opacity: 0.6;
-  transform: scale(0.94);
-  transition: opacity 200ms ease, transform 200ms ease, background 200ms ease;
-  overflow: hidden;
-  word-break: break-word;
+.hc-side-preview-slot {
+  flex: 0 0 5%;
   display: flex;
   align-items: center;
-  justify-content: center;
+  padding: 0;
 }
-.hc-side-preview:hover {
-  opacity: 1;
-  transform: scale(0.97);
+.hc-side-preview {
+  width: 100%;
+  height: 80%;
   background: #ffffff;
+  border: 1px solid #f0f0f0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 200ms ease, transform 200ms ease;
 }
-.hc-side-preview:disabled {
-  cursor: default;
-  visibility: hidden;
+.hc-side-preview-left {
+  border-radius: 0 10px 10px 0;
+  border-left: none;
 }
-.hc-side-preview-label {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+.hc-side-preview-right {
+  border-radius: 10px 0 0 10px;
+  border-right: none;
+}
+.hc-side-preview:hover { opacity: 1; }
+.hc-side-preview:focus-visible {
+  outline: 2px solid #1677ff;
+  outline-offset: 2px;
 }
 `;
 
@@ -477,64 +469,70 @@ function CarouselHeader({ detail, prev, next }) {
   else if (slideFromInitial === 'left') animation = `hc-in-left ${CAROUSEL_SLIDE_MS}ms ease`;
 
   return (
-    <div
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      style={{
-        display: 'flex',
-        alignItems: 'stretch',
-        gap: 10,
-        touchAction: 'pan-y',
-      }}
-    >
-      <style>{CAROUSEL_CSS}</style>
-      <CarouselSidePreview item={prev} side="left" onClick={() => goTo('prev')} />
+    <div style={{ overflow: 'hidden', marginLeft: -32, marginRight: -32 }}>
       <div
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
         style={{
-          flex: '1 1 auto',
-          minWidth: 0,
-          animation,
-          willChange: animation ? 'transform, opacity' : undefined,
+          display: 'flex',
+          alignItems: 'stretch',
+          gap: 12,
+          touchAction: 'pan-y',
+          paddingLeft: 16,
+          paddingRight: 16,
         }}
       >
-        <Card>
-          <div style={{ textAlign: 'center' }}>
-            <Title level={2} style={{ margin: 0 }}>
-              {detail.title}
-            </Title>
-            {detail.english_name && (
-              <Text type="secondary">{detail.english_name}</Text>
-            )}
-            <div style={{ marginTop: 8 }}>
-              <Space size={4} wrap style={{ justifyContent: 'center' }}>
-                <Tag color="blue">{detail.family}</Tag>
-                <Tag>Level {detail.level}</Tag>
-              </Space>
+        <style>{CAROUSEL_CSS}</style>
+        <CarouselSidePreview item={prev} side="left" onClick={() => goTo('prev')} />
+        <div
+          style={{
+            flex: '1 1 auto',
+            minWidth: 0,
+            animation,
+            willChange: animation ? 'transform, opacity' : undefined,
+          }}
+        >
+          <Card>
+            <div style={{ textAlign: 'center' }}>
+              <Title level={2} style={{ margin: 0 }}>
+                {detail.title}
+              </Title>
+              {detail.english_name && (
+                <Text type="secondary">{detail.english_name}</Text>
+              )}
+              <div style={{ marginTop: 8 }}>
+                <Space size={4} wrap style={{ justifyContent: 'center' }}>
+                  <Tag color="blue">{detail.family}</Tag>
+                  <Tag>Level {detail.level}</Tag>
+                </Space>
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
+        <CarouselSidePreview item={next} side="right" onClick={() => goTo('next')} />
       </div>
-      <CarouselSidePreview item={next} side="right" onClick={() => goTo('next')} />
     </div>
   );
 }
 
 function CarouselSidePreview({ item, side, onClick }) {
-  if (!item) {
-    return <div className="hc-side-preview" aria-hidden style={{ visibility: 'hidden' }} />;
-  }
-  const label = item.title ?? item.exercise_name;
-  return (
+  const sideClass = side === 'left' ? 'hc-side-preview-left' : 'hc-side-preview-right';
+  const inner = item ? (
     <button
       type="button"
       onClick={onClick}
-      aria-label={`${side === 'left' ? 'Předchozí' : 'Další'} cvik: ${label}`}
+      aria-label={`${side === 'left' ? 'Předchozí' : 'Další'} cvik: ${item.title ?? item.exercise_name}`}
       data-testid={`carousel-${side === 'left' ? 'prev' : 'next'}`}
-      className="hc-side-preview"
-    >
-      <span className="hc-side-preview-label">{label}</span>
-    </button>
+      className={`hc-side-preview ${sideClass}`}
+    />
+  ) : (
+    <div
+      className={`hc-side-preview ${sideClass}`}
+      aria-hidden
+      style={{ visibility: 'hidden' }}
+    />
   );
+  return <div className="hc-side-preview-slot">{inner}</div>;
 }
 
 function ExerciseDetailBody({ detail, setDetail, exerciseName, userList }) {

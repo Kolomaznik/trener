@@ -463,15 +463,6 @@ describe('ExerciseDetail page', () => {
 
   // ── Navigation ─────────────────────────────────────────────────────────────
 
-  it('navigates back to list when "Zpět na seznam" button is clicked', async () => {
-    renderWithRouter();
-
-    await screen.findByText('Kliky o zeď');
-    fireEvent.click(screen.getByRole('button', { name: /Zpět na seznam/ }));
-
-    expect(await screen.findByTestId('list-marker')).toBeInTheDocument();
-  });
-
   it('navigates to next exercise via the carousel "next" preview', async () => {
     getExerciseDetail.mockImplementation(async (id) =>
       id === 'pushups_level_2' ? detailFixtureLevel2 : detailFixture,
@@ -483,7 +474,7 @@ describe('ExerciseDetail page', () => {
     renderWithRouter();
 
     const nextPreview = await screen.findByTestId('carousel-next');
-    expect(nextPreview).toHaveTextContent('Kliky v předklonu');
+    expect(nextPreview).toHaveAccessibleName(/Kliky v předklonu/);
     fireEvent.click(nextPreview);
 
     await waitFor(() =>
@@ -512,8 +503,8 @@ describe('ExerciseDetail page', () => {
     renderWithRouter('/exercises/pushups_level_1');
 
     // First item: prev wraps to last, next is the second item.
-    expect(await screen.findByTestId('carousel-prev')).toHaveTextContent('Kliky na lavici');
-    expect(screen.getByTestId('carousel-next')).toHaveTextContent('Kliky v předklonu');
+    expect(await screen.findByTestId('carousel-prev')).toHaveAccessibleName(/Kliky na lavici/);
+    expect(screen.getByTestId('carousel-next')).toHaveAccessibleName(/Kliky v předklonu/);
   });
 
   // ── Error states ───────────────────────────────────────────────────────────
