@@ -384,15 +384,46 @@ export default function ExerciseDetail() {
   );
 }
 
+const CAROUSEL_CARD_HEIGHT = 140;
+
 function CarouselTitleCard({ item }) {
   return (
-    <Card>
-      <div style={{ textAlign: 'center' }}>
-        <Title level={2} style={{ margin: 0 }}>
+    <Card styles={{ body: { height: CAROUSEL_CARD_HEIGHT, overflow: 'hidden' } }}>
+      <div
+        style={{
+          textAlign: 'center',
+          height: '100%',
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'stretch',
+          minWidth: 0,
+        }}
+      >
+        <Title
+          level={2}
+          style={{
+            margin: 0,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
           {item.title}
         </Title>
         {item.english_name && (
-          <Text type="secondary">{item.english_name}</Text>
+          <Text
+            type="secondary"
+            style={{
+              display: 'block',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {item.english_name}
+          </Text>
         )}
         {(item.family || item.level != null) && (
           <div style={{ marginTop: 8 }}>
@@ -451,11 +482,26 @@ function CarouselHeader({ detail, prev, next }) {
   };
 
   return (
-    <div style={{ marginLeft: -32, marginRight: -32 }}>
+    <div style={{ marginLeft: -32, marginRight: -32 }} className="hc-carousel-wrap">
+      <style>{`
+        .hc-carousel-wrap .slick-dots li button {
+          background: #001d66 !important;
+          opacity: 0.35 !important;
+        }
+        .hc-carousel-wrap .slick-dots li button:hover {
+          opacity: 0.7 !important;
+        }
+        .hc-carousel-wrap .slick-dots li.slick-active::after {
+          background: #001d66 !important;
+        }
+        .hc-carousel-wrap .slick-dots li.slick-active button {
+          opacity: 1 !important;
+        }
+      `}</style>
       <Carousel
         initialSlide={1}
         afterChange={handleAfterChange}
-        dots={false}
+        dotPosition="bottom"
         centerMode
         centerPadding="5%"
         speed={260}
