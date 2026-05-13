@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Alert,
   Button,
   Card,
+  Carousel,
   Col,
   Descriptions,
   Divider,
@@ -383,156 +384,99 @@ export default function ExerciseDetail() {
   );
 }
 
-const CAROUSEL_SLIDE_MS = 260;
-
-const CAROUSEL_CSS = `
-@keyframes hc-in-right { from { transform: translateX(60%) scale(0.92); opacity: 0; } to { transform: translateX(0) scale(1); opacity: 1; } }
-@keyframes hc-in-left  { from { transform: translateX(-60%) scale(0.92); opacity: 0; } to { transform: translateX(0) scale(1); opacity: 1; } }
-@keyframes hc-out-left { from { transform: translateX(0) scale(1); opacity: 1; } to { transform: translateX(-60%) scale(0.92); opacity: 0; } }
-@keyframes hc-out-right{ from { transform: translateX(0) scale(1); opacity: 1; } to { transform: translateX(60%) scale(0.92); opacity: 0; } }
-
-.hc-side-preview-slot {
-  flex: 0 0 5%;
-  display: flex;
-  align-items: center;
-  padding: 0;
-}
-.hc-side-preview {
-  width: 100%;
-  height: 80%;
-  background: #ffffff;
-  border: 1px solid #f0f0f0;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-  cursor: pointer;
-  opacity: 0.75;
-  transition: opacity 200ms ease, transform 200ms ease;
-}
-.hc-side-preview-left {
-  border-radius: 0 10px 10px 0;
-  border-left: none;
-}
-.hc-side-preview-right {
-  border-radius: 10px 0 0 10px;
-  border-right: none;
-}
-.hc-side-preview:hover { opacity: 1; }
-.hc-side-preview:focus-visible {
-  outline: 2px solid #1677ff;
-  outline-offset: 2px;
-}
-`;
-
-function CarouselHeader({ detail, prev, next }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [slideFromInitial] = useState(() => location.state?.slideFrom ?? null);
-  const [outgoing, setOutgoing] = useState(null); // 'next' | 'prev' | null
-  const touchStartXRef = useRef(null);
-
-  useEffect(() => {
-    if (!outgoing) return undefined;
-    const target = outgoing === 'next' ? next : prev;
-    if (!target) {
-      setOutgoing(null);
-      return undefined;
-    }
-    const slideFrom = outgoing === 'next' ? 'right' : 'left';
-    const id = setTimeout(() => {
-      navigate(`/exercises/${target.exercise_name}`, { state: { slideFrom } });
-    }, CAROUSEL_SLIDE_MS);
-    return () => clearTimeout(id);
-  }, [outgoing, next, prev, navigate]);
-
-  const goTo = (dir) => {
-    if (outgoing) return;
-    const target = dir === 'next' ? next : prev;
-    if (!target) return;
-    setOutgoing(dir);
-  };
-
-  const handleTouchStart = (e) => {
-    touchStartXRef.current = e.touches[0]?.clientX ?? null;
-  };
-  const handleTouchEnd = (e) => {
-    const startX = touchStartXRef.current;
-    touchStartXRef.current = null;
-    if (startX == null) return;
-    const dx = (e.changedTouches[0]?.clientX ?? startX) - startX;
-    if (dx > 50) goTo('prev');
-    else if (dx < -50) goTo('next');
-  };
-
-  let animation;
-  if (outgoing === 'next') animation = `hc-out-left ${CAROUSEL_SLIDE_MS}ms ease forwards`;
-  else if (outgoing === 'prev') animation = `hc-out-right ${CAROUSEL_SLIDE_MS}ms ease forwards`;
-  else if (slideFromInitial === 'right') animation = `hc-in-right ${CAROUSEL_SLIDE_MS}ms ease`;
-  else if (slideFromInitial === 'left') animation = `hc-in-left ${CAROUSEL_SLIDE_MS}ms ease`;
-
+function CarouselTitleCard({ item }) {
   return (
-    <div style={{ overflow: 'hidden', marginLeft: -32, marginRight: -32 }}>
-      <div
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        style={{
-          display: 'flex',
-          alignItems: 'stretch',
-          gap: 12,
-          touchAction: 'pan-y',
-          paddingLeft: 16,
-          paddingRight: 16,
-        }}
-      >
-        <style>{CAROUSEL_CSS}</style>
-        <CarouselSidePreview item={prev} side="left" onClick={() => goTo('prev')} />
-        <div
+    <Card>
+      <div style={{ textAlign: 'center' }}>
+        <Title level={2} style={{ margin: 0 }}>
+          {item.title}
+        </Title>
+        {item.english_name && (
+          <Text type="secondary">{item.english_name}</Text>
+        )}
+        {(item.family || item.level != null) && (
+          <div style={{ marginTop: 8 }}>
+            <Space size={4} wrap style={{ justifyContent: 'center' }}>
+              {item.family && <Tag color="blue">{item.family}</Tag>}
+              {item.level != null && <Tag>Level {item.level}</Tag>}
+            </Space>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function CarouselSlide({ item, testid, sideLabel, onClick }) {
+  return (
+    <div style={{ padding: '0 6px' }}>
+      {onClick ? (
+        <button
+          type="button"
+          data-testid={testid}
+          aria-label={`${sideLabel}: ${item.title ?? item.exercise_name}`}
+          onClick={onClick}
           style={{
-            flex: '1 1 auto',
-            minWidth: 0,
-            animation,
-            willChange: animation ? 'transform, opacity' : undefined,
+            display: 'block',
+            width: '100%',
+            padding: 0,
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            textAlign: 'inherit',
           }}
         >
-          <Card>
-            <div style={{ textAlign: 'center' }}>
-              <Title level={2} style={{ margin: 0 }}>
-                {detail.title}
-              </Title>
-              {detail.english_name && (
-                <Text type="secondary">{detail.english_name}</Text>
-              )}
-              <div style={{ marginTop: 8 }}>
-                <Space size={4} wrap style={{ justifyContent: 'center' }}>
-                  <Tag color="blue">{detail.family}</Tag>
-                  <Tag>Level {detail.level}</Tag>
-                </Space>
-              </div>
-            </div>
-          </Card>
-        </div>
-        <CarouselSidePreview item={next} side="right" onClick={() => goTo('next')} />
-      </div>
+          <CarouselTitleCard item={item} />
+        </button>
+      ) : (
+        <CarouselTitleCard item={item} />
+      )}
     </div>
   );
 }
 
-function CarouselSidePreview({ item, side, onClick }) {
-  const sideClass = side === 'left' ? 'hc-side-preview-left' : 'hc-side-preview-right';
-  const inner = item ? (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={`${side === 'left' ? 'Předchozí' : 'Další'} cvik: ${item.title ?? item.exercise_name}`}
-      data-testid={`carousel-${side === 'left' ? 'prev' : 'next'}`}
-      className={`hc-side-preview ${sideClass}`}
-    />
-  ) : (
-    <div
-      className={`hc-side-preview ${sideClass}`}
-      aria-hidden
-      style={{ visibility: 'hidden' }}
-    />
+function CarouselHeader({ detail, prev, next }) {
+  const navigate = useNavigate();
+
+  if (!prev && !next) {
+    return <CarouselTitleCard item={detail} />;
+  }
+
+  const handleAfterChange = (currentSlide) => {
+    if (currentSlide === 0 && prev) {
+      navigate(`/exercises/${prev.exercise_name}`);
+    } else if (currentSlide === 2 && next) {
+      navigate(`/exercises/${next.exercise_name}`);
+    }
+  };
+
+  return (
+    <div style={{ marginLeft: -32, marginRight: -32 }}>
+      <Carousel
+        initialSlide={1}
+        afterChange={handleAfterChange}
+        dots={false}
+        centerMode
+        centerPadding="5%"
+        speed={260}
+        infinite={false}
+      >
+        <CarouselSlide
+          item={prev}
+          testid="carousel-prev"
+          sideLabel="Předchozí cvik"
+          onClick={() => navigate(`/exercises/${prev.exercise_name}`)}
+        />
+        <CarouselSlide item={detail} />
+        <CarouselSlide
+          item={next}
+          testid="carousel-next"
+          sideLabel="Další cvik"
+          onClick={() => navigate(`/exercises/${next.exercise_name}`)}
+        />
+      </Carousel>
+    </div>
   );
-  return <div className="hc-side-preview-slot">{inner}</div>;
 }
 
 function ExerciseDetailBody({ detail, setDetail, exerciseName, userList }) {
