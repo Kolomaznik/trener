@@ -53,7 +53,7 @@ class MuscleLoadResponse(BaseModel):
     muscle_exercise_count: dict[str, int] = Field(default_factory=dict)
     # Total reps performed in the window per muscle: every series whose
     # exercise engages the muscle contributes its full ``total_reps``.
-    muscle_repetitions: dict[str, int] = Field(default_factory=dict)
+    muscle_repetitions: dict[str, float] = Field(default_factory=dict)
 
 
 async def _user_weight_kg(db: AsyncIOMotorDatabase, email: str) -> float | None:
@@ -125,7 +125,7 @@ async def get_dashboard_muscle_load(
 
     # Per-muscle total reps — every series whose exercise engages the muscle
     # contributes its full ``total_reps``.
-    reps: dict[str, int] = {}
+    reps: dict[str, float] = {}
     total_reps = 0
     for s in series:
         series_reps = int(s.get("total_reps", 0))
@@ -136,7 +136,7 @@ async def get_dashboard_muscle_load(
         engagement = ex.get("muscle_engagement_percent") or {}
         for muscle, pct in engagement.items():
             if pct and pct > 0:
-                reps[muscle] = reps.get(muscle, 0) + series_reps
+                reps[muscle] = reps.get(muscle, 0) + (series_reps * pct / 100)
 
     totals: dict[str, float] = {}
     if weight_kg is not None:

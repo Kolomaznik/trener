@@ -88,20 +88,12 @@ function buildIntegerStops(loadRange, suffix = '') {
   });
 }
 
-const SCALE_TITLES = {
-  load: 'Přemístěná zátěž',
-  exercise_count: 'Počet cviků',
-  repetitions: 'Počet opakování',
-  percent: 'Zapojení',
-};
-
 function MuscleMapScale({ color, mode = 'percent', loadRange = null }) {
   let stops;
   if (mode === 'load') stops = buildLoadStops(loadRange);
   else if (mode === 'exercise_count') stops = buildIntegerStops(loadRange, '×');
   else if (mode === 'repetitions') stops = buildIntegerStops(loadRange);
   else stops = PERCENT_SCALE_STOPS;
-  const title = SCALE_TITLES[mode] ?? SCALE_TITLES.percent;
   return (
     <div
       data-testid="muscle-map-scale"
@@ -114,7 +106,6 @@ function MuscleMapScale({ color, mode = 'percent', loadRange = null }) {
         lineHeight: 1.2,
       }}
     >
-      <div style={{ fontWeight: 500, marginBottom: 2 }}>{title}</div>
       {stops.map((stop, i) => {
         // Spread alpha evenly from 1.0 (top/max) down to 0.18 (bottom/min)
         // so every swatch is visually distinct regardless of the pct values.
