@@ -595,7 +595,7 @@ function CarouselHeader({ exerciseName, userList, detailByName }) {
   );
 }
 
-function ExerciseDetailBody({ detail, updateCachedDetail, exerciseName, refreshUserList }) {
+function ExerciseDetailBody({ detail, setDetail, exerciseName, userList }) {
   // ── Workout session state ─────────────────────────────────────────────────
   const levelInfo = detail.user_level ?? null;
 

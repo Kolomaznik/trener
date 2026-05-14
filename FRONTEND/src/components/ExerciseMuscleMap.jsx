@@ -32,10 +32,12 @@ function slugsFor(key) {
   return ENGAGEMENT_TO_SLUGS[key] ?? [key.replace(/_/g, '-')];
 }
 
-/** Colours for each mode — load: red ramp, percent: blue ramp. */
+/** Colours per mode — load: red, exercise_count: green, percent & repetitions: blue. */
 const MODE_COLOR = {
   load: '#c62828',
   percent: '#1565c0',
+  exercise_count: '#2e7d32',
+  repetitions: '#1565c0',
 };
 
 function intensityOpacity(pct) {
@@ -74,10 +76,24 @@ function buildLoadStops(loadRange) {
   });
 }
 
+function buildIntegerStops(loadRange, suffix = '') {
+  if (!loadRange || loadRange.max <= 0) return [];
+  const { min, max } = loadRange;
+  return Array.from({ length: 5 }, (_, i) => {
+    const value = max - (i * (max - min)) / 4;
+    return {
+      pct: (value / max) * 100,
+      label: `${Math.round(value)}${suffix}`,
+    };
+  });
+}
+
 function MuscleMapScale({ color, mode = 'percent', loadRange = null }) {
-  const isLoad = mode === 'load';
-  const stops = isLoad ? buildLoadStops(loadRange) : PERCENT_SCALE_STOPS;
-  const title = isLoad ? 'Přemístěná zátěž' : 'Zapojení';
+  let stops;
+  if (mode === 'load') stops = buildLoadStops(loadRange);
+  else if (mode === 'exercise_count') stops = buildIntegerStops(loadRange, '×');
+  else if (mode === 'repetitions') stops = buildIntegerStops(loadRange);
+  else stops = PERCENT_SCALE_STOPS;
   return (
     <div
       data-testid="muscle-map-scale"
@@ -90,14 +106,13 @@ function MuscleMapScale({ color, mode = 'percent', loadRange = null }) {
         lineHeight: 1.2,
       }}
     >
-      <div style={{ fontWeight: 500, marginBottom: 2 }}>{title}</div>
       {stops.map((stop, i) => {
         // Spread alpha evenly from 1.0 (top/max) down to 0.18 (bottom/min)
         // so every swatch is visually distinct regardless of the pct values.
         const alpha = 1.0 - (i / Math.max(stops.length - 1, 1)) * 0.82;
         return (
         <div
-          key={stop.label}
+          key={`${mode}-${i}`}
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}
         >
           <div
