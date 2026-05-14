@@ -14,7 +14,7 @@
       },
       "group": {
         "kind": "build",
-        "isDefault": true
+        "isDefault": false
       }
     },
     {
@@ -30,8 +30,18 @@
       },
       "group": {
         "kind": "build",
-        "isDefault": true
+        "isDefault": false
       }
-    }
+    },
+    {
+				"label": "Start All",
+				"dependsOn": ["Run Backend FastAPI", "Run Frontend Dev"],
+				"dependsOrder": "parallel",
+				"problemMatcher": [],
+				"group": {
+					"kind": "build",
+					"isDefault": true
+				}
+			}
   ]
 }
