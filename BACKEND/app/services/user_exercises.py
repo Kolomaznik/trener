@@ -48,14 +48,11 @@ from typing import Any
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
 
+from app.db import SCHEMA_FILTER
 from app.services.fitness_math import REST_SECONDS
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_FILTER: dict[str, Any] = {
-    "level": {"$exists": True},
-    "family": {"$exists": True},
-}
 PROGRESSION_LEVELS: tuple[str, ...] = ("beginner", "intermediate", "mastery")
 PROGRESSION_STARS: dict[str, int] = {
     "beginner": 1,

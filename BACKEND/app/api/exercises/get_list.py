@@ -1,17 +1,10 @@
-from typing import Any
-
 from fastapi import APIRouter, Depends
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
 
-from app.db import get_db
+from app.db import SCHEMA_FILTER, get_db
 
 router = APIRouter(prefix="/exercises", tags=["exercises"])
-
-SCHEMA_FILTER: dict[str, Any] = {
-    "level": {"$exists": True},
-    "family": {"$exists": True},
-}
 
 
 class CatalogExerciseItem(BaseModel):

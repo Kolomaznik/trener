@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 .env
 .ruff_cache/
+dumps/
 
 # Source images for migrations are kept locally only; the migration embeds
 # the corresponding .webp version (committed) as a base64 data URL.

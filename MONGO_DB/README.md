@@ -62,6 +62,45 @@ uv run python manage.py new seed default_workout_templates
 uv run python manage.py new transform exercises_split_name
 ```
 
+## Dump a restore databáze
+
+Mimo migrace jsou k dispozici dva standalone skripty pro zálohu a obnovu dat.
+Oba načítají připojení z `.env` stejně jako `manage.py`.
+
+### `dump.py`
+
+Uloží každý dokument jako samostatný JSON soubor (BSON Extended JSON, takže
+`ObjectId`/`datetime` zůstanou zachované):
+
+```bash
+uv run python dump.py
+```
+
+Struktura výstupu:
+
+```
+dumps/<YYYY-MM-DD_HHMMSS>/<collection_name>/<record_id>.json
+```
+
+Adresář `dumps/` je v `.gitignore` — zálohy se necommitují.
+
+### `restore.py`
+
+Nahraje dokumenty z dumpu zpět do databáze.
+
+```bash
+# vypíše nalezené dumpy a nechá vybrat (Enter = nejnovější)
+uv run python restore.py
+
+# bez ptaní vezme nejnovější dump
+uv run python restore.py --latest
+
+# před nahráním zahodí všechny kolekce v cílové databázi
+uv run python restore.py --latest --clean
+```
+
+Bez `--clean` se dokumenty upsertují podle `_id` (existující se přepíšou).
+
 ## Naming konvence migrací
 
 ```

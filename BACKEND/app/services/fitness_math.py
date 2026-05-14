@@ -9,9 +9,6 @@ Exported symbols
 REST_SECONDS              : dict[str, int]
     Recommended rest period (seconds) between sets for each training level.
 
-compute_level             : (list[int], dict | None) -> str
-    Derive a user's training level from recent repetition history.
-
 calculate_muscle_load     : (...) -> dict[str, MuscleEngagement]
     Compute per-muscle volume load (kg) for a given workout.
 
@@ -23,7 +20,6 @@ evaluate_set_performance  : (list[dict], float | None, int | None) -> SetEvaluat
 """
 
 from datetime import UTC, datetime
-from typing import Any
 
 from pydantic import BaseModel
 
@@ -44,39 +40,6 @@ REST_SECONDS: dict[str, int] = {
     "intermediate": 60,
     "mastery": 45,
 }
-
-# ---------------------------------------------------------------------------
-# Level computation
-# ---------------------------------------------------------------------------
-
-
-def compute_level(recent_reps: list[int], progression_goals: dict[str, Any] | None) -> str:
-    """Derive a user's training level from recent repetition history.
-
-    The level is determined by comparing the *average* total_reps across the
-    last N sessions against the thresholds stored in ``progression_goals``.
-
-    Args:
-        recent_reps: List of ``total_reps`` values from recent workout sessions
-            (most-recent first).  An empty list means no history.
-        progression_goals: Mapping with at least ``"beginner"`` and
-            ``"mastery"`` keys, each containing a ``"reps"`` threshold.
-            May be ``None`` when the exercise has no goals defined.
-
-    Returns:
-        One of ``"beginner"``, ``"intermediate"``, or ``"mastery"``.
-    """
-    if not recent_reps or not progression_goals:
-        return "beginner"
-    avg = sum(recent_reps) / len(recent_reps)
-    mastery_reps = (progression_goals.get("mastery") or {}).get("reps", 0)
-    beginner_reps = (progression_goals.get("beginner") or {}).get("reps", 0)
-    if avg >= mastery_reps:
-        return "mastery"
-    if avg >= beginner_reps:
-        return "intermediate"
-    return "beginner"
-
 
 # ---------------------------------------------------------------------------
 # Muscle-load calculation
