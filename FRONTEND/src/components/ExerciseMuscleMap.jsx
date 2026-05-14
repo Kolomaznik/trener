@@ -32,11 +32,12 @@ function slugsFor(key) {
   return ENGAGEMENT_TO_SLUGS[key] ?? [key.replace(/_/g, '-')];
 }
 
-/** Colours for each mode — load: red, percent & series_count: blue. */
+/** Colours per mode — load: red, exercise_count: green, percent & repetitions: blue. */
 const MODE_COLOR = {
   load: '#c62828',
   percent: '#1565c0',
-  series_count: '#1565c0',
+  exercise_count: '#2e7d32',
+  repetitions: '#1565c0',
 };
 
 function intensityOpacity(pct) {
@@ -75,28 +76,30 @@ function buildLoadStops(loadRange) {
   });
 }
 
-function buildSeriesCountStops(loadRange) {
+function buildIntegerStops(loadRange, suffix = '') {
   if (!loadRange || loadRange.max <= 0) return [];
   const { min, max } = loadRange;
   return Array.from({ length: 5 }, (_, i) => {
     const value = max - (i * (max - min)) / 4;
     return {
       pct: (value / max) * 100,
-      label: `${Math.round(value)}×`,
+      label: `${Math.round(value)}${suffix}`,
     };
   });
 }
 
 const SCALE_TITLES = {
   load: 'Přemístěná zátěž',
-  series_count: 'Počet sérií',
+  exercise_count: 'Počet cviků',
+  repetitions: 'Počet opakování',
   percent: 'Zapojení',
 };
 
 function MuscleMapScale({ color, mode = 'percent', loadRange = null }) {
   let stops;
   if (mode === 'load') stops = buildLoadStops(loadRange);
-  else if (mode === 'series_count') stops = buildSeriesCountStops(loadRange);
+  else if (mode === 'exercise_count') stops = buildIntegerStops(loadRange, '×');
+  else if (mode === 'repetitions') stops = buildIntegerStops(loadRange);
   else stops = PERCENT_SCALE_STOPS;
   const title = SCALE_TITLES[mode] ?? SCALE_TITLES.percent;
   return (
@@ -118,7 +121,7 @@ function MuscleMapScale({ color, mode = 'percent', loadRange = null }) {
         const alpha = 1.0 - (i / Math.max(stops.length - 1, 1)) * 0.82;
         return (
         <div
-          key={stop.label}
+          key={`${mode}-${i}`}
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}
         >
           <div
