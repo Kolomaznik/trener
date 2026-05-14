@@ -128,7 +128,7 @@ async def get_dashboard_muscle_load(
         engagement = ex.get("muscle_engagement_percent") or {}
         for muscle, pct in engagement.items():
             if pct and pct > 0:
-                reps[muscle] = reps.get(muscle, 0) + (series_reps * pct / 100)
+                reps[muscle] = reps.get(muscle, 0) + series_reps
 
     totals: dict[str, float] = {}
     if weight_kg is not None:
