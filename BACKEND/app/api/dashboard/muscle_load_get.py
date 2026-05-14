@@ -24,7 +24,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field
 
 from app.auth import GoogleUser, get_current_user
-from app.db import get_db
+from app.db import get_db, get_user_weight_kg
 from app.services.fitness_math import MuscleEngagement, calculate_muscle_load
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -56,14 +56,6 @@ class MuscleLoadResponse(BaseModel):
     muscle_repetitions: dict[str, float] = Field(default_factory=dict)
 
 
-async def _user_weight_kg(db: AsyncIOMotorDatabase, email: str) -> float | None:
-    user_doc = await db["users"].find_one({"email": email})
-    if user_doc is None:
-        return None
-    raw = user_doc.get("weight_kg")
-    return float(raw) if raw is not None else None
-
-
 @router.get("/muscle-load", response_model=MuscleLoadResponse)
 async def get_dashboard_muscle_load(
     range: RangeKey = Query(default="week"),
@@ -88,7 +80,7 @@ async def get_dashboard_muscle_load(
         .to_list(None)
     )
 
-    weight_kg = await _user_weight_kg(db, user.email)
+    weight_kg = await get_user_weight_kg(db, user.email)
     if not series:
         return MuscleLoadResponse(
             range=range,

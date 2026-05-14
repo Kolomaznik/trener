@@ -6,7 +6,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field
 
 from app.auth import GoogleUser, get_optional_user
-from app.db import get_db
+from app.db import SCHEMA_FILTER, get_db, get_user_weight_kg
 from app.services.fitness_math import (
     REST_SECONDS,
     MuscleEngagement,
@@ -24,11 +24,6 @@ def _intervals_from_counting(counting: list[dict]) -> list[int]:
 
 
 router = APIRouter(prefix="/exercises", tags=["exercises"])
-
-SCHEMA_FILTER: dict[str, Any] = {
-    "level": {"$exists": True},
-    "family": {"$exists": True},
-}
 
 
 class Cadence(BaseModel):
@@ -102,14 +97,6 @@ class ExerciseDetailResponse(BaseModel):
     next_exercise_title: str | None = None
     muscle_load_by_difficulty: MuscleLoadByDifficulty | None = None
     user_level: UserLevelInfo | None = None
-
-
-async def _user_weight_kg(db: AsyncIOMotorDatabase, email: str) -> float | None:
-    user_doc = await db["users"].find_one({"email": email})
-    if user_doc is None:
-        return None
-    raw = user_doc.get("weight_kg")
-    return float(raw) if raw is not None else None
 
 
 def _muscle_load_by_difficulty(
@@ -266,7 +253,7 @@ async def get_exercise_detail(
                 exercise_doc.get("muscle_engagement_percent") or {}
             )
             level_coefficient: float = exercise_doc.get("level_coefficient", 0.5)
-            weight_kg = await _user_weight_kg(db, user.email)
+            weight_kg = await get_user_weight_kg(db, user.email)
             mld = _muscle_load_by_difficulty(
                 progression_goals=progression_goals,
                 muscle_engagement_percent=muscle_engagement_percent,
