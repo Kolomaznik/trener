@@ -40,6 +40,14 @@ const MODE_COLOR = {
   repetitions: '#1565c0',
 };
 
+/** Scale legend titles per mode. */
+const MODE_TITLE = {
+  load: 'Přemístěná zátěž',
+  percent: 'Zapojení',
+  exercise_count: 'Počet cviků',
+  repetitions: 'Počet opakování',
+};
+
 function intensityOpacity(pct) {
   if (pct <= 0) return 0;
   return Math.min(1, 0.35 + (pct / 50) * 0.65);
@@ -106,6 +114,9 @@ function MuscleMapScale({ color, mode = 'percent', loadRange = null }) {
         lineHeight: 1.2,
       }}
     >
+      <div style={{ fontWeight: 500, marginBottom: 2 }}>
+        {MODE_TITLE[mode] ?? MODE_TITLE.percent}
+      </div>
       {stops.map((stop, i) => {
         // Spread alpha evenly from 1.0 (top/max) down to 0.18 (bottom/min)
         // so every swatch is visually distinct regardless of the pct values.
