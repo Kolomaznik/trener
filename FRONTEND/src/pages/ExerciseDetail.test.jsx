@@ -199,6 +199,31 @@ function renderWithRouter(initialPath = '/exercises/pushups_level_1') {
   );
 }
 
+// The infinite carousel makes react-slick clone slides for the loop; clones
+// carry the same data-testid. Scope queries to the original (non-cloned) slide.
+function getRealCarouselSlide(testid) {
+  const real = screen
+    .getAllByTestId(testid)
+    .filter((el) => !el.closest('.slick-cloned'));
+  if (real.length !== 1) {
+    throw new Error(
+      `Expected exactly one non-cloned [data-testid="${testid}"], found ${real.length}`,
+    );
+  }
+  return real[0];
+}
+
+async function findRealCarouselSlide(testid) {
+  const all = await screen.findAllByTestId(testid);
+  const real = all.filter((el) => !el.closest('.slick-cloned'));
+  if (real.length !== 1) {
+    throw new Error(
+      `Expected exactly one non-cloned [data-testid="${testid}"], found ${real.length}`,
+    );
+  }
+  return real[0];
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('ExerciseDetail page', () => {
@@ -473,14 +498,20 @@ describe('ExerciseDetail page', () => {
     ]);
     renderWithRouter();
 
-    const nextPreview = await screen.findByTestId('carousel-next');
+    const nextPreview = await findRealCarouselSlide('carousel-next');
     expect(nextPreview).toHaveAccessibleName(/Kliky v předklonu/);
     fireEvent.click(nextPreview);
 
     await waitFor(() =>
       expect(getExerciseDetail).toHaveBeenCalledWith('pushups_level_2'),
     );
-    expect(await screen.findByText('Kliky v předklonu')).toBeInTheDocument();
+    // After navigating, the carousel re-centres on level 2, so "next" wraps
+    // back to level 1.
+    await waitFor(() =>
+      expect(getRealCarouselSlide('carousel-next')).toHaveAccessibleName(
+        /Kliky o zeď/,
+      ),
+    );
   });
 
   it('does not render carousel previews when the user has only one exercise', async () => {
@@ -503,8 +534,8 @@ describe('ExerciseDetail page', () => {
     renderWithRouter('/exercises/pushups_level_1');
 
     // First item: prev wraps to last, next is the second item.
-    expect(await screen.findByTestId('carousel-prev')).toHaveAccessibleName(/Kliky na lavici/);
-    expect(screen.getByTestId('carousel-next')).toHaveAccessibleName(/Kliky v předklonu/);
+    expect(await findRealCarouselSlide('carousel-prev')).toHaveAccessibleName(/Kliky na lavici/);
+    expect(getRealCarouselSlide('carousel-next')).toHaveAccessibleName(/Kliky v předklonu/);
   });
 
   // ── Error states ───────────────────────────────────────────────────────────
