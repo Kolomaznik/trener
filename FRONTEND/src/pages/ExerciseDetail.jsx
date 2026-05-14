@@ -557,7 +557,7 @@ function CarouselHeader({ exerciseName, userList, detailByName }) {
         centerMode
         centerPadding="5%"
         speed={260}
-        infinite={false}
+        infinite
       >
         {userList.map((row, idx) => {
           // Row carries the authoritative title; cached detail (when present)
