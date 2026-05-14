@@ -140,6 +140,38 @@ describe('ExerciseMuscleMap', () => {
     expect(container.querySelector('style').textContent).toMatch(/#c62828/);
   });
 
+  // ── Scale: series_count mode ─────────────────────────────────────────────────
+
+  it('shows series_count title and integer-formatted stops', () => {
+    render(
+      <ExerciseMuscleMap
+        engagement={{ chest: 50 }}
+        mode="series_count"
+        loadRange={{ min: 1, max: 12 }}
+      />,
+    );
+
+    const scale = screen.getByTestId('muscle-map-scale');
+    expect(scale).toHaveTextContent('Počet sérií');
+
+    const swatches = scale.querySelectorAll('span');
+    expect(swatches).toHaveLength(5);
+    // Top stop = max (12), bottom = min (1).
+    expect(swatches[0].textContent).toBe('12×');
+    expect(swatches[4].textContent).toBe('1×');
+  });
+
+  it('uses the green ramp in series_count mode', () => {
+    const { container } = render(
+      <ExerciseMuscleMap
+        engagement={{ chest: 30 }}
+        mode="series_count"
+        loadRange={{ min: 1, max: 5 }}
+      />,
+    );
+    expect(container.querySelector('style').textContent).toMatch(/#2e7d32/);
+  });
+
   it('honours an explicit color prop, overriding the mode default', () => {
     const { container } = render(
       <ExerciseMuscleMap engagement={{ chest: 30 }} color="#abcdef" />,

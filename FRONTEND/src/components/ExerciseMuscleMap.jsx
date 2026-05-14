@@ -32,10 +32,11 @@ function slugsFor(key) {
   return ENGAGEMENT_TO_SLUGS[key] ?? [key.replace(/_/g, '-')];
 }
 
-/** Colours for each mode — load: red ramp, percent: blue ramp. */
+/** Colours for each mode — load: red, percent: blue, series_count: green. */
 const MODE_COLOR = {
   load: '#c62828',
   percent: '#1565c0',
+  series_count: '#2e7d32',
 };
 
 function intensityOpacity(pct) {
@@ -74,10 +75,30 @@ function buildLoadStops(loadRange) {
   });
 }
 
+function buildSeriesCountStops(loadRange) {
+  if (!loadRange || loadRange.max <= 0) return [];
+  const { min, max } = loadRange;
+  return Array.from({ length: 5 }, (_, i) => {
+    const value = max - (i * (max - min)) / 4;
+    return {
+      pct: (value / max) * 100,
+      label: `${Math.round(value)}×`,
+    };
+  });
+}
+
+const SCALE_TITLES = {
+  load: 'Přemístěná zátěž',
+  series_count: 'Počet sérií',
+  percent: 'Zapojení',
+};
+
 function MuscleMapScale({ color, mode = 'percent', loadRange = null }) {
-  const isLoad = mode === 'load';
-  const stops = isLoad ? buildLoadStops(loadRange) : PERCENT_SCALE_STOPS;
-  const title = isLoad ? 'Přemístěná zátěž' : 'Zapojení';
+  let stops;
+  if (mode === 'load') stops = buildLoadStops(loadRange);
+  else if (mode === 'series_count') stops = buildSeriesCountStops(loadRange);
+  else stops = PERCENT_SCALE_STOPS;
+  const title = SCALE_TITLES[mode] ?? SCALE_TITLES.percent;
   return (
     <div
       data-testid="muscle-map-scale"

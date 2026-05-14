@@ -46,6 +46,10 @@ class MuscleLoadResponse(BaseModel):
     series_count: int = Field(ge=0)
     total_load_kg: float = Field(ge=0)
     muscle_load: dict[str, MuscleEngagement] | None = None
+    # How many series in the window engaged each muscle. Computed from
+    # ``muscle_engagement_percent`` only — does not depend on ``weight_kg``,
+    # so it is populated even for users without a profile weight.
+    muscle_series_count: dict[str, int] = Field(default_factory=dict)
 
 
 async def _user_weight_kg(db: AsyncIOMotorDatabase, email: str) -> float | None:
@@ -78,14 +82,15 @@ async def get_dashboard_muscle_load(
     )
 
     weight_kg = await _user_weight_kg(db, user.email)
-    if weight_kg is None or not series:
+    if not series:
         return MuscleLoadResponse(
             range=range,
             start_date=start,
             end_date=end,
-            series_count=len(series),
+            series_count=0,
             total_load_kg=0.0,
             muscle_load=None if weight_kg is None else {},
+            muscle_series_count={},
         )
 
     exercise_ids = {s["exercise_id"] for s in series}
@@ -100,6 +105,7 @@ async def get_dashboard_muscle_load(
     by_name: dict[str, dict[str, Any]] = {doc["name"]: doc for doc in exercise_docs}
 
     totals: dict[str, float] = {}
+    counts: dict[str, int] = {}
     for s in series:
         ex = by_name.get(s["exercise_id"])
         if ex is None:
@@ -107,14 +113,29 @@ async def get_dashboard_muscle_load(
         engagement = ex.get("muscle_engagement_percent") or {}
         if not engagement:
             continue
-        per_muscle = calculate_muscle_load(
-            weight_kg=weight_kg,
-            total_reps=int(s.get("total_reps", 0)),
-            level_coefficient=float(ex.get("level_coefficient", 0.5)),
-            muscle_engagement_percent=engagement,
+        for muscle, pct in engagement.items():
+            if pct and pct > 0:
+                counts[muscle] = counts.get(muscle, 0) + 1
+        if weight_kg is not None:
+            per_muscle = calculate_muscle_load(
+                weight_kg=weight_kg,
+                total_reps=int(s.get("total_reps", 0)),
+                level_coefficient=float(ex.get("level_coefficient", 0.5)),
+                muscle_engagement_percent=engagement,
+            )
+            for muscle, m in per_muscle.items():
+                totals[muscle] = totals.get(muscle, 0.0) + m.muscle_load
+
+    if weight_kg is None:
+        return MuscleLoadResponse(
+            range=range,
+            start_date=start,
+            end_date=end,
+            series_count=len(series),
+            total_load_kg=0.0,
+            muscle_load=None,
+            muscle_series_count=counts,
         )
-        for muscle, m in per_muscle.items():
-            totals[muscle] = totals.get(muscle, 0.0) + m.muscle_load
 
     if not totals:
         return MuscleLoadResponse(
@@ -124,6 +145,7 @@ async def get_dashboard_muscle_load(
             series_count=len(series),
             total_load_kg=0.0,
             muscle_load={},
+            muscle_series_count=counts,
         )
 
     max_load = max(totals.values())
@@ -142,4 +164,5 @@ async def get_dashboard_muscle_load(
         series_count=len(series),
         total_load_kg=round(sum(totals.values()), 1),
         muscle_load=muscle_load,
+        muscle_series_count=counts,
     )
