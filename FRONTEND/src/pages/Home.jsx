@@ -67,7 +67,7 @@ export default function Home() {
   const [muscleData, setMuscleData] = useState(null);
   const [muscleLoading, setMuscleLoading] = useState(true);
   const [muscleError, setMuscleError] = useState('');
-  const [mapMode, setMapMode] = useState(MAP_MODE_LOAD);
+  const [mapMode, setMapMode] = useState(MAP_MODE_SERIES_COUNT);
 
   useEffect(() => {
     const node = containerRef.current;
@@ -218,14 +218,6 @@ export default function Home() {
   }, [muscleSeriesCountEntries]);
 
   const hasLoadData = muscleData?.muscle_load != null;
-
-  // If the user has no profile weight, the load view is meaningless — fall
-  // back to series_count so something useful is visible by default.
-  useEffect(() => {
-    if (!muscleLoading && !hasLoadData && mapMode === MAP_MODE_LOAD) {
-      setMapMode(MAP_MODE_SERIES_COUNT);
-    }
-  }, [muscleLoading, hasLoadData, mapMode]);
 
   const { visibleWeeks, visibleMonthLabels } = useMemo(() => {
     if (containerWidth <= 0 || weeks.length === 0) {
