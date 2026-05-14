@@ -13,7 +13,8 @@ const MUSCLE_RANGE_OPTIONS = [
 ];
 
 const MAP_MODE_LOAD = 'load';
-const MAP_MODE_SERIES_COUNT = 'series_count';
+const MAP_MODE_EXERCISE_COUNT = 'exercise_count';
+const MAP_MODE_REPETITIONS = 'repetitions';
 
 const { Title, Paragraph } = Typography;
 const HEATMAP_COLORS = ['#ebedf0', '#c6e48b', '#7bc96f', '#239a3b', '#196127'];
@@ -67,7 +68,7 @@ export default function Home() {
   const [muscleData, setMuscleData] = useState(null);
   const [muscleLoading, setMuscleLoading] = useState(true);
   const [muscleError, setMuscleError] = useState('');
-  const [mapMode, setMapMode] = useState(MAP_MODE_SERIES_COUNT);
+  const [mapMode, setMapMode] = useState(MAP_MODE_REPETITIONS);
 
   useEffect(() => {
     const node = containerRef.current;
@@ -195,29 +196,63 @@ export default function Home() {
     return { min: Math.min(...loads), max: Math.max(...loads) };
   }, [muscleLoadEntries]);
 
-  const muscleSeriesCountEntries = useMemo(
-    () => Object.entries(muscleData?.muscle_series_count ?? {}),
+  const muscleExerciseCountEntries = useMemo(
+    () => Object.entries(muscleData?.muscle_exercise_count ?? {}),
     [muscleData],
   );
 
-  const muscleSeriesEngagement = useMemo(() => {
-    if (muscleSeriesCountEntries.length === 0) return {};
-    const maxCount = Math.max(...muscleSeriesCountEntries.map(([, n]) => n), 1);
+  const muscleExerciseEngagement = useMemo(() => {
+    if (muscleExerciseCountEntries.length === 0) return {};
+    const maxCount = Math.max(...muscleExerciseCountEntries.map(([, n]) => n), 1);
     return Object.fromEntries(
-      muscleSeriesCountEntries.map(([muscle, count]) => [
+      muscleExerciseCountEntries.map(([muscle, count]) => [
         muscle,
         Math.round((count / maxCount) * 100),
       ]),
     );
-  }, [muscleSeriesCountEntries]);
+  }, [muscleExerciseCountEntries]);
 
-  const muscleSeriesRange = useMemo(() => {
-    if (muscleSeriesCountEntries.length === 0) return null;
-    const counts = muscleSeriesCountEntries.map(([, n]) => n);
+  const muscleExerciseRange = useMemo(() => {
+    if (muscleExerciseCountEntries.length === 0) return null;
+    const counts = muscleExerciseCountEntries.map(([, n]) => n);
     return { min: Math.min(...counts), max: Math.max(...counts) };
-  }, [muscleSeriesCountEntries]);
+  }, [muscleExerciseCountEntries]);
+
+  const muscleRepetitionsEntries = useMemo(
+    () => Object.entries(muscleData?.muscle_repetitions ?? {}),
+    [muscleData],
+  );
+
+  const muscleRepetitionsEngagement = useMemo(() => {
+    if (muscleRepetitionsEntries.length === 0) return {};
+    const maxReps = Math.max(...muscleRepetitionsEntries.map(([, n]) => n), 1);
+    return Object.fromEntries(
+      muscleRepetitionsEntries.map(([muscle, reps]) => [
+        muscle,
+        Math.round((reps / maxReps) * 100),
+      ]),
+    );
+  }, [muscleRepetitionsEntries]);
+
+  const muscleRepetitionsRange = useMemo(() => {
+    if (muscleRepetitionsEntries.length === 0) return null;
+    const reps = muscleRepetitionsEntries.map(([, n]) => n);
+    return { min: Math.min(...reps), max: Math.max(...reps) };
+  }, [muscleRepetitionsEntries]);
 
   const hasLoadData = muscleData?.muscle_load != null;
+
+  const mapEngagement = {
+    [MAP_MODE_LOAD]: muscleEngagement,
+    [MAP_MODE_EXERCISE_COUNT]: muscleExerciseEngagement,
+    [MAP_MODE_REPETITIONS]: muscleRepetitionsEngagement,
+  }[mapMode];
+
+  const mapRange = {
+    [MAP_MODE_LOAD]: muscleLoadRange,
+    [MAP_MODE_EXERCISE_COUNT]: muscleExerciseRange,
+    [MAP_MODE_REPETITIONS]: muscleRepetitionsRange,
+  }[mapMode];
 
   const { visibleWeeks, visibleMonthLabels } = useMemo(() => {
     if (containerWidth <= 0 || weeks.length === 0) {
@@ -354,21 +389,18 @@ export default function Home() {
         <Flex justify="center" style={{ padding: 24 }}>
           <Spin />
         </Flex>
-      ) : muscleSeriesCountEntries.length === 0 ? (
-        <Paragraph type="secondary" style={{ textAlign: 'center' }}>
-          V tomto období zatím nejsou žádné série.
-        </Paragraph>
-      ) : (
+      ) : !muscleData ? null : (
         <>
           <Flex justify="center" style={{ marginBottom: 12 }}>
             <Segmented
               options={[
+                { label: 'Počet opakování', value: MAP_MODE_REPETITIONS },
+                { label: 'Počet cviků', value: MAP_MODE_EXERCISE_COUNT },
                 {
                   label: 'Přemístěná zátěž',
                   value: MAP_MODE_LOAD,
                   disabled: !hasLoadData,
                 },
-                { label: 'Počet sérií', value: MAP_MODE_SERIES_COUNT },
               ]}
               value={mapMode}
               onChange={setMapMode}
@@ -384,23 +416,19 @@ export default function Home() {
             />
           )}
 
-          <ExerciseMuscleMap
-            engagement={
-              mapMode === MAP_MODE_LOAD ? muscleEngagement : muscleSeriesEngagement
-            }
-            mode={mapMode}
-            loadRange={mapMode === MAP_MODE_LOAD ? muscleLoadRange : muscleSeriesRange}
-          />
+          <ExerciseMuscleMap engagement={mapEngagement} mode={mapMode} loadRange={mapRange} />
 
           <Paragraph type="secondary" style={{ textAlign: 'center', marginTop: 8 }}>
-            {mapMode === MAP_MODE_LOAD ? (
+            {mapMode === MAP_MODE_LOAD && (
               <>
                 Celková zátěž: {(muscleData.total_load_kg / 1000).toFixed(2)} t
                 {' · '}
                 {muscleData.series_count} sérií
               </>
-            ) : (
-              <>{muscleData.series_count} sérií</>
+            )}
+            {mapMode === MAP_MODE_EXERCISE_COUNT && <>{muscleData.exercise_count} cviků</>}
+            {mapMode === MAP_MODE_REPETITIONS && (
+              <>{muscleData.total_reps} opakování</>
             )}
           </Paragraph>
         </>

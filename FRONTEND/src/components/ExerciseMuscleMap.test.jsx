@@ -140,19 +140,19 @@ describe('ExerciseMuscleMap', () => {
     expect(container.querySelector('style').textContent).toMatch(/#c62828/);
   });
 
-  // ── Scale: series_count mode ─────────────────────────────────────────────────
+  // ── Scale: exercise_count mode ───────────────────────────────────────────────
 
-  it('shows series_count title and integer-formatted stops', () => {
+  it('shows exercise_count title and integer-formatted stops', () => {
     render(
       <ExerciseMuscleMap
         engagement={{ chest: 50 }}
-        mode="series_count"
+        mode="exercise_count"
         loadRange={{ min: 1, max: 12 }}
       />,
     );
 
     const scale = screen.getByTestId('muscle-map-scale');
-    expect(scale).toHaveTextContent('Počet sérií');
+    expect(scale).toHaveTextContent('Počet cviků');
 
     const swatches = scale.querySelectorAll('span');
     expect(swatches).toHaveLength(5);
@@ -161,12 +161,44 @@ describe('ExerciseMuscleMap', () => {
     expect(swatches[4].textContent).toBe('1×');
   });
 
-  it('uses the blue ramp in series_count mode', () => {
+  it('uses the green ramp in exercise_count mode', () => {
     const { container } = render(
       <ExerciseMuscleMap
         engagement={{ chest: 30 }}
-        mode="series_count"
+        mode="exercise_count"
         loadRange={{ min: 1, max: 5 }}
+      />,
+    );
+    expect(container.querySelector('style').textContent).toMatch(/#2e7d32/);
+  });
+
+  // ── Scale: repetitions mode ──────────────────────────────────────────────────
+
+  it('shows repetitions title and plain integer stops', () => {
+    render(
+      <ExerciseMuscleMap
+        engagement={{ chest: 50 }}
+        mode="repetitions"
+        loadRange={{ min: 8, max: 120 }}
+      />,
+    );
+
+    const scale = screen.getByTestId('muscle-map-scale');
+    expect(scale).toHaveTextContent('Počet opakování');
+
+    const swatches = scale.querySelectorAll('span');
+    expect(swatches).toHaveLength(5);
+    // Top stop = max (120), bottom = min (8), no suffix.
+    expect(swatches[0].textContent).toBe('120');
+    expect(swatches[4].textContent).toBe('8');
+  });
+
+  it('uses the blue ramp in repetitions mode', () => {
+    const { container } = render(
+      <ExerciseMuscleMap
+        engagement={{ chest: 30 }}
+        mode="repetitions"
+        loadRange={{ min: 5, max: 50 }}
       />,
     );
     expect(container.querySelector('style').textContent).toMatch(/#1565c0/);
