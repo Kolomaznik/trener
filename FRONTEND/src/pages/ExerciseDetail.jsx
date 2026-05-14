@@ -318,23 +318,21 @@ function useRestTimer(initialSeconds, active) {
 
 export default function ExerciseDetail() {
   const { name: exerciseName } = useParams();
-  const navigate = useNavigate();
-  const [detail, setDetail] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [detailByName, setDetailByName] = useState({});
   const [error, setError] = useState(null);
   const [userList, setUserList] = useState([]);
+  const inFlightRef = useRef(new Set());
 
-  useEffect(() => {
-    if (!exerciseName) return undefined;
-    let active = true;
-    setLoading(true);
-    setError(null);
-    getExerciseDetail(exerciseName)
+  const fetchDetail = (name, { isCurrent = false } = {}) => {
+    if (!name) return;
+    if (inFlightRef.current.has(name)) return;
+    inFlightRef.current.add(name);
+    getExerciseDetail(name)
       .then((data) => {
-        if (active) setDetail(data);
+        setDetailByName((prev) => ({ ...prev, [name]: data }));
       })
       .catch((err) => {
-        if (!active) return;
+        if (!isCurrent) return;
         if (err?.response?.status === 404) {
           setError('Cvik nebyl nalezen.');
         } else {
@@ -343,11 +341,17 @@ export default function ExerciseDetail() {
         }
       })
       .finally(() => {
-        if (active) setLoading(false);
+        inFlightRef.current.delete(name);
       });
-    return () => {
-      active = false;
-    };
+  };
+
+  useEffect(() => {
+    if (!exerciseName) return;
+    setError(null);
+    if (detailByName[exerciseName]) return;
+    fetchDetail(exerciseName, { isCurrent: true });
+    // detailByName intentionally omitted: a cache write must not re-fire this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exerciseName]);
 
   useEffect(() => {
@@ -356,28 +360,58 @@ export default function ExerciseDetail() {
       .then((list) => {
         if (active) setUserList(Array.isArray(list) ? list : []);
       })
-      .catch(() => {
-        // Not critical — carousel siblings just won't render.
-      });
+      .catch(() => {});
     return () => {
       active = false;
     };
   }, []);
 
+  useEffect(() => {
+    if (userList.length === 0) return;
+    userList.forEach((row) => {
+      if (!detailByName[row.exercise_name]) {
+        fetchDetail(row.exercise_name);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userList]);
+
+  const updateCachedDetail = (name, fresh) => {
+    setDetailByName((prev) => ({ ...prev, [name]: fresh }));
+  };
+
+  const refreshUserList = async () => {
+    try {
+      const list = await getUserExercises();
+      setUserList(Array.isArray(list) ? list : []);
+    } catch {
+      // Not critical — the carousel just keeps its current slides.
+    }
+  };
+
+  const detail = exerciseName ? detailByName[exerciseName] : null;
+
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       {error && <Alert type="error" message={error} showIcon />}
 
-      {loading || !detail ? (
+      <CarouselHeader
+        exerciseName={exerciseName}
+        userList={userList}
+        detailByName={detailByName}
+      />
+
+      {!detail ? (
         <Card>
           <Skeleton active paragraph={{ rows: 10 }} />
         </Card>
       ) : (
         <ExerciseDetailBody
+          key={exerciseName}
           detail={detail}
-          setDetail={setDetail}
+          updateCachedDetail={updateCachedDetail}
           exerciseName={exerciseName}
-          userList={userList}
+          refreshUserList={refreshUserList}
         />
       )}
     </Space>
@@ -439,45 +473,63 @@ function CarouselTitleCard({ item }) {
 }
 
 function CarouselSlide({ item, testid, sideLabel, onClick }) {
+  if (!onClick) {
+    return (
+      <div style={{ padding: '0 6px' }}>
+        <CarouselTitleCard item={item} />
+      </div>
+    );
+  }
+  const label = sideLabel
+    ? `${sideLabel}: ${item.title ?? item.exercise_name}`
+    : `Cvik: ${item.title ?? item.exercise_name}`;
   return (
     <div style={{ padding: '0 6px' }}>
-      {onClick ? (
-        <button
-          type="button"
-          data-testid={testid}
-          aria-label={`${sideLabel}: ${item.title ?? item.exercise_name}`}
-          onClick={onClick}
-          style={{
-            display: 'block',
-            width: '100%',
-            padding: 0,
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            textAlign: 'inherit',
-          }}
-        >
-          <CarouselTitleCard item={item} />
-        </button>
-      ) : (
+      <button
+        type="button"
+        data-testid={testid}
+        aria-label={label}
+        onClick={onClick}
+        style={{
+          display: 'block',
+          width: '100%',
+          padding: 0,
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          textAlign: 'inherit',
+        }}
+      >
         <CarouselTitleCard item={item} />
-      )}
+      </button>
     </div>
   );
 }
 
-function CarouselHeader({ detail, prev, next }) {
+// Renders one slide per exercise in the user's list, keeping the active
+// exercise centred. Slide changes (swipe or click) drive the route; the
+// route in turn feeds `initialSlide`, so antd's Carousel re-syncs itself.
+function CarouselHeader({ exerciseName, userList, detailByName }) {
   const navigate = useNavigate();
+  const currentIdx = userList.findIndex((e) => e.exercise_name === exerciseName);
 
-  if (!prev && !next) {
-    return <CarouselTitleCard item={detail} />;
+  if (userList.length < 2 || currentIdx < 0) {
+    const row = userList[currentIdx];
+    const cached = detailByName[exerciseName];
+    const item = row
+      ? { ...cached, ...row }
+      : cached ?? { title: exerciseName };
+    return <CarouselTitleCard item={item} />;
   }
 
-  const handleAfterChange = (currentSlide) => {
-    if (currentSlide === 0 && prev) {
-      navigate(`/exercises/${prev.exercise_name}`);
-    } else if (currentSlide === 2 && next) {
-      navigate(`/exercises/${next.exercise_name}`);
+  const len = userList.length;
+  const prevIdx = (currentIdx - 1 + len) % len;
+  const nextIdx = (currentIdx + 1) % len;
+
+  const handleAfterChange = (idx) => {
+    const target = userList[idx];
+    if (target && target.exercise_name !== exerciseName) {
+      navigate(`/exercises/${target.exercise_name}`);
     }
   };
 
@@ -499,45 +551,54 @@ function CarouselHeader({ detail, prev, next }) {
         }
       `}</style>
       <Carousel
-        initialSlide={1}
+        initialSlide={currentIdx}
         afterChange={handleAfterChange}
-        dotPosition="bottom"
+        dotPlacement="bottom"
         centerMode
         centerPadding="5%"
         speed={260}
         infinite={false}
       >
-        <CarouselSlide
-          item={prev}
-          testid="carousel-prev"
-          sideLabel="Předchozí cvik"
-          onClick={() => navigate(`/exercises/${prev.exercise_name}`)}
-        />
-        <CarouselSlide item={detail} />
-        <CarouselSlide
-          item={next}
-          testid="carousel-next"
-          sideLabel="Další cvik"
-          onClick={() => navigate(`/exercises/${next.exercise_name}`)}
-        />
+        {userList.map((row, idx) => {
+          // Row carries the authoritative title; cached detail (when present)
+          // only enriches it with english_name / family / level.
+          const item = { ...detailByName[row.exercise_name], ...row };
+          // Tag the logical prev/next (with wrap) for tests and a11y. With a
+          // 2-item list prev and next collapse onto the same slide — next wins.
+          let testid;
+          let sideLabel;
+          if (idx !== currentIdx) {
+            if (idx === nextIdx) {
+              testid = 'carousel-next';
+              sideLabel = 'Další cvik';
+            } else if (idx === prevIdx) {
+              testid = 'carousel-prev';
+              sideLabel = 'Předchozí cvik';
+            }
+          }
+          return (
+            <CarouselSlide
+              key={row.exercise_name}
+              item={item}
+              testid={testid}
+              sideLabel={sideLabel}
+              onClick={
+                idx === currentIdx
+                  ? undefined
+                  : () => navigate(`/exercises/${row.exercise_name}`)
+              }
+            />
+          );
+        })}
       </Carousel>
     </div>
   );
 }
 
-function ExerciseDetailBody({ detail, setDetail, exerciseName, userList }) {
+function ExerciseDetailBody({ detail, updateCachedDetail, exerciseName, refreshUserList }) {
   // ── Workout session state ─────────────────────────────────────────────────
   const levelInfo = detail.user_level ?? null;
 
-  const { prevExercise, nextExercise } = useMemo(() => {
-    const idx = userList.findIndex((e) => e.exercise_name === exerciseName);
-    const len = userList.length;
-    if (idx < 0 || len < 2) return { prevExercise: null, nextExercise: null };
-    return {
-      prevExercise: userList[(idx - 1 + len) % len],
-      nextExercise: userList[(idx + 1) % len],
-    };
-  }, [userList, exerciseName]);
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState(null);
   const [setNumber, setSetNumber] = useState(1);
@@ -674,7 +735,8 @@ function ExerciseDetailBody({ detail, setDetail, exerciseName, userList }) {
     try {
       await addUserExercise(exerciseName);
       const fresh = await getExerciseDetail(exerciseName);
-      setDetail(fresh);
+      updateCachedDetail(exerciseName, fresh);
+      await refreshUserList();
     } catch (err) {
       console.error('Failed to add exercise:', err);
       const detail = err?.response?.data?.detail;
@@ -739,7 +801,7 @@ function ExerciseDetailBody({ detail, setDetail, exerciseName, userList }) {
       if (result?.evaluation != null) evaluation = result.evaluation;
       if (result?.total_reps != null) correctedTotalReps = result.total_reps;
       const freshDetail = await getExerciseDetail(exerciseName);
-      setDetail(freshDetail);
+      updateCachedDetail(exerciseName, freshDetail);
     } catch {
       setSaveError('Sérii se nepodařilo uložit. Data jsou zachována lokálně.');
     } finally {
@@ -787,9 +849,6 @@ function ExerciseDetailBody({ detail, setDetail, exerciseName, userList }) {
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      {/* ── Compact header: carousel with prev/next exercise previews ──── */}
-      <CarouselHeader detail={detail} prev={prevExercise} next={nextExercise} />
-
       {/* ── Personal goal: Tvoje úroveň ──────────────────────────────────── */}
       {levelInfo && (
         <Card size="small" title="Tvoje úroveň">
