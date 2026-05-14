@@ -43,9 +43,8 @@ from app.services.user_exercises import PROGRESSION_LEVELS, LevelUpInfo, refresh
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/exercise-series", tags=["exercise-series"])
-
 router = APIRouter(prefix="/exercises/series", tags=["exercises"])
+
 
 class CountingEvent(BaseModel):
     """One voice-counted rep event. The list of these on the request body
