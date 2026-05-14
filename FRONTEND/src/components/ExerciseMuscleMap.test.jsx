@@ -161,7 +161,7 @@ describe('ExerciseMuscleMap', () => {
     expect(swatches[4].textContent).toBe('1×');
   });
 
-  it('uses the green ramp in series_count mode', () => {
+  it('uses the blue ramp in series_count mode', () => {
     const { container } = render(
       <ExerciseMuscleMap
         engagement={{ chest: 30 }}
@@ -169,7 +169,7 @@ describe('ExerciseMuscleMap', () => {
         loadRange={{ min: 1, max: 5 }}
       />,
     );
-    expect(container.querySelector('style').textContent).toMatch(/#2e7d32/);
+    expect(container.querySelector('style').textContent).toMatch(/#1565c0/);
   });
 
   it('honours an explicit color prop, overriding the mode default', () => {

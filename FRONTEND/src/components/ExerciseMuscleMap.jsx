@@ -32,11 +32,11 @@ function slugsFor(key) {
   return ENGAGEMENT_TO_SLUGS[key] ?? [key.replace(/_/g, '-')];
 }
 
-/** Colours for each mode — load: red, percent: blue, series_count: green. */
+/** Colours for each mode — load: red, percent & series_count: blue. */
 const MODE_COLOR = {
   load: '#c62828',
   percent: '#1565c0',
-  series_count: '#2e7d32',
+  series_count: '#1565c0',
 };
 
 function intensityOpacity(pct) {
