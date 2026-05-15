@@ -18,7 +18,6 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from urllib.parse import urlparse, urlunparse
 
 import pymongo
 from bson.json_util import loads as bson_loads
@@ -40,9 +39,6 @@ def _load_env() -> tuple[str, str]:
     except KeyError as exc:
         sys.exit(f"Chybí proměnná {exc.args[0]} — zkopíruj .env.example do .env a vyplň hodnoty.")
 
-    parsed = urlparse(uri)
-    if not parsed.path or parsed.path == "/":
-        uri = urlunparse(parsed._replace(path=f"/{db_name}"))
     return uri, db_name
 
 
@@ -96,9 +92,7 @@ def main() -> None:
     dump_dir = _select_dump(args.latest)
 
     client = pymongo.MongoClient(uri)
-    db = client.get_default_database()
-    if db is None:
-        db = client[db_name]
+    db = client[db_name]
 
     print(f"Restore '{dump_dir.name}' -> databáze '{db.name}'")
 
