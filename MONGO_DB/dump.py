@@ -16,7 +16,6 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import urlparse, urlunparse
 
 import pymongo
 from bson.json_util import dumps as bson_dumps
@@ -38,9 +37,6 @@ def _load_env() -> tuple[str, str]:
     except KeyError as exc:
         sys.exit(f"Chybí proměnná {exc.args[0]} — zkopíruj .env.example do .env a vyplň hodnoty.")
 
-    parsed = urlparse(uri)
-    if not parsed.path or parsed.path == "/":
-        uri = urlunparse(parsed._replace(path=f"/{db_name}"))
     return uri, db_name
 
 
@@ -52,9 +48,7 @@ def _safe_filename(record_id: object) -> str:
 def main() -> None:
     uri, db_name = _load_env()
     client = pymongo.MongoClient(uri)
-    db = client.get_default_database()
-    if db is None:
-        db = client[db_name]
+    db = client[db_name]
 
     target = DUMPS_DIR / datetime.now().strftime("%Y-%m-%d_%H%M%S")
     print(f"Dump databáze '{db.name}' -> {target}")
