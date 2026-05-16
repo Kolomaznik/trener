@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import ExercisesCatalog from './ExercisesCatalog.jsx';
 
-vi.mock('../../api/exercises/get_catalog.js', () => ({
-  getExercisesCatalog: vi.fn(),
+vi.mock('../../api/catalog/get_exercise_list.js', () => ({
+  getExerciseList: vi.fn(),
 }));
 vi.mock('../../api/user_exercises/get_list.js', () => ({
   getUserExercises: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock('../../api/user_exercises/post.js', () => ({
   addUserExercise: vi.fn(),
 }));
 
-import { getExercisesCatalog } from '../../api/exercises/get_catalog.js';
+import { getExerciseList } from '../../api/catalog/get_exercise_list.js';
 import { getUserExercises } from '../../api/user_exercises/get_list.js';
 import { addUserExercise } from '../../api/user_exercises/post.js';
 
@@ -35,8 +35,8 @@ function renderPage() {
 
 describe('ExercisesCatalog page', () => {
   beforeEach(() => {
-    getExercisesCatalog.mockReset();
-    getExercisesCatalog.mockResolvedValue(fixture);
+    getExerciseList.mockReset();
+    getExerciseList.mockResolvedValue(fixture);
     getUserExercises.mockReset();
     getUserExercises.mockResolvedValue([]);
     addUserExercise.mockReset();
@@ -53,7 +53,7 @@ describe('ExercisesCatalog page', () => {
   it('renders one row per catalog entry', async () => {
     renderPage();
 
-    await waitFor(() => expect(getExercisesCatalog).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getExerciseList).toHaveBeenCalledTimes(1));
 
     expect(await screen.findByText('Kliky o zeď')).toBeInTheDocument();
     expect(screen.getByText('Kliky v předklonu')).toBeInTheDocument();
@@ -104,7 +104,7 @@ describe('ExercisesCatalog page', () => {
   });
 
   it('shows error alert when the catalog API call fails', async () => {
-    getExercisesCatalog.mockRejectedValueOnce(new Error('boom'));
+    getExerciseList.mockRejectedValueOnce(new Error('boom'));
     renderPage();
 
     expect(await screen.findByText(/Nepodařilo se načíst katalog cviků/)).toBeInTheDocument();

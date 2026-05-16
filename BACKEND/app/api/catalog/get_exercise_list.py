@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from app.db import SCHEMA_FILTER, get_db
 
-router = APIRouter(prefix="/exercises", tags=["exercises"])
+router = APIRouter(prefix="/catalog", tags=["catalog"])
 
 
 class CatalogExerciseItem(BaseModel):
@@ -16,8 +16,8 @@ class CatalogExerciseItem(BaseModel):
     level: int
 
 
-@router.get("/catalog", response_model=list[CatalogExerciseItem])
-async def get_exercises_catalog(
+@router.get("", response_model=list[CatalogExerciseItem])
+async def get_exercise_list(
     db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> list[CatalogExerciseItem]:
     """Lean read-only catalog of every exercise in the system.

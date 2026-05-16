@@ -47,13 +47,13 @@ def _seed_level_one_exercises(mock_db):
     )
 
 
-def test_get_exercises_catalog_returns_lean_rows_without_auth(client, mock_db):
-    """The /exercises/catalog endpoint is the admin table data source.
+def test_get_exercise_list_returns_lean_rows_without_auth(client, mock_db):
+    """The /catalog/ endpoint is the admin table data source.
     No authentication required, returns only (name, title, family, level)
     sorted by family then level."""
     _seed_level_one_exercises(mock_db)
 
-    response = client.get("/exercises/catalog")
+    response = client.get("/catalog/")
     assert response.status_code == 200
 
     items = response.json()
@@ -70,7 +70,7 @@ def test_catalog_does_not_create_user_exercises_rows(client, mock_db):
     _seed_level_one_exercises(mock_db)
     mock_db["users"].insert_one({"email": "alice@example.com", "weight_kg": 80.0})
 
-    response = client.get("/exercises/catalog", headers=AUTH)
+    response = client.get("/catalog/", headers=AUTH)
     assert response.status_code == 200
     items = response.json()
     assert all("user_level" not in item for item in items)
@@ -79,6 +79,6 @@ def test_catalog_does_not_create_user_exercises_rows(client, mock_db):
 
 def test_legacy_trainee_endpoint_is_gone(client):
     """The /exercises root endpoint was removed. Detail (/exercises/{name})
-    and catalog (/exercises/catalog) are the only routes the prefix exposes."""
+    is the only route the prefix still exposes."""
     response = client.get("/exercises")
     assert response.status_code == 404

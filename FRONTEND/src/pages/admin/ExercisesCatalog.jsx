@@ -13,7 +13,7 @@ import {
   Typography,
 } from 'antd';
 import { CheckCircleTwoTone, PlusOutlined } from '@ant-design/icons';
-import { getExercisesCatalog } from '../../api/exercises/get_catalog.js';
+import { getExerciseList } from '../../api/catalog/get_exercise_list.js';
 import { getUserExercises } from '../../api/user_exercises/get_list.js';
 import { addUserExercise } from '../../api/user_exercises/post.js';
 
@@ -32,7 +32,7 @@ export default function ExercisesCatalog() {
     setLoading(true);
     setError(null);
 
-    Promise.all([getExercisesCatalog(), getUserExercises().catch(() => [])])
+    Promise.all([getExerciseList(), getUserExercises().catch(() => [])])
       .then(([catalog, mine]) => {
         if (!active) return;
         setRows(catalog);
