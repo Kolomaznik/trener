@@ -46,8 +46,14 @@ erDiagram
         date completed_at
         date created_at
     }
+    WORKOUT {
+        text user_email PK,FK
+        date day PK
+        jsonb plan
+    }
     CATALOG ||--o{ CATALOG_MEDIA : "has"
     USERS ||--o{ EXERCISES : "has"
+    USERS ||--o{ WORKOUT : "has"
     CATALOG ||--o{ EXERCISES : "referenced by"
 ```
 
@@ -116,6 +122,16 @@ SELECT name, (muscle_engagement->>'chest')::int AS chest_pct
 SELECT name FROM catalog
  WHERE muscle_engagement ?& array['chest','triceps','deltoids'];
 ```
+
+### `workout.plan`
+
+JSONB pole jmen cviků (`exercise_name`), jak byly aktivní (`exercises.completed_at IS NULL`) v okamžiku, kdy uživatel poprvé požádal o dnešní trénink. Snapshot — další přidání/dokončení cviků během dne se v `plan` neprojeví.
+
+```json
+["pushups_level_1", "bridges_level_1", "squats_level_1"]
+```
+
+`PUT /workout` upsertuje řádek `(user_email, CURRENT_DATE)`. První volání naplní `plan` z `exercises`; další volání v ten samý den jen vrátí už uložený plan (ON CONFLICT DO NOTHING).
 
 Tabulka `users` nemá žádné JSONB sloupce — celý řádek jsou scalary.
 
@@ -205,6 +221,17 @@ uv run python seed/load_exercises_from_mongo_dump.py --dump 2026-05-15_084622
 Vyžaduje, aby už byly nasypané `catalog` a `users` — řádky, které odkazují na chybějící `exercise_name` nebo `user_email`, loader přeskočí s warning (FK by stejně spadlo).
 
 Loader rozbalí BSON Extended JSON wrappery (`$oid`, `$date`) bez závislosti na `pymongo`.
+
+### `workouts`
+
+Backfill historických tréninků z Mongo `exercise_series` kolekce. Pro každý unikátní pár `(user_email, datum z started_at)` vytvoří jeden řádek v `workout`. **Všechny řádky dostanou stejný `plan`** — aktuální seznam cviků daného uživatele ze SQL `exercises`. Není to rekonstrukce reálné historie, jen vyplnění datového modelu pro dev.
+
+```bash
+uv run python seed/load_workouts_from_mongo_dump.py
+uv run python seed/load_workouts_from_mongo_dump.py --dump 2026-05-18_213640
+```
+
+Vyžaduje, aby už byly nasypané `users` a `exercises` (jinak `plan` skončí jako prázdné pole nebo páry s neznámým `user_email` se přeskočí). Idempotentní přes `ON CONFLICT (user_email, day) DO NOTHING` — re-run jen přidá nové dvojice.
 
 ## Naming konvence migrací
 
