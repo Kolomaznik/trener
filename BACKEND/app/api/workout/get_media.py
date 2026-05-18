@@ -33,7 +33,8 @@ async def get_media(
     base64 blobs travel one at a time.
     """
     row = await fetchone(
-        "SELECT exercise_name, name, data FROM media " "WHERE exercise_name = %s AND name = %s",
+        "SELECT exercise_name, name, data FROM catalog_media "
+        "WHERE exercise_name = %s AND name = %s",
         (exercise_name, media_name),
     )
     if row is None:

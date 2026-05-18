@@ -49,7 +49,7 @@ CATALOG_INSERT_SQL = (
 )
 
 MEDIA_INSERT_SQL = (
-    "INSERT INTO media (exercise_name, name, data) VALUES (%s, %s, %s) "
+    "INSERT INTO catalog_media (exercise_name, name, data) VALUES (%s, %s, %s) "
     "ON CONFLICT (exercise_name, name) DO UPDATE SET data = EXCLUDED.data"
 )
 

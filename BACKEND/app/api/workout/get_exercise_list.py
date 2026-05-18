@@ -47,7 +47,7 @@ async def get_exercise_list(
                c.muscle_engagement,
                e.created_at AS added_at,
                (SELECT COALESCE(array_agg(m.name ORDER BY m.name), ARRAY[]::text[])
-                  FROM media m
+                  FROM catalog_media m
                  WHERE m.exercise_name = c.name) AS media
           FROM exercises e
           JOIN catalog c ON c.name = e.exercise_name

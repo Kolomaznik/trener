@@ -24,7 +24,7 @@ erDiagram
         jsonb goal
         jsonb muscle_engagement
     }
-    MEDIA {
+    CATALOG_MEDIA {
         text exercise_name PK,FK
         text name PK
         text data
@@ -46,12 +46,12 @@ erDiagram
         bool completed
         timestamptz created_at
     }
-    CATALOG ||--o{ MEDIA : "has"
+    CATALOG ||--o{ CATALOG_MEDIA : "has"
     USERS ||--o{ EXERCISES : "has"
     CATALOG ||--o{ EXERCISES : "referenced by"
 ```
 
-### `media`
+### `catalog_media`
 
 Jeden řádek = jeden obrázek nebo video k cviku. Composite PK je `(exercise_name, name)`; `exercise_name` je FK do `catalog(name)` s `ON DELETE CASCADE`. `data` drží celý `data:image/...;base64,...` URI tak, jak přišel z dumpu.
 
