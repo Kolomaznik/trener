@@ -9,8 +9,8 @@ from app.api.exercises.get_detail import router as exercises_detail_router
 from app.api.exercises.series import router as exercises_series_router
 from app.api.health.get import router as health_router
 from app.api.trening_vezne.get import router as trening_vezne_router
-from app.api.user.settings.get import router as user_settings_get_router
-from app.api.user.settings.patch import router as user_settings_patch_router
+from app.api.user.get_profile import router as user_profile_get_router
+from app.api.user.patch_profile import router as user_profile_patch_router
 from app.api.user_exercises.get import router as user_exercises_get_router
 from app.api.user_exercises.post import router as user_exercises_post_router
 from config import settings
@@ -41,8 +41,8 @@ app.include_router(exercises_detail_router)
 app.include_router(exercises_series_router)
 app.include_router(user_exercises_get_router)
 app.include_router(user_exercises_post_router)
-app.include_router(user_settings_get_router)
-app.include_router(user_settings_patch_router)
+app.include_router(user_profile_get_router)
+app.include_router(user_profile_patch_router)
 app.include_router(trening_vezne_router)
 
 

@@ -2,13 +2,119 @@
 
 Migrační projekt pro PostgreSQL databázi projektu **trener**. Postaven nad knihovnou [`yoyo-migrations`](https://ollycope.com/software/yoyo/latest/) s vlastním tenkým CLI wrapperem (`manage.py`), který načítá konfiguraci z `.env`.
 
-Sourozenec [`MONGO_DB/`](../MONGO_DB/) — postupně přebírá kolekce z MongoDB. První na řadě je **catalog** (immutable seznam cviků).
+Sourozenec [`MONGO_DB/`](../MONGO_DB/) — postupně přebírá kolekce z MongoDB. Aktuálně migrované: **catalog** (immutable seznam cviků) a **users** (účty + profil).
 
 Spravuje:
 
 - **Schéma tabulek + indexy** (kategorie `schema`)
 - **Datové transformace** existujících řádků (kategorie `transform`)
-- _Seed data_ pro `catalog` se neřeší migrací, ale standalone skriptem [`seed/load_catalog_from_mongo_dump.py`](seed/load_catalog_from_mongo_dump.py) — viz níže.
+- _Seed data_ pro každou migrovanou kolekci ze standalone skriptů v [`seed/`](seed/) — viz níže.
+
+## Schema
+
+Aktuální stav PostgreSQL tabulek. Pro Mongo kolekce, které ještě nejsou migrované, viz [MONGO_DB/](../MONGO_DB/).
+
+```mermaid
+erDiagram
+    CATALOG {
+        text name PK
+        text title
+        text english_name
+        text description
+        jsonb goal
+        jsonb media
+        jsonb muscle_engagement
+    }
+    USERS {
+        text email PK
+        text sub UK
+        text name
+        text picture
+        int birth_year
+        int height_cm "CHECK 50-250"
+        double weight_kg "CHECK 20-300"
+        text gender "CHECK male/female"
+        timestamptz created_at
+    }
+```
+
+## JSONB columns
+
+Konkrétní příklady payloadů pro každý JSONB sloupec — užitečné pro debugování a psaní `->>` / `->` dotazů.
+
+### `catalog.goal`
+
+Cíl pro jeden cvik: počet sérií a opakování. Hodnoty pocházejí ze dvou různých tierů původního Mongo `progression_goals` (reps z intermediate, sets z mastery) — viz [seed/load_catalog_from_mongo_dump.py](seed/load_catalog_from_mongo_dump.py) (`_extract_goal`).
+
+```json
+{
+  "sets": 3,
+  "reps": 25
+}
+```
+
+Příklad dotazu:
+
+```sql
+SELECT name, (goal->>'sets')::int AS sets, (goal->>'reps')::int AS reps
+  FROM catalog
+ WHERE (goal->>'reps')::int >= 20
+ ORDER BY (goal->>'reps')::int DESC;
+```
+
+### `catalog.media`
+
+Variabilní mapa `<key> → string`. Hodnoty mohou být HTTPS URL nebo inline `data:` URI s base64 obrázkem/videem (kratší než externí upload, ale řádově větší než URL).
+
+```json
+{
+  "front": "data:image/webp;base64,UklGRiQAAABXRUJQVlA4IBgAAAAwAQ…",
+  "back":  "data:image/webp;base64,UklGRkgAAABXRUJQVlA4IDw…",
+  "demo":  "https://cdn.example/pushups_demo.mp4"
+}
+```
+
+> JSONB blob s base64 daty se v Postgresu automaticky TOAST-uje a komprimuje, ale ovlivňuje velikost záloh a cenu I/O na hostovaných službách (Supabase, Neon). Pro nový obsah preferuj URL na object storage.
+
+Příklad dotazu:
+
+```sql
+SELECT name, jsonb_object_keys(media) AS media_key FROM catalog;
+```
+
+### `catalog.muscle_engagement`
+
+Variabilní mapa `<muscle_name> → percent` (int 0–100). Klíče jsou volné — nový sval prostě jen přibyde v JSONB, schema se nemění. Suma hodnot u jednoho cviku nemusí dělat 100 % (vyjadřuje relativní zapojení).
+
+```json
+{
+  "chest": 40,
+  "triceps": 30,
+  "deltoids": 15,
+  "abs": 5,
+  "lower_back": 5,
+  "hands": 5
+}
+```
+
+Příklady dotazu:
+
+```sql
+-- Cviky, které zapojují prsa
+SELECT name FROM catalog WHERE muscle_engagement ? 'chest';
+
+-- Cviky se zapojením prsou >= 30 %
+SELECT name, (muscle_engagement->>'chest')::int AS chest_pct
+  FROM catalog
+ WHERE (muscle_engagement->>'chest')::int >= 30
+ ORDER BY chest_pct DESC;
+
+-- Cviky pokrývající všechny zadané svaly najednou
+SELECT name FROM catalog
+ WHERE muscle_engagement ?& array['chest','triceps','deltoids'];
+```
+
+Tabulka `users` nemá žádné JSONB sloupce — celý řádek jsou scalary.
 
 ## Instalace
 
@@ -44,7 +150,7 @@ docker run -d --name trener-pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgr
 uv run python manage.py up
 
 # aplikuj migrace pouze do daného migration id (včetně)
-uv run python manage.py up --to 20260516120000
+uv run python manage.py up --to 20260517120000
 
 # rollback aplikovaných migrací do daného id (exclusive — vše novější se odrolovat)
 uv run python manage.py down --to 20260516120000
@@ -52,14 +158,22 @@ uv run python manage.py down --to 20260516120000
 # výpis migrací (applied/pending)
 uv run python manage.py status
 
+# DESTRUKTIVNÍ: zahodí celé public schéma (data, tabulky, yoyo metastore)
+# a vytvoří ho znovu prázdné. Pak je potřeba znovu spustit `up`.
+# Default je interaktivní potvrzení; pro CI/skripty přidej `--yes`.
+uv run python manage.py clear
+uv run python manage.py clear --yes
+
 # vytvoř novou migraci se správným timestamp prefixem
-uv run python manage.py new schema add_users_table
+uv run python manage.py new schema add_user_exercises_table
 uv run python manage.py new transform catalog_split_family
 ```
 
-## Seed: catalog z MongoDB dumpu
+## Seed: import z MongoDB dumpu
 
-Naplnění tabulky `catalog` z existujícího MongoDB dumpu pod [`../MONGO_DB/dumps/`](../MONGO_DB/dumps/):
+Loadery čtou nejnovější dump pod [`../MONGO_DB/dumps/`](../MONGO_DB/dumps/). Všechny jsou idempotentní (`INSERT … ON CONFLICT DO UPDATE`) — opakované spuštění proti čerstvějšímu dumpu jen aktualizuje data.
+
+### `catalog`
 
 ```bash
 # default: nejnovější dump
@@ -69,7 +183,14 @@ uv run python seed/load_catalog_from_mongo_dump.py
 uv run python seed/load_catalog_from_mongo_dump.py --dump 2026-05-15_084622
 ```
 
-Loader je idempotentní (`INSERT … ON CONFLICT (name) DO UPDATE`) — opakované spuštění proti čerstvějšímu dumpu jen aktualizuje data.
+### `users`
+
+```bash
+uv run python seed/load_users_from_mongo_dump.py
+uv run python seed/load_users_from_mongo_dump.py --dump 2026-05-15_084622
+```
+
+Loader rozbalí BSON Extended JSON wrappery (`$oid`, `$date`) bez závislosti na `pymongo`.
 
 ## Naming konvence migrací
 
@@ -79,8 +200,9 @@ Loader je idempotentní (`INSERT … ON CONFLICT (name) DO UPDATE`) — opakovan
 
 - **kategorie** ∈ `schema`, `seed`, `transform`
 - timestamp generuje `manage.py new` automaticky
+- **obsah souboru pouze ASCII** — yoyo čte migrace přes `open(path)` bez `encoding=`, což na Windows defaultuje na cp1252 a spadne na vícebyte UTF-8 sekvenci. Český text patří do README/loaderů, ne do migrací.
 
-Příklad: `20260516120000_schema_initial_catalog.py`
+Příklad: `20260517120000_schema_initial_users.py`
 
 ## Šablona migrace
 
@@ -117,14 +239,17 @@ cp .env.example .env
 # 4. první spuštění migrací
 uv run python manage.py up
 
-# 5. seed catalog z aktuálního Mongo dumpu
+# 5. seed všech kolekcí z aktuálního Mongo dumpu
 uv run python seed/load_catalog_from_mongo_dump.py
+uv run python seed/load_users_from_mongo_dump.py
 
 # 6. ověření obsahu
-psql "$DATABASE_URL" -c "SELECT name, glutes, hamstrings FROM catalog ORDER BY name;"
+psql "$DATABASE_URL" -c "SELECT name, muscle_engagement FROM catalog ORDER BY name;"
+psql "$DATABASE_URL" -c "SELECT email, sub, height_cm, weight_kg, created_at FROM users;"
 
 # 7. druhé spuštění seedu musí být no-op pro počet řádků (ON CONFLICT)
 uv run python seed/load_catalog_from_mongo_dump.py
+uv run python seed/load_users_from_mongo_dump.py
 ```
 
 ## Pre-commit

@@ -2,6 +2,7 @@ from functools import lru_cache
 from typing import Any
 
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+from psycopg_pool import AsyncConnectionPool
 
 from config import settings
 
@@ -22,9 +23,16 @@ def get_db() -> AsyncIOMotorDatabase:
     return _client()[settings.mongo_database]
 
 
-async def get_user_weight_kg(db: AsyncIOMotorDatabase, email: str) -> float | None:
-    user_doc = await db["users"].find_one({"email": email})
-    if user_doc is None:
+async def get_user_weight_kg(pool: AsyncConnectionPool, email: str) -> float | None:
+    """Read the user's weight from the Postgres ``users`` table.
+
+    The Mongo ``users`` collection is no longer the source of truth for
+    profile data -- see ``app/sql_db.py`` and ``app/api/user/get_profile.py``.
+    """
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT weight_kg FROM users WHERE email = %s", (email,))
+            row = await cur.fetchone()
+    if row is None or row["weight_kg"] is None:
         return None
-    raw = user_doc.get("weight_kg")
-    return float(raw) if raw is not None else None
+    return float(row["weight_kg"])

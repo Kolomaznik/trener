@@ -3,6 +3,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from psycopg_pool import AsyncConnectionPool
 from pydantic import BaseModel, Field
 
 from app.auth import GoogleUser, get_optional_user
@@ -14,6 +15,7 @@ from app.services.fitness_math import (
     calculate_muscle_load,
 )
 from app.services.user_exercises import PROGRESSION_LEVELS, _normalize_progression_level
+from app.sql_db import get_pool
 
 
 def _intervals_from_counting(counting: list[dict]) -> list[int]:
@@ -134,6 +136,7 @@ def _muscle_load_by_difficulty(
 async def get_exercise_detail(
     exercise_name: str,
     db: AsyncIOMotorDatabase = Depends(get_db),
+    pool: AsyncConnectionPool = Depends(get_pool),
     user: GoogleUser | None = Depends(get_optional_user),
 ) -> ExerciseDetailResponse:
     # Catalog data (cadence, progression_goals, family, level, …) is the
@@ -253,7 +256,7 @@ async def get_exercise_detail(
                 exercise_doc.get("muscle_engagement_percent") or {}
             )
             level_coefficient: float = exercise_doc.get("level_coefficient", 0.5)
-            weight_kg = await get_user_weight_kg(db, user.email)
+            weight_kg = await get_user_weight_kg(pool, user.email)
             mld = _muscle_load_by_difficulty(
                 progression_goals=progression_goals,
                 muscle_engagement_percent=muscle_engagement_percent,

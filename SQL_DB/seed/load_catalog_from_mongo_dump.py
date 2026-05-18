@@ -31,37 +31,9 @@ DUMPS_DIR = ROOT.parent / "MONGO_DB" / "dumps"
 
 # Musí být v souladu s migration 20260516120000_schema_initial_catalog.py.
 # Pořadí je závazné — používá se přímo v INSERT statementu.
-MUSCLE_COLUMNS: tuple[str, ...] = (
-    "chest",
-    "deltoids",
-    "biceps",
-    "triceps",
-    "forearms",
-    "abs",
-    "obliques",
-    "hip_flexors",
-    "trapezius",
-    "rhomboids",
-    "lats",
-    "lower_back",
-    "quadriceps",
-    "hamstrings",
-    "glutes",
-    "abductors",
-    "adductors",
-    "calves",
-    "tibialis",
-    "neck",
-    "knees",
-    "hands",
-    "ankles",
-    "feet",
-)
-MUSCLE_SET = frozenset(MUSCLE_COLUMNS)
-
 SCALAR_COLUMNS = ("name", "title", "english_name", "description")
-JSONB_COLUMNS = ("cadence", "media")
-ALL_COLUMNS = SCALAR_COLUMNS + JSONB_COLUMNS + MUSCLE_COLUMNS
+JSONB_COLUMNS = ("goal", "media", "muscle_engagement")
+ALL_COLUMNS = SCALAR_COLUMNS + JSONB_COLUMNS
 
 # INSERT INTO catalog (name, title, …) VALUES (%s, %s, …)
 #   ON CONFLICT (name) DO UPDATE SET title = EXCLUDED.title, …
@@ -102,28 +74,36 @@ def _select_dump(name: str | None) -> Path:
     sys.exit(f"Dump {name!r} nenalezen. Dostupné: {available}")
 
 
+def _extract_goal(doc: dict) -> dict:
+    """Sbalí Mongo ``progression_goals`` třístupňový strom do jednoho cíle.
+
+    Per user spec: ``reps`` z intermediate tieru, ``sets`` z mastery tieru.
+    Vrátí ``{"sets": int|None, "reps": int|None}`` — chybějící hodnoty
+    skončí jako JSON ``null``.
+    """
+    goals = doc.get("progression_goals") or {}
+    return {
+        "sets": (goals.get("mastery") or {}).get("sets"),
+        "reps": (goals.get("intermediate") or {}).get("reps"),
+    }
+
+
 def _row_from_doc(doc: dict) -> tuple:
     name = doc.get("name") or doc.get("_id")
     if not name:
         raise ValueError(f"Dokument bez 'name'/'_id': {doc!r}")
 
-    muscle_engagement = doc.get("muscle_engagement_percent") or {}
-    unknown = set(muscle_engagement) - MUSCLE_SET
-    if unknown:
-        raise ValueError(
-            f"Dokument {name!r} obsahuje neznámé svaly {sorted(unknown)}. "
-            f"Přidej je do MUSCLE_COLUMNS a vytvoř ALTER TABLE migraci."
-        )
-
-    scalar_values = (
+    # Mongo field is ``muscle_engagement_percent`` — v PG je sloupec
+    # přejmenovaný na ``muscle_engagement`` (procenta jsou implicitní).
+    return (
         name,
         doc["title"],
         doc.get("english_name"),
         doc["description"],
+        Jsonb(_extract_goal(doc)),
+        Jsonb(doc.get("media") or {}),
+        Jsonb(doc.get("muscle_engagement_percent") or {}),
     )
-    jsonb_values = (Jsonb(doc["cadence"]), Jsonb(doc.get("media") or {}))
-    muscle_values = tuple(int(muscle_engagement.get(m, 0)) for m in MUSCLE_COLUMNS)
-    return scalar_values + jsonb_values + muscle_values
 
 
 def main() -> None:

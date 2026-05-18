@@ -3,7 +3,7 @@
 Tenký wrapper kolem knihovny ``yoyo-migrations`` — načte ``.env`` přes
 ``python-dotenv``, dohledá migrace v ``migrations/`` a deleguje na yoyo
 programatické API. Drží jediný zdroj pravdy o připojení v ``.env`` a stejnou
-CLI plochu jako ``MONGO_DB/manage.py`` (up / down / status / new).
+CLI plochu jako ``MONGO_DB/manage.py`` (up / down / status / clear / new).
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 from yoyo import get_backend, read_migrations
@@ -93,6 +94,40 @@ def cmd_status(_args: argparse.Namespace) -> None:
         print(f"  {m.id:<60} {mark}")
 
 
+def _sanitize_url(url: str) -> str:
+    """Skryje heslo v URL pro výpis na konzoli."""
+    parsed = urlparse(url)
+    if parsed.password:
+        return url.replace(parsed.password, "***")
+    return url
+
+
+def cmd_clear(args: argparse.Namespace) -> None:
+    """Zahodí celý ``public`` schema (včetně yoyo metastoru) a vytvoří ho znovu prázdný.
+
+    Destruktivní! Po `clear` musíš spustit `up` aby se znovu aplikovaly všechny
+    migrace od začátku. Použij na development / staging Postgres, nikdy bez
+    rozmyslu na produkci.
+    """
+    database_url = _load_env()
+    if not args.yes:
+        print(f"DROP SCHEMA public CASCADE na databázi:\n  {_sanitize_url(database_url)}")
+        print("Tohle zahodí VŠECHNA data (tabulky, sekvence, yoyo metastore).")
+        if input("Pokračovat? Napiš 'yes' pro potvrzení: ").strip() != "yes":
+            sys.exit("Zrušeno.")
+
+    backend = get_backend(database_url)
+    conn = backend.connection
+    cur = conn.cursor()
+    try:
+        cur.execute("DROP SCHEMA public CASCADE")
+        cur.execute("CREATE SCHEMA public")
+        conn.commit()
+    finally:
+        cur.close()
+    print("Hotovo. Spusť `manage.py up` pro znovuaplikování migrací.")
+
+
 def cmd_new(args: argparse.Namespace) -> None:
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     filename = f"{timestamp}_{args.category}_{args.description}.py"
@@ -129,6 +164,17 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_status = sub.add_parser("status", help="výpis migrací (applied/pending)")
     p_status.set_defaults(func=cmd_status)
+
+    p_clear = sub.add_parser(
+        "clear",
+        help="DESTRUKTIVNÍ: drop celého public schématu (včetně yoyo metastoru)",
+    )
+    p_clear.add_argument(
+        "--yes",
+        action="store_true",
+        help="přeskoč interaktivní potvrzení (pro CI / skripty)",
+    )
+    p_clear.set_defaults(func=cmd_clear)
 
     p_new = sub.add_parser("new", help="vytvoří novou migraci se správným timestamp prefixem")
     p_new.add_argument("category", choices=["schema", "seed", "transform"])

@@ -14,13 +14,8 @@ class GoogleUser(BaseModel):
 
     sub: str
     email: EmailStr
-    email_verified: bool | None = None
     name: str | None = None
-    given_name: str | None = None
-    family_name: str | None = None
     picture: HttpUrl | None = None
-    locale: str | None = None
-    hd: str | None = None
 
 
 async def _fetch_google_userinfo(token: str) -> GoogleUser:

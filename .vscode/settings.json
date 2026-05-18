@@ -4,5 +4,20 @@
   "python.testing.cwd": "${workspaceFolder}/BACKEND",
   "python.testing.pytestArgs": ["tests"],
   "python.defaultInterpreterPath": "${workspaceFolder}/BACKEND/.venv/Scripts/python.exe",
-  "python.analysis.extraPaths": ["${workspaceFolder}/BACKEND"]
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/BACKEND"
+  ],
+  "sqltools.connections": [
+    {
+      "ssh": "Disabled",
+      "previewLimit": 50,
+      "server": "tramway.proxy.rlwy.net",
+      "port": 12884,
+      "driver": "PostgreSQL",
+      "name": "Trener",
+      "database": "railway",
+      "username": "postgres",
+      "password": "lsozzmDQtQTQzWVAySGMvHRmlnGYxOhy"
+    }
+  ]
 }

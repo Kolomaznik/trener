@@ -10,10 +10,12 @@ class Settings(BaseSettings):
     cors_origin_regex: str | None = None
     mongo_uri: str = "mongodb://localhost:27017"
     mongo_database: str = "trener"
+    database_url: str = "postgresql://postgres:postgres@localhost:5432/trener"
     google_userinfo_url: str = "https://www.googleapis.com/oauth2/v3/userinfo"
     sentry_dsn: str | None = None
     sentry_traces_sample_rate: float = 0.1
-    @field_validator("google_userinfo_url", "mongo_uri", mode="before")
+
+    @field_validator("google_userinfo_url", "mongo_uri", "database_url", mode="before")
     @classmethod
     def strip_url_whitespace(cls, v: str) -> str:
         return v.strip()
