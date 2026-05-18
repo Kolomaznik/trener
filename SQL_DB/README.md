@@ -2,7 +2,7 @@
 
 Migrační projekt pro PostgreSQL databázi projektu **trener**. Postaven nad knihovnou [`yoyo-migrations`](https://ollycope.com/software/yoyo/latest/) s vlastním tenkým CLI wrapperem (`manage.py`), který načítá konfiguraci z `.env`.
 
-Sourozenec [`MONGO_DB/`](../MONGO_DB/) — postupně přebírá kolekce z MongoDB. Aktuálně migrované: **catalog** (immutable seznam cviků) a **users** (účty + profil).
+Sourozenec [`MONGO_DB/`](../MONGO_DB/) — postupně přebírá kolekce z MongoDB. Aktuálně migrované: **catalog** (immutable seznam cviků), **users** (účty + profil) a **exercises** (N:M mezi users a catalog — které cviky si uživatel přidal).
 
 Spravuje:
 
@@ -36,6 +36,14 @@ erDiagram
         text gender "CHECK male/female"
         timestamptz created_at
     }
+    EXERCISES {
+        text exercise_name PK,FK
+        text user_email PK,FK
+        bool completed
+        timestamptz created_at
+    }
+    USERS ||--o{ EXERCISES : "has"
+    CATALOG ||--o{ EXERCISES : "referenced by"
 ```
 
 ## JSONB columns
@@ -116,6 +124,8 @@ SELECT name FROM catalog
 
 Tabulka `users` nemá žádné JSONB sloupce — celý řádek jsou scalary.
 
+Tabulka `exercises` je N:M mezi `users` a `catalog` s kompozitním PK `(exercise_name, user_email)`. Aktuálně drží jen `completed` a `created_at` (kdy si uživatel cvik přidal). Per-user state machine z Monga (`user_level`, `consecutive_successes`, `level_history`) přijde v další migraci — pole se loaderem zatím ignorují.
+
 ## Instalace
 
 ```bash
@@ -190,6 +200,15 @@ uv run python seed/load_users_from_mongo_dump.py
 uv run python seed/load_users_from_mongo_dump.py --dump 2026-05-15_084622
 ```
 
+### `exercises`
+
+```bash
+uv run python seed/load_exercises_from_mongo_dump.py
+uv run python seed/load_exercises_from_mongo_dump.py --dump 2026-05-15_084622
+```
+
+Vyžaduje, aby už byly nasypané `catalog` a `users` — řádky, které odkazují na chybějící `exercise_name` nebo `user_email`, loader přeskočí s warning (FK by stejně spadlo).
+
 Loader rozbalí BSON Extended JSON wrappery (`$oid`, `$date`) bez závislosti na `pymongo`.
 
 ## Naming konvence migrací
@@ -242,14 +261,17 @@ uv run python manage.py up
 # 5. seed všech kolekcí z aktuálního Mongo dumpu
 uv run python seed/load_catalog_from_mongo_dump.py
 uv run python seed/load_users_from_mongo_dump.py
+uv run python seed/load_exercises_from_mongo_dump.py
 
 # 6. ověření obsahu
 psql "$DATABASE_URL" -c "SELECT name, muscle_engagement FROM catalog ORDER BY name;"
 psql "$DATABASE_URL" -c "SELECT email, sub, height_cm, weight_kg, created_at FROM users;"
+psql "$DATABASE_URL" -c "SELECT user_email, exercise_name, completed, created_at FROM exercises ORDER BY exercise_name;"
 
 # 7. druhé spuštění seedu musí být no-op pro počet řádků (ON CONFLICT)
 uv run python seed/load_catalog_from_mongo_dump.py
 uv run python seed/load_users_from_mongo_dump.py
+uv run python seed/load_exercises_from_mongo_dump.py
 ```
 
 ## Pre-commit

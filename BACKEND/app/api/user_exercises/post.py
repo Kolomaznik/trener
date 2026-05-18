@@ -3,6 +3,7 @@ from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from psycopg_pool import AsyncConnectionPool
 from pydantic import BaseModel
 
 from app.auth import GoogleUser, get_current_user
@@ -12,6 +13,7 @@ from app.services.user_exercises import (
     UserExerciseAlreadyExists,
     add_user_exercise,
 )
+from app.sql_db import get_pool
 
 router = APIRouter(prefix="/user-exercises", tags=["user-exercises"])
 
@@ -34,6 +36,7 @@ async def post_user_exercise(
     payload: AddUserExerciseRequest = Body(...),
     user: GoogleUser = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_db),
+    pool: AsyncConnectionPool = Depends(get_pool),
 ) -> UserExerciseCreated:
     """Add an exercise from the catalog to the user's personal list.
 
@@ -53,6 +56,20 @@ async def post_user_exercise(
             status_code=409,
             detail=f"already added: {exc}",
         ) from exc
+
+    # Bridge: mirror the add into the SQL `exercises` table so the new
+    # PG-backed GET /catalog shows the row immediately. Drop this once the
+    # workout flow (get_detail/series/user_exercises GET) reads from PG too.
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                INSERT INTO exercises (exercise_name, user_email)
+                VALUES (%s, %s)
+                ON CONFLICT (exercise_name, user_email) DO NOTHING
+                """,
+                (payload.exercise_name, user.email),
+            )
 
     # The catalog goal for the user's starting tier (always "beginner"
     # right after add) — looked up here rather than cached on the row.

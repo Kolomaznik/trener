@@ -14,14 +14,12 @@ import {
 } from 'antd';
 import { CheckCircleTwoTone, PlusOutlined } from '@ant-design/icons';
 import { getExerciseList } from '../../api/catalog/get_exercise_list.js';
-import { getUserExercises } from '../../api/user_exercises/get_list.js';
 import { addUserExercise } from '../../api/user_exercises/post.js';
 
 const { Title } = Typography;
 
 export default function ExercisesCatalog() {
   const [rows, setRows] = useState([]);
-  const [addedNames, setAddedNames] = useState(() => new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
@@ -32,11 +30,10 @@ export default function ExercisesCatalog() {
     setLoading(true);
     setError(null);
 
-    Promise.all([getExerciseList(), getUserExercises().catch(() => [])])
-      .then(([catalog, mine]) => {
+    getExerciseList()
+      .then((catalog) => {
         if (!active) return;
         setRows(catalog);
-        setAddedNames(new Set(mine.map((row) => row.exercise_name)));
       })
       .catch((err) => {
         if (!active) return;
@@ -55,7 +52,7 @@ export default function ExercisesCatalog() {
     const needle = search.trim().toLowerCase();
     if (!needle) return rows;
     return rows.filter((row) =>
-      [row.title, row.family, String(row.level), row.name]
+      [row.title, row.name]
         .some((field) => field?.toLowerCase().includes(needle)),
     );
   }, [rows, search]);
@@ -64,11 +61,11 @@ export default function ExercisesCatalog() {
     setPendingName(record.name);
     try {
       await addUserExercise(record.name);
-      setAddedNames((prev) => {
-        const next = new Set(prev);
-        next.add(record.name);
-        return next;
-      });
+      setRows((prev) =>
+        prev.map((row) =>
+          row.name === record.name ? { ...row, status: 'in_progress' } : row,
+        ),
+      );
       message.success(`Cvik „${record.title}" přidán do tvého seznamu.`);
     } catch (err) {
       const detail = err?.response?.data?.detail;
@@ -89,32 +86,25 @@ export default function ExercisesCatalog() {
         defaultSortOrder: 'ascend',
       },
       {
-        title: 'Rodina',
-        dataIndex: 'family',
-        key: 'family',
-        sorter: (a, b) => a.family.localeCompare(b.family, 'cs'),
-      },
-      {
-        title: 'Úroveň',
-        dataIndex: 'level',
-        key: 'level',
-        sorter: (a, b) => a.level - b.level,
-        width: 100,
-      },
-      {
         title: 'Akce',
         key: 'action',
         width: 160,
         render: (_value, record) => {
-          const added = addedNames.has(record.name);
-          if (added) {
+          if (record.status === 'completed') {
             return (
               <Tag
                 color="success"
                 icon={<CheckCircleTwoTone twoToneColor="#52c41a" />}
-                data-testid={`added-${record.name}`}
+                data-testid={`completed-${record.name}`}
               >
-                Přidáno
+                Splněno
+              </Tag>
+            );
+          }
+          if (record.status === 'in_progress') {
+            return (
+              <Tag color="warning" data-testid={`in-progress-${record.name}`}>
+                In progress
               </Tag>
             );
           }
@@ -133,18 +123,17 @@ export default function ExercisesCatalog() {
         },
       },
     ],
-    // handleAdd is recreated each render but only needs addedNames + pendingName
-    // for memoization correctness; ESLint's exhaustive-deps would force the
-    // function in here, which would defeat the memo. Lint-aligned alternative
-    // is to wrap handleAdd in useCallback — out of scope.
+    // handleAdd is recreated each render but only needs pendingName for
+    // memoization correctness; ESLint's exhaustive-deps would force the
+    // function in here, which would defeat the memo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [addedNames, pendingName],
+    [pendingName],
   );
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <Typography>
-        <Title level={2} style={{ marginBottom: 0 }}>Cviky (katalog)</Title>
+        <Title level={2} style={{ marginBottom: 0 }}>Katalog</Title>
       </Typography>
 
       {error && <Alert type="error" showIcon message={error} />}
@@ -152,7 +141,7 @@ export default function ExercisesCatalog() {
       <Card>
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           <Input.Search
-            placeholder="Hledat podle názvu, rodiny nebo úrovně"
+            placeholder="Hledat podle názvu"
             allowClear
             value={search}
             onChange={(event) => setSearch(event.target.value)}

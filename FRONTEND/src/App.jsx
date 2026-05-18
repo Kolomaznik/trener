@@ -191,7 +191,7 @@ export default function App() {
         {
           key: '/admin/exercises',
           icon: <DatabaseOutlined />,
-          label: 'Cviky (katalog)',
+          label: 'Katalog',
         },
         {
           key: '/settings',

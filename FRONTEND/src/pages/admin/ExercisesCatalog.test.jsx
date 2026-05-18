@@ -7,22 +7,18 @@ import ExercisesCatalog from './ExercisesCatalog.jsx';
 vi.mock('../../api/catalog/get_exercise_list.js', () => ({
   getExerciseList: vi.fn(),
 }));
-vi.mock('../../api/user_exercises/get_list.js', () => ({
-  getUserExercises: vi.fn(),
-}));
 vi.mock('../../api/user_exercises/post.js', () => ({
   addUserExercise: vi.fn(),
 }));
 
 import { getExerciseList } from '../../api/catalog/get_exercise_list.js';
-import { getUserExercises } from '../../api/user_exercises/get_list.js';
 import { addUserExercise } from '../../api/user_exercises/post.js';
 
 const fixture = [
-  { name: 'bridges_level_1', title: 'Krátké mosty', family: 'Mosty', level: 1 },
-  { name: 'pushups_level_1', title: 'Kliky o zeď', family: 'Kliky', level: 1 },
-  { name: 'pushups_level_2', title: 'Kliky v předklonu', family: 'Kliky', level: 2 },
-  { name: 'squats_level_1', title: 'Dřepy ve svíčce', family: 'Dřepy', level: 1 },
+  { name: 'bridges_level_1', title: 'Krátké mosty', status: 'not_added' },
+  { name: 'pushups_level_1', title: 'Kliky o zeď', status: 'not_added' },
+  { name: 'pushups_level_2', title: 'Kliky v předklonu', status: 'in_progress' },
+  { name: 'squats_level_1', title: 'Dřepy ve svíčce', status: 'completed' },
 ];
 
 function renderPage() {
@@ -37,8 +33,6 @@ describe('ExercisesCatalog page', () => {
   beforeEach(() => {
     getExerciseList.mockReset();
     getExerciseList.mockResolvedValue(fixture);
-    getUserExercises.mockReset();
-    getUserExercises.mockResolvedValue([]);
     addUserExercise.mockReset();
     addUserExercise.mockResolvedValue({
       exercise_name: 'pushups_level_1',
@@ -61,9 +55,9 @@ describe('ExercisesCatalog page', () => {
     expect(screen.getByText('Dřepy ve svíčce')).toBeInTheDocument();
   });
 
-  it('renders the heading "Cviky (katalog)"', async () => {
+  it('renders the heading "Katalog"', async () => {
     renderPage();
-    expect(await screen.findByRole('heading', { name: 'Cviky (katalog)' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Katalog' })).toBeInTheDocument();
   });
 
   it('search filters rows by title', async () => {
@@ -78,19 +72,6 @@ describe('ExercisesCatalog page', () => {
     });
     expect(screen.getByText('Kliky o zeď')).toBeInTheDocument();
     expect(screen.getByText('Kliky v předklonu')).toBeInTheDocument();
-  });
-
-  it('search filters rows by family', async () => {
-    renderPage();
-    await screen.findByText('Kliky o zeď');
-
-    const search = screen.getByTestId('catalog-search').querySelector('input');
-    fireEvent.change(search, { target: { value: 'mosty' } });
-
-    await waitFor(() => {
-      expect(screen.queryByText('Kliky o zeď')).not.toBeInTheDocument();
-    });
-    expect(screen.getByText('Krátké mosty')).toBeInTheDocument();
   });
 
   it('shows empty state when no rows match the filter', async () => {
@@ -116,19 +97,19 @@ describe('ExercisesCatalog page', () => {
     expect(screen.getByTestId('add-bridges_level_1')).toBeInTheDocument();
   });
 
-  it('marks rows as Přidáno when the user already has them', async () => {
-    getUserExercises.mockResolvedValue([
-      { exercise_name: 'pushups_level_1', user_level: 'beginner' },
-    ]);
+  it('renders an In progress label for rows the user has added but not completed', async () => {
     renderPage();
-
-    expect(await screen.findByTestId('added-pushups_level_1')).toBeInTheDocument();
-    expect(screen.queryByTestId('add-pushups_level_1')).not.toBeInTheDocument();
-    // The other rows still show an Add button.
-    expect(screen.getByTestId('add-bridges_level_1')).toBeInTheDocument();
+    expect(await screen.findByTestId('in-progress-pushups_level_2')).toBeInTheDocument();
+    expect(screen.queryByTestId('add-pushups_level_2')).not.toBeInTheDocument();
   });
 
-  it('clicking Add posts to /user-exercises and replaces the button with Přidáno', async () => {
+  it('renders a Splněno label for rows the user has completed', async () => {
+    renderPage();
+    expect(await screen.findByTestId('completed-squats_level_1')).toBeInTheDocument();
+    expect(screen.queryByTestId('add-squats_level_1')).not.toBeInTheDocument();
+  });
+
+  it('clicking Add posts to /user-exercises and flips the row to In progress', async () => {
     renderPage();
 
     const addBtn = await screen.findByTestId('add-pushups_level_1');
@@ -137,6 +118,6 @@ describe('ExercisesCatalog page', () => {
     await waitFor(() =>
       expect(addUserExercise).toHaveBeenCalledWith('pushups_level_1'),
     );
-    expect(await screen.findByTestId('added-pushups_level_1')).toBeInTheDocument();
+    expect(await screen.findByTestId('in-progress-pushups_level_1')).toBeInTheDocument();
   });
 });
