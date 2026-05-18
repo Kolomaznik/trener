@@ -2,11 +2,10 @@ from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends
-from psycopg_pool import AsyncConnectionPool
 from pydantic import BaseModel, ConfigDict
 
 from app.auth import GoogleUser, get_current_user
-from app.sql_db import get_pool
+from app.sql_db import fetchone
 
 router = APIRouter(tags=["user"])
 
@@ -30,7 +29,6 @@ class UserSettingsResponse(BaseModel):
 @router.get("/user/settings", response_model=UserSettingsResponse)
 async def get_user_settings(
     user: GoogleUser = Depends(get_current_user),
-    pool: AsyncConnectionPool = Depends(get_pool),
 ) -> UserSettingsResponse:
     """Upsert the user row from the Google profile and return the full record.
 
@@ -43,18 +41,14 @@ async def get_user_settings(
     google_profile = user.model_dump(mode="json")
     params = (user.email,) + tuple(google_profile.get(field) for field in _GOOGLE_FIELDS)
 
-    async with pool.connection() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                f"""\
-                    INSERT INTO users (email, {", ".join(_GOOGLE_FIELDS)})
-                    VALUES ({", ".join(["%s"] * (1 + len(_GOOGLE_FIELDS)))})
-                    ON CONFLICT (email) DO UPDATE SET
-                        {", ".join(f"{c} = EXCLUDED.{c}" for c in _GOOGLE_FIELDS)}
-                    RETURNING *
-                """,
-                params,
-            )
-            row = await cur.fetchone()
-
+    row = await fetchone(
+        f"""\
+            INSERT INTO users (email, {", ".join(_GOOGLE_FIELDS)})
+            VALUES ({", ".join(["%s"] * (1 + len(_GOOGLE_FIELDS)))})
+            ON CONFLICT (email) DO UPDATE SET
+                {", ".join(f"{c} = EXCLUDED.{c}" for c in _GOOGLE_FIELDS)}
+            RETURNING *
+        """,
+        params,
+    )
     return UserSettingsResponse.model_validate(row)
