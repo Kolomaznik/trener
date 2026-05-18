@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.catalog.get_exercise_list import router as catalog_router
 from app.api.dashboard.get import router as dashboard_router
 from app.api.dashboard.muscle_load_get import router as dashboard_muscle_load_router
+from app.api.exercise.get_exercise_list import router as exercise_router
+from app.api.exercise.get_exercise_media import router as exercise_media_router
 from app.api.exercises.get_detail import router as exercises_detail_router
 from app.api.exercises.series import router as exercises_series_router
 from app.api.health.get import router as health_router
@@ -13,8 +15,6 @@ from app.api.user.get_profile import router as user_profile_get_router
 from app.api.user.patch_profile import router as user_profile_patch_router
 from app.api.user_exercises.get import router as user_exercises_get_router
 from app.api.user_exercises.post import router as user_exercises_post_router
-from app.api.workout.get_exercise_list import router as workout_router
-from app.api.workout.get_media import router as workout_media_router
 from config import settings
 
 app = FastAPI(title=settings.app_name)
@@ -45,8 +45,8 @@ app.include_router(user_exercises_get_router)
 app.include_router(user_exercises_post_router)
 app.include_router(user_profile_get_router)
 app.include_router(user_profile_patch_router)
-app.include_router(workout_router)
-app.include_router(workout_media_router)
+app.include_router(exercise_router)
+app.include_router(exercise_media_router)
 app.include_router(trening_vezne_router)
 
 

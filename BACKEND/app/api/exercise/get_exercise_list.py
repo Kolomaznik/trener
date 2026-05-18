@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from app.auth import GoogleUser, get_current_user
 from app.sql_db import fetchall
 
-router = APIRouter(prefix="/workout", tags=["workout"])
+router = APIRouter(prefix="/exercise", tags=["exercise"])
 
 
 class WorkoutExerciseItem(BaseModel):
@@ -25,7 +25,7 @@ class WorkoutExerciseItem(BaseModel):
     goal: dict[str, Any]
     muscle_engagement: dict[str, Any]
     media: list[str]
-    added_at: datetime
+    added_at: date
 
 
 @router.get("", response_model=list[WorkoutExerciseItem])
@@ -52,7 +52,7 @@ async def get_exercise_list(
           FROM exercises e
           JOIN catalog c ON c.name = e.exercise_name
          WHERE e.user_email = %s
-           AND NOT e.completed
+           AND e.completed_at IS NULL
          ORDER BY e.created_at
         """,
         (user.email,),

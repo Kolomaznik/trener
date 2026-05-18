@@ -43,8 +43,8 @@ erDiagram
     EXERCISES {
         text exercise_name PK,FK
         text user_email PK,FK
-        bool completed
-        timestamptz created_at
+        date completed_at
+        date created_at
     }
     CATALOG ||--o{ CATALOG_MEDIA : "has"
     USERS ||--o{ EXERCISES : "has"
@@ -119,7 +119,7 @@ SELECT name FROM catalog
 
 Tabulka `users` nemá žádné JSONB sloupce — celý řádek jsou scalary.
 
-Tabulka `exercises` je N:M mezi `users` a `catalog` s kompozitním PK `(exercise_name, user_email)`. Aktuálně drží jen `completed` a `created_at` (kdy si uživatel cvik přidal). Per-user state machine z Monga (`user_level`, `consecutive_successes`, `level_history`) přijde v další migraci — pole se loaderem zatím ignorují.
+Tabulka `exercises` je N:M mezi `users` a `catalog` s kompozitním PK `(exercise_name, user_email)`. Aktuálně drží jen `created_at` (datum, kdy si uživatel cvik přidal) a `completed_at` (datum, kdy ho označil za splněný; `NULL` = ještě nesplněn). Per-user state machine z Monga (`user_level`, `consecutive_successes`, `level_history`) přijde v další migraci — pole se loaderem zatím ignorují.
 
 ## Instalace
 
@@ -261,7 +261,7 @@ uv run python seed/load_exercises_from_mongo_dump.py
 # 6. ověření obsahu
 psql "$DATABASE_URL" -c "SELECT name, muscle_engagement FROM catalog ORDER BY name;"
 psql "$DATABASE_URL" -c "SELECT email, sub, height_cm, weight_kg, created_at FROM users;"
-psql "$DATABASE_URL" -c "SELECT user_email, exercise_name, completed, created_at FROM exercises ORDER BY exercise_name;"
+psql "$DATABASE_URL" -c "SELECT user_email, exercise_name, completed_at, created_at FROM exercises ORDER BY exercise_name;"
 
 # 7. druhé spuštění seedu musí být no-op pro počet řádků (ON CONFLICT)
 uv run python seed/load_catalog_from_mongo_dump.py

@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from app.auth import GoogleUser, get_current_user
 from app.sql_db import fetchone
 
-router = APIRouter(prefix="/workout", tags=["workout"])
+router = APIRouter(prefix="/exercise", tags=["exercise"])
 
 
 class WorkoutMediaResponse(BaseModel):

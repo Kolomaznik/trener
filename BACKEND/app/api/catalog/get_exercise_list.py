@@ -32,7 +32,7 @@ async def get_exercise_list(
         SELECT c.name, c.title,
                CASE
                    WHEN e.exercise_name IS NULL THEN 'not_added'
-                   WHEN e.completed THEN 'completed'
+                   WHEN e.completed_at IS NOT NULL THEN 'completed'
                    ELSE 'in_progress'
                END AS status
           FROM catalog c
