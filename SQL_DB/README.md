@@ -22,8 +22,12 @@ erDiagram
         text english_name
         text description
         jsonb goal
-        jsonb media
         jsonb muscle_engagement
+    }
+    MEDIA {
+        text exercise_name PK,FK
+        text name PK
+        text data
     }
     USERS {
         text email PK
@@ -42,9 +46,20 @@ erDiagram
         bool completed
         timestamptz created_at
     }
+    CATALOG ||--o{ MEDIA : "has"
     USERS ||--o{ EXERCISES : "has"
     CATALOG ||--o{ EXERCISES : "referenced by"
 ```
+
+### `media`
+
+Jeden řádek = jeden obrázek nebo video k cviku. Composite PK je `(exercise_name, name)`; `exercise_name` je FK do `catalog(name)` s `ON DELETE CASCADE`. `data` drží celý `data:image/...;base64,...` URI tak, jak přišel z dumpu.
+
+| Sloupec | Typ | Null | Popis |
+| --- | --- | --- | --- |
+| `exercise_name` | `TEXT` PK, FK → `catalog(name)` ON DELETE CASCADE | NOT NULL | Cvik, ke kterému media patří. |
+| `name` | `TEXT` PK | NOT NULL | Slot v rámci cviku — např. `front`, `back`, `demo`. |
+| `data` | `TEXT` | NOT NULL | `data:image/...;base64,...` URI nebo HTTPS URL. Backend ji posílá frontendu beze změny. |
 
 ## JSONB columns
 
@@ -68,26 +83,6 @@ SELECT name, (goal->>'sets')::int AS sets, (goal->>'reps')::int AS reps
   FROM catalog
  WHERE (goal->>'reps')::int >= 20
  ORDER BY (goal->>'reps')::int DESC;
-```
-
-### `catalog.media`
-
-Variabilní mapa `<key> → string`. Hodnoty mohou být HTTPS URL nebo inline `data:` URI s base64 obrázkem/videem (kratší než externí upload, ale řádově větší než URL).
-
-```json
-{
-  "front": "data:image/webp;base64,UklGRiQAAABXRUJQVlA4IBgAAAAwAQ…",
-  "back":  "data:image/webp;base64,UklGRkgAAABXRUJQVlA4IDw…",
-  "demo":  "https://cdn.example/pushups_demo.mp4"
-}
-```
-
-> JSONB blob s base64 daty se v Postgresu automaticky TOAST-uje a komprimuje, ale ovlivňuje velikost záloh a cenu I/O na hostovaných službách (Supabase, Neon). Pro nový obsah preferuj URL na object storage.
-
-Příklad dotazu:
-
-```sql
-SELECT name, jsonb_object_keys(media) AS media_key FROM catalog;
 ```
 
 ### `catalog.muscle_engagement`

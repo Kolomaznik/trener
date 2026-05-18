@@ -13,6 +13,8 @@ from app.api.user.get_profile import router as user_profile_get_router
 from app.api.user.patch_profile import router as user_profile_patch_router
 from app.api.user_exercises.get import router as user_exercises_get_router
 from app.api.user_exercises.post import router as user_exercises_post_router
+from app.api.workout.get_exercise_list import router as workout_router
+from app.api.workout.get_media import router as workout_media_router
 from config import settings
 
 app = FastAPI(title=settings.app_name)
@@ -43,6 +45,8 @@ app.include_router(user_exercises_get_router)
 app.include_router(user_exercises_post_router)
 app.include_router(user_profile_get_router)
 app.include_router(user_profile_patch_router)
+app.include_router(workout_router)
+app.include_router(workout_media_router)
 app.include_router(trening_vezne_router)
 
 

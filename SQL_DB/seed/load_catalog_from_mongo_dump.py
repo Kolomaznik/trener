@@ -1,12 +1,15 @@
-"""Seed PostgreSQL ``catalog`` tabulky ze stromu JSON souborů vytvořeného
-``MONGO_DB/dump.py``.
+"""Seed PostgreSQL ``catalog`` (a souvisejících ``media``) tabulek ze stromu
+JSON souborů vytvořeného ``MONGO_DB/dump.py``.
 
 Načte připojení z ``../.env`` (stejně jako ``manage.py``), vybere dump z
 ``../MONGO_DB/dumps/`` (default = nejnovější) a upsertuje každý dokument do
-tabulky ``catalog`` přes ``INSERT … ON CONFLICT (name) DO UPDATE``.
+tabulky ``catalog`` přes ``INSERT … ON CONFLICT (name) DO UPDATE``. Současně
+rozloží Mongo pole ``media`` (dict ``{slot: data_uri}``) do samostatných
+řádků v tabulce ``media`` (composite PK ``(exercise_name, name)``).
 
 Skripty není migrace — schéma řeší ``manage.py`` / yoyo. Tenhle loader je
-idempotentní a může se přespustit kdykoliv proti čerstvějšímu dumpu.
+idempotentní a může se přespustit kdykoliv proti čerstvějšímu dumpu; obě
+upserty běží ve stejné transakci.
 """
 
 from __future__ import annotations
@@ -32,7 +35,7 @@ DUMPS_DIR = ROOT.parent / "MONGO_DB" / "dumps"
 # Musí být v souladu s migration 20260516120000_schema_initial_catalog.py.
 # Pořadí je závazné — používá se přímo v INSERT statementu.
 SCALAR_COLUMNS = ("name", "title", "english_name", "description")
-JSONB_COLUMNS = ("goal", "media", "muscle_engagement")
+JSONB_COLUMNS = ("goal", "muscle_engagement")
 ALL_COLUMNS = SCALAR_COLUMNS + JSONB_COLUMNS
 
 # INSERT INTO catalog (name, title, …) VALUES (%s, %s, …)
@@ -40,9 +43,14 @@ ALL_COLUMNS = SCALAR_COLUMNS + JSONB_COLUMNS
 _PLACEHOLDERS = ", ".join(["%s"] * len(ALL_COLUMNS))
 _COLUMNS_SQL = ", ".join(ALL_COLUMNS)
 _UPDATE_SET = ", ".join(f"{c} = EXCLUDED.{c}" for c in ALL_COLUMNS if c != "name")
-INSERT_SQL = (
+CATALOG_INSERT_SQL = (
     f"INSERT INTO catalog ({_COLUMNS_SQL}) VALUES ({_PLACEHOLDERS}) "
     f"ON CONFLICT (name) DO UPDATE SET {_UPDATE_SET}"
+)
+
+MEDIA_INSERT_SQL = (
+    "INSERT INTO media (exercise_name, name, data) VALUES (%s, %s, %s) "
+    "ON CONFLICT (exercise_name, name) DO UPDATE SET data = EXCLUDED.data"
 )
 
 
@@ -88,28 +96,38 @@ def _extract_goal(doc: dict) -> dict:
     }
 
 
-def _row_from_doc(doc: dict) -> tuple:
+def _exercise_name(doc: dict) -> str:
     name = doc.get("name") or doc.get("_id")
     if not name:
         raise ValueError(f"Dokument bez 'name'/'_id': {doc!r}")
+    return name
 
+
+def _catalog_row(doc: dict) -> tuple:
     # Mongo field is ``muscle_engagement_percent`` — v PG je sloupec
     # přejmenovaný na ``muscle_engagement`` (procenta jsou implicitní).
     return (
-        name,
+        _exercise_name(doc),
         doc["title"],
         doc.get("english_name"),
         doc["description"],
         Jsonb(_extract_goal(doc)),
-        Jsonb(doc.get("media") or {}),
         Jsonb(doc.get("muscle_engagement_percent") or {}),
     )
+
+
+def _media_rows(doc: dict) -> list[tuple]:
+    """Rozloží ``doc["media"]`` (dict ``{slot: data_uri}``) na řádky pro
+    tabulku ``media``. Prázdné nebo chybějící ``media`` -> prázdný seznam."""
+    name = _exercise_name(doc)
+    media = doc.get("media") or {}
+    return [(name, slot, data) for slot, data in media.items()]
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="load_catalog_from_mongo_dump",
-        description="Seed catalog table from a MongoDB dump (JSON tree).",
+        description="Seed catalog + media tables from a MongoDB dump (JSON tree).",
     )
     parser.add_argument(
         "--dump",
@@ -124,21 +142,28 @@ def main() -> None:
     if not exercises_dir.is_dir():
         sys.exit(f"V dumpu {dump_dir.name} chybí adresář 'exercises'.")
 
-    rows: list[tuple] = []
+    catalog_rows: list[tuple] = []
+    media_rows: list[tuple] = []
     for path in sorted(exercises_dir.glob("*.json")):
         with path.open("r", encoding="utf-8") as fh:
             doc = json.load(fh)
-        rows.append(_row_from_doc(doc))
+        catalog_rows.append(_catalog_row(doc))
+        media_rows.extend(_media_rows(doc))
 
-    if not rows:
+    if not catalog_rows:
         sys.exit(f"V {exercises_dir} nejsou žádné JSON soubory.")
 
     with psycopg.connect(database_url, autocommit=False) as conn:
         with conn.cursor() as cur:
-            cur.executemany(INSERT_SQL, rows)
+            cur.executemany(CATALOG_INSERT_SQL, catalog_rows)
+            if media_rows:
+                cur.executemany(MEDIA_INSERT_SQL, media_rows)
         conn.commit()
 
-    print(f"{len(rows)} catalog rows loaded from {dump_dir.name}")
+    print(
+        f"{len(catalog_rows)} catalog rows, {len(media_rows)} media rows "
+        f"loaded from {dump_dir.name}"
+    )
 
 
 if __name__ == "__main__":
