@@ -26,7 +26,7 @@ class UserSettingsResponse(BaseModel):
     created_at: datetime
 
 
-@router.get("/user/settings", response_model=UserSettingsResponse)
+@router.get("/user", response_model=UserSettingsResponse)
 async def get_user_settings(
     user: GoogleUser = Depends(get_current_user),
 ) -> UserSettingsResponse:

@@ -51,10 +51,26 @@ erDiagram
         date day PK
         jsonb plan
     }
+    WORKOUT_SERIES {
+        text user_email PK,FK
+        date day PK,FK
+        text exercise_name PK,FK
+        time time PK
+        int set_number
+        int total_reps
+        int target_reps
+        double total_duration_sec
+        jsonb counting
+        jsonb evaluation
+        text user_level
+    }
     CATALOG ||--o{ CATALOG_MEDIA : "has"
     USERS ||--o{ EXERCISES : "has"
     USERS ||--o{ WORKOUT : "has"
     CATALOG ||--o{ EXERCISES : "referenced by"
+    EXERCISES }o--o{ WORKOUT : "in plan"
+    WORKOUT ||--o{ WORKOUT_SERIES : "logs"
+    CATALOG ||--o{ WORKOUT_SERIES : "set of"
 ```
 
 ### `catalog_media`
@@ -66,6 +82,26 @@ Jeden řádek = jeden obrázek nebo video k cviku. Composite PK je `(exercise_na
 | `exercise_name` | `TEXT` PK, FK → `catalog(name)` ON DELETE CASCADE | NOT NULL | Cvik, ke kterému media patří. |
 | `name` | `TEXT` PK | NOT NULL | Slot v rámci cviku — např. `front`, `back`, `demo`. |
 | `data` | `TEXT` | NOT NULL | `data:image/...;base64,...` URI nebo HTTPS URL. Backend ji posílá frontendu beze změny. |
+
+### `workout_series`
+
+Jeden řádek = jeden zalogovaný set. Composite PK je `(user_email, day, exercise_name, time)`. Dvě FK:
+- `exercise_name` → `catalog(name)` ON DELETE CASCADE
+- `(user_email, day)` → `workout(user_email, day)` ON DELETE CASCADE (vyžaduje existující parent workout)
+
+| Sloupec | Typ | Null | Popis |
+| --- | --- | --- | --- |
+| `user_email` | `TEXT` PK, FK | NOT NULL | Vlastník workoutu. |
+| `day` | `DATE` PK, FK | NOT NULL | Datum workoutu (z parent `workout.day`). |
+| `exercise_name` | `TEXT` PK, FK → `catalog(name)` | NOT NULL | Cvik, ke kterému set patří. |
+| `time` | `TIME` PK | NOT NULL | Wall-clock čas startu setu (microsecond precision); diskriminátor mezi sety stejného cviku v rámci dne. |
+| `set_number` | `INT` | NOT NULL | Pořadí setu v rámci cviku v ten den (1-indexed). |
+| `total_reps` | `INT` | NOT NULL | Skutečný počet opakování v setu. |
+| `target_reps` | `INT` | NULL | Cíl pro set (z `catalog.goal.reps` v okamžiku startu); chybí na starších záznamech. |
+| `total_duration_sec` | `DOUBLE PRECISION` | NOT NULL | Délka setu v sekundách. |
+| `counting` | `JSONB` | NOT NULL `DEFAULT '[]'::jsonb` | Pole per-rep eventů (viz [JSONB columns](#jsonb-columns)). |
+| `evaluation` | `JSONB` | NULL | Vyhodnocení setu (pace, trend, recommendation) — viz [JSONB columns](#jsonb-columns). |
+| `user_level` | `TEXT` | NULL | Tier uživatele v okamžiku setu (`beginner`/`intermediate`/`mastery`). |
 
 ## JSONB columns
 
@@ -132,6 +168,56 @@ JSONB pole jmen cviků (`exercise_name`), jak byly aktivní (`exercises.complete
 ```
 
 `PUT /workout` upsertuje řádek `(user_email, CURRENT_DATE)`. První volání naplní `plan` z `exercises`; další volání v ten samý den jen vrátí už uložený plan (ON CONFLICT DO NOTHING).
+
+### `workout_series.counting`
+
+Pole per-rep eventů z voice-counting flow. Každý prvek nese vlastní timestamp + zda byl skutečně rozpoznán nebo interpolován mezi dvěma rozpoznanými.
+
+```json
+[
+  {"value": 1, "token": "1", "timestamp_ms": 1778309068671, "timestamp_iso": "2026-05-09T06:44:28.671000+00:00", "interpolated": true},
+  {"value": 2, "token": "2", "timestamp_ms": 1778309071686, "timestamp_iso": "2026-05-09T06:44:31.686Z", "interpolated": false},
+  {"value": 3, "token": "3", "timestamp_ms": 1778309072123, "timestamp_iso": "2026-05-09T06:44:32.123Z", "interpolated": false}
+]
+```
+
+Příklad dotazu:
+
+```sql
+-- Sety, kde víc než polovina opakování byla interpolovaná
+SELECT user_email, day, exercise_name, time
+  FROM workout_series
+ WHERE jsonb_array_length(counting) > 0
+   AND (
+     SELECT count(*) FILTER (WHERE (e->>'interpolated')::bool)
+       FROM jsonb_array_elements(counting) AS e
+   ) * 2 > jsonb_array_length(counting);
+```
+
+### `workout_series.evaluation`
+
+Fixní struktura — vyhodnocení setu vůči tempu, trendu a target_reps. `NULL` pro starší záznamy, které ho nemají.
+
+```json
+{
+  "pace_label": "too_fast",
+  "trend_label": "steady",
+  "repetition_label": "too_few",
+  "avg_interval_sec": 0.44,
+  "recommendation": "Tempo je příliš rychlé. Zpomal na 6s/rep a soustřeď se na formu.",
+  "is_completed": false
+}
+```
+
+Příklad dotazu:
+
+```sql
+-- Splněné sety za poslední týden
+SELECT user_email, day, exercise_name, total_reps
+  FROM workout_series
+ WHERE day >= CURRENT_DATE - INTERVAL '7 days'
+   AND (evaluation->>'is_completed')::bool;
+```
 
 Tabulka `users` nemá žádné JSONB sloupce — celý řádek jsou scalary.
 
@@ -232,6 +318,17 @@ uv run python seed/load_workouts_from_mongo_dump.py --dump 2026-05-18_213640
 ```
 
 Vyžaduje, aby už byly nasypané `users` a `exercises` (jinak `plan` skončí jako prázdné pole nebo páry s neznámým `user_email` se přeskočí). Idempotentní přes `ON CONFLICT (user_email, day) DO NOTHING` — re-run jen přidá nové dvojice.
+
+### `workout_series`
+
+Backfill set-level záznamů z Mongo `exercise_series`. Pro každý dokument vytvoří jeden řádek `(user_email, day, exercise_name, time)` se všemi metrickými poli (`counting`, `evaluation`, `total_reps`, ...).
+
+```bash
+uv run python seed/load_series_from_mongo_dump.py
+uv run python seed/load_series_from_mongo_dump.py --dump 2026-05-18_213640
+```
+
+Vyžaduje už nasypané `workouts` (composite FK target — bez parent řádku v `workout` INSERT spadne). Páry s neznámou `(user_email, day)` se přeskočí s warningem. Idempotentní přes `ON CONFLICT (user_email, day, exercise_name, time) DO NOTHING`.
 
 ## Naming konvence migrací
 

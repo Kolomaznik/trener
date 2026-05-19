@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from app.auth import GoogleUser, get_current_user
 from app.sql_db import get_pool
 
-router = APIRouter(prefix="/workout", tags=["workout"])
+router = APIRouter(prefix="/user/workout", tags=["user"])
 
 
 class WorkoutTodayItem(BaseModel):

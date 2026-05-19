@@ -20,7 +20,7 @@ class UserSettingsPatch(BaseModel):
     birth_year: int | None = Field(default=None, ge=1900, le=datetime.now().year)
 
 
-@router.patch("/user/settings", status_code=status.HTTP_204_NO_CONTENT)
+@router.patch("/user", status_code=status.HTTP_204_NO_CONTENT)
 async def patch_user_settings(
     patch: UserSettingsPatch = Body(...),
     user: GoogleUser = Depends(get_current_user),
@@ -42,5 +42,5 @@ async def patch_user_settings(
     if exists is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User profile not found. Call GET /user/settings first.",
+            detail="User profile not found. Call GET /user first.",
         )
